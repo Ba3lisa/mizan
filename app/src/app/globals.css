@@ -1,1 +1,240 @@
 @import "tailwindcss";
+
+/* ================================================================
+   MIZAN — Design System
+   Dark-first Egyptian government transparency portal
+   Aesthetic: Dark editorial — Bloomberg meets Arabic calligraphy
+   ================================================================ */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar-background: var(--sidebar-background);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Noto Kufi Arabic", "Source Serif 4", Georgia, serif;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+}
+
+/* ── DARK theme (DEFAULT) ────────────────────────────── */
+:root {
+  --background: #0F1117;
+  --foreground: #E8ECF4;
+  --card: #181C25;
+  --card-foreground: #E8ECF4;
+  --popover: #1E2330;
+  --popover-foreground: #E8ECF4;
+  --primary: #C9A84C;
+  --primary-foreground: #0F1117;
+  --secondary: #1E2330;
+  --secondary-foreground: #E8ECF4;
+  --muted: #1A1E28;
+  --muted-foreground: #7A8299;
+  --accent: #1E2330;
+  --accent-foreground: #C9A84C;
+  --destructive: #E5484D;
+  --destructive-foreground: #FFFFFF;
+  --border: #252A36;
+  --input: #252A36;
+  --ring: #C9A84C;
+  --radius: 0.75rem;
+
+  --chart-1: #C9A84C;
+  --chart-2: #6C8EEF;
+  --chart-3: #2EC4B6;
+  --chart-4: #E76F51;
+  --chart-5: #9B72CF;
+
+  --sidebar-background: #181C25;
+  --sidebar-foreground: #E8ECF4;
+  --sidebar-primary: #C9A84C;
+  --sidebar-primary-foreground: #0F1117;
+  --sidebar-accent: #1E2330;
+  --sidebar-accent-foreground: #E8ECF4;
+  --sidebar-border: #252A36;
+  --sidebar-ring: #C9A84C;
+
+  /* backward-compat aliases */
+  --mizan-bg: var(--background);
+  --mizan-surface: var(--card);
+  --mizan-surface-hover: var(--muted);
+  --mizan-border: var(--border);
+  --mizan-border-strong: #333A4A;
+  --mizan-text-primary: var(--foreground);
+  --mizan-text-secondary: var(--muted-foreground);
+  --mizan-text-tertiary: #525C72;
+  --mizan-accent: var(--primary);
+  --mizan-accent-muted: rgba(201,168,76,0.12);
+  --mizan-success: #2EC4B6;
+  --mizan-danger: #E5484D;
+  --surface: var(--card);
+  --surface-elevated: var(--popover);
+  --surface-hover: var(--muted);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-tertiary: #525C72;
+  --accent-muted: rgba(201,168,76,0.12);
+  --border-strong: #333A4A;
+
+  --font-display: "Noto Kufi Arabic", "Source Serif 4", Georgia, serif;
+  --font-body: "Source Serif 4", Georgia, serif;
+  --font-data: "JetBrains Mono", monospace;
+  --header-h: 3.5rem;
+  --max-width: 1320px;
+}
+
+/* ── LIGHT theme ─────────────────────────────────────── */
+[data-theme="light"] {
+  --background: #FAFAF8;
+  --foreground: #1A1A1A;
+  --card: #FFFFFF;
+  --card-foreground: #1A1A1A;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1A1A;
+  --primary: #9E7C2D;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F3F1EC;
+  --secondary-foreground: #1A1A1A;
+  --muted: #F3F1EC;
+  --muted-foreground: #6B6B6B;
+  --accent: #F3F1EC;
+  --accent-foreground: #9E7C2D;
+  --destructive: #DC2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #E5E2DA;
+  --input: #E5E2DA;
+  --ring: #9E7C2D;
+
+  --chart-1: #9E7C2D;
+  --chart-2: #4A6BDB;
+  --chart-3: #0D9488;
+  --chart-4: #DC6843;
+  --chart-5: #7E4FB5;
+
+  --sidebar-background: #FFFFFF;
+  --sidebar-foreground: #1A1A1A;
+  --sidebar-primary: #9E7C2D;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F3F1EC;
+  --sidebar-accent-foreground: #1A1A1A;
+  --sidebar-border: #E5E2DA;
+  --sidebar-ring: #9E7C2D;
+
+  --mizan-bg: var(--background);
+  --mizan-surface: var(--card);
+  --mizan-surface-hover: var(--muted);
+  --mizan-border: var(--border);
+  --mizan-border-strong: #CCC8BC;
+  --mizan-text-primary: var(--foreground);
+  --mizan-text-secondary: var(--muted-foreground);
+  --mizan-text-tertiary: #999;
+  --mizan-accent: var(--primary);
+  --mizan-accent-muted: rgba(158,124,45,0.08);
+  --mizan-success: #0D9488;
+  --mizan-danger: #DC2626;
+  --surface: var(--card);
+  --surface-elevated: var(--popover);
+  --surface-hover: var(--muted);
+  --text-primary: var(--foreground);
+  --text-secondary: var(--muted-foreground);
+  --text-tertiary: #999;
+  --accent-muted: rgba(158,124,45,0.08);
+  --border-strong: #CCC8BC;
+}
+
+/* ================================================================ */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+html[dir="rtl"] { font-family: var(--font-display); line-height: 1.8; letter-spacing: 0; }
+html[dir="ltr"] { font-family: var(--font-body); line-height: 1.65; }
+
+.data-number {
+  font-family: var(--font-data);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+[dir="rtl"] .data-number { direction: ltr; unicode-bidi: embed; }
+
+.container-page {
+  max-width: var(--max-width);
+  margin: 0 auto;
+  padding-inline: 1.5rem;
+}
+@media (min-width: 1024px) { .container-page { padding-inline: 2rem; } }
+
+.page-content {
+  padding-top: calc(var(--header-h) + 2rem);
+  padding-bottom: 4rem;
+}
+
+/* ── Animations ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes pulse-glow {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(201,168,76,0.4); }
+  50% { opacity: 0.7; box-shadow: 0 0 8px 2px rgba(201,168,76,0.15); }
+}
+.animate-fade-up { animation: fade-up 600ms cubic-bezier(0.16,1,0.3,1) both; }
+.skeleton {
+  background: linear-gradient(90deg, var(--card) 25%, var(--muted) 50%, var(--card) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+.last-updated {
+  display: inline-flex; align-items: center; gap: 0.375rem;
+  font-size: 0.75rem; color: var(--muted-foreground);
+}
+.last-updated .pulse-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #2EC4B6; animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

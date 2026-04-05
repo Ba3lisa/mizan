@@ -9,7 +9,26 @@
 
 ---
 
-## 1. 
+## 1. Data Philosophy
+
+**Every number on Mizan MUST be backed by a source.** No data without citation. No hardcoded numbers without a reference URL. This is a transparency platform — the data itself must be transparent.
+
+### Rules:
+- ALL data lives in Convex (single source of truth)
+- ALL data has a `sourceUrl` field pointing to where it was obtained
+- The AI cron agent (every 6h) validates and refreshes data from official sources
+- The `/transparency` page shows a full audit trail of what the agent did
+- Frontend pages read from Convex — they never hardcode data that should be dynamic
+- When data can't be sourced, it must be clearly marked as "estimated" or "unverified"
+- Currency: all financial data supports EGP/USD toggle via CurrencyProvider
+
+### Data sources (in priority order):
+1. World Bank API (debt, GDP, economic indicators) — automated
+2. Central Bank of Egypt (exchange rates, reserves) — automated
+3. Ministry of Finance (budget) — AI-parsed from mof.gov.eg
+4. Cabinet.gov.eg (government structure) — AI-parsed, human-reviewed
+5. Parliament.gov.eg (members) — manual curation (JS-rendered SPA)
+6. CAPMAS (statistics) — manual + AI-assisted
 
 Managed by Father of Projects (FoP). Stack: nextjs-convex.
 
@@ -23,6 +42,7 @@ Managed by Father of Projects (FoP). Stack: nextjs-convex.
 
 ### Before EVERY code change, read:
 1. `convex_rules.txt` — for ALL Convex code
+2. `app/convex/_generated/ai/guidelines.md` — Convex AI guidelines and patterns
 
 ### Code Quality
 - TypeScript ONLY (never JavaScript)

@@ -1,0 +1,343 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import { useLanguage } from "@/components/providers";
+import { useCurrency } from "@/components/providers";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { AlertTriangle } from "lucide-react";
+
+// ─── Tax brackets (Egypt 2024) ────────────────────────────────────────────────
+
+interface Bracket {
+  from: number;
+  to: number | null;
+  rate: number;
+}
+
+const TAX_BRACKETS: Bracket[] = [
+  { from: 0, to: 15000, rate: 0 },
+  { from: 15001, to: 30000, rate: 0.025 },
+  { from: 30001, to: 45000, rate: 0.1 },
+  { from: 45001, to: 60000, rate: 0.15 },
+  { from: 60001, to: 200000, rate: 0.2 },
+  { from: 200001, to: 400000, rate: 0.225 },
+  { from: 400001, to: null, rate: 0.25 },
+];
+
+// ─── Spending categories ──────────────────────────────────────────────────────
+
+interface SpendingCategory {
+  key: string;
+  nameAr: string;
+  nameEn: string;
+  pct: number;
+  color: string;
+}
+
+const SPENDING: SpendingCategory[] = [
+  { key: "debt", nameAr: "خدمة الدين", nameEn: "Debt Service", pct: 22.6, color: "#E5484D" },
+  { key: "wages", nameAr: "الأجور", nameEn: "Wages", pct: 18.3, color: "#C9A84C" },
+  { key: "subsidies", nameAr: "الدعم", nameEn: "Subsidies", pct: 13.6, color: "#F76B15" },
+  { key: "infra", nameAr: "البنية التحتية", nameEn: "Infrastructure", pct: 9.7, color: "#2EC4B6" },
+  { key: "edu", nameAr: "التعليم", nameEn: "Education", pct: 7.0, color: "#6C8EEF" },
+  { key: "health", nameAr: "الصحة", nameEn: "Health", pct: 4.7, color: "#3FC380" },
+  { key: "defence", nameAr: "الدفاع", nameEn: "Defence", pct: 3.7, color: "#8E8E93" },
+  { key: "other", nameAr: "أخرى", nameEn: "Other", pct: 20.3, color: "#5E5CE6" },
+];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function calcTax(salary: number): number {
+  let tax = 0;
+  for (const bracket of TAX_BRACKETS) {
+    if (salary <= bracket.from - 1) break;
+    const taxable = bracket.to === null
+      ? salary - bracket.from + 1
+      : Math.min(salary, bracket.to) - bracket.from + 1;
+    if (taxable > 0) tax += taxable * bracket.rate;
+  }
+  return Math.max(0, tax);
+}
+
+function fmtEGP(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return n.toFixed(0);
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function SpendingBar({
+  category,
+  taxPaid,
+  isAr,
+}: {
+  category: SpendingCategory;
+  taxPaid: number;
+  isAr: boolean;
+}) {
+  const amount = (taxPaid * category.pct) / 100;
+  return (
+    <div className="flex items-center gap-3">
+      <div className="w-32 flex-shrink-0 text-right" dir="ltr">
+        <span className="text-xs text-muted-foreground whitespace-nowrap">
+          {isAr ? category.nameAr : category.nameEn}
+        </span>
+      </div>
+      <div className="flex-1 relative h-7 bg-muted rounded overflow-hidden">
+        <div
+          className="absolute inset-y-0 start-0 rounded transition-all duration-700"
+          style={{ width: `${category.pct}%`, background: category.color }}
+        />
+        <span className="absolute inset-y-0 start-2 flex items-center text-[0.65rem] font-mono font-bold text-white/90 mix-blend-plus-lighter">
+          {category.pct}%
+        </span>
+      </div>
+      <div className="w-28 flex-shrink-0 text-end">
+        <span className="font-mono text-sm font-bold text-foreground">
+          {fmtEGP(amount)}{" "}
+          <span className="text-[0.625rem] text-muted-foreground font-normal">EGP</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+const MIN_SALARY = 10_000;
+const MAX_SALARY = 10_000_000;
+const DEFAULT_SALARY = 120_000;
+
+export default function YourSharePage() {
+  const { lang, dir } = useLanguage();
+  const isAr = lang === "ar";
+  const [inputVal, setInputVal] = useState<string>(DEFAULT_SALARY.toLocaleString());
+  const [salary, setSalary] = useState<number>(DEFAULT_SALARY);
+
+  const handleInput = useCallback((raw: string) => {
+    setInputVal(raw);
+    const n = parseInt(raw.replace(/,/g, ""), 10);
+    if (!isNaN(n) && n >= 0) {
+      setSalary(Math.min(n, MAX_SALARY));
+    }
+  }, []);
+
+  const handleSlider = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const n = parseInt(e.target.value, 10);
+    setSalary(n);
+    setInputVal(n.toLocaleString());
+  }, []);
+
+  const taxPaid = calcTax(salary);
+  const effectiveRate = salary > 0 ? (taxPaid / salary) * 100 : 0;
+  const debtAmount = (taxPaid * 22.6) / 100;
+  const eduAmount = (taxPaid * 7.0) / 100;
+  const healthAmount = (taxPaid * 4.7) / 100;
+
+  return (
+    <div className="page-content" dir={dir}>
+      <div className="container-page">
+        {/* Header */}
+        <div className="mb-10">
+          <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">
+            {isAr ? "الميزانية الشخصية" : "Personal Budget"}
+          </p>
+          <h1 className="text-3xl md:text-4xl font-black mb-2">
+            {isAr ? "أين تذهب ضرائبك؟" : "Where Do Your Taxes Go?"}
+          </h1>
+          <p className="text-muted-foreground text-sm max-w-lg">
+            {isAr
+              ? "أدخل راتبك السنوي واكتشف كيف تُوزَّع ضرائبك على بنود الموازنة المصرية ٢٠٢٤"
+              : "Enter your annual salary and see how your taxes are distributed across Egypt's 2024 budget"}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* ─── Input Column ─────────────────────────────────────────────── */}
+          <div className="lg:col-span-1 space-y-6">
+            <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
+              <CardContent className="p-6 space-y-5">
+                <div>
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-widest block mb-2">
+                    {isAr ? "الراتب السنوي (جنيه مصري)" : "Annual Salary (EGP)"}
+                  </label>
+                  <div className="relative">
+                    <span className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-mono">ج.م</span>
+                    <Input
+                      value={inputVal}
+                      onChange={(e) => handleInput(e.target.value)}
+                      className="ps-10 font-mono text-lg font-bold"
+                      placeholder="120,000"
+                      dir="ltr"
+                    />
+                  </div>
+                </div>
+
+                {/* Slider */}
+                <div className="space-y-2">
+                  <input
+                    type="range"
+                    min={MIN_SALARY}
+                    max={MAX_SALARY}
+                    step={5000}
+                    value={Math.min(Math.max(salary, MIN_SALARY), MAX_SALARY)}
+                    onChange={handleSlider}
+                    className="w-full accent-[#C9A84C] cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono" dir="ltr">
+                    <span>10K</span>
+                    <span>10M</span>
+                  </div>
+                </div>
+
+                {/* Quick picks */}
+                <div className="flex flex-wrap gap-2">
+                  {[60_000, 120_000, 300_000, 600_000].map((v) => (
+                    <button
+                      key={v}
+                      onClick={() => { setSalary(v); setInputVal(v.toLocaleString()); }}
+                      className="text-[0.625rem] font-mono px-2.5 py-1 rounded-full border border-border hover:border-primary/50 hover:text-primary text-muted-foreground transition-colors"
+                    >
+                      {v >= 1_000_000 ? `${v / 1_000_000}M` : `${v / 1_000}K`}
+                    </button>
+                  ))}
+                </div>
+
+                <Separator />
+
+                {/* Tax summary */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">{isAr ? "الراتب السنوي" : "Annual Salary"}</span>
+                    <span className="font-mono text-sm font-bold">{salary.toLocaleString()} EGP</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">{isAr ? "إجمالي الضريبة" : "Total Tax Paid"}</span>
+                    <span className="font-mono text-sm font-bold text-primary">{taxPaid.toLocaleString(undefined, { maximumFractionDigits: 0 })} EGP</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">{isAr ? "المعدل الفعلي" : "Effective Rate"}</span>
+                    <Badge variant="secondary" className="font-mono text-xs">
+                      {effectiveRate.toFixed(1)}%
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Tax bracket info */}
+            <Card className="border-border/60 bg-card/60">
+              <CardContent className="p-5">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+                  {isAr ? "شرائح الضريبة ٢٠٢٤" : "2024 Tax Brackets"}
+                </p>
+                <div className="space-y-1.5" dir="ltr">
+                  {TAX_BRACKETS.map((b, i) => {
+                    const isActive = salary > b.from && (b.to === null || salary <= b.to);
+                    return (
+                      <div
+                        key={i}
+                        className={`flex items-center justify-between text-xs rounded px-2 py-1 transition-colors ${
+                          isActive ? "bg-primary/10 text-primary font-semibold" : "text-muted-foreground"
+                        }`}
+                      >
+                        <span>
+                          {b.from.toLocaleString()}
+                          {b.to ? ` – ${b.to.toLocaleString()}` : "+"}
+                        </span>
+                        <span className="font-mono">{(b.rate * 100).toFixed(1)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[0.625rem] text-muted-foreground mt-3">
+                  {isAr ? "المصدر: مصلحة الضرائب المصرية ٢٠٢٤" : "Source: Egyptian Tax Authority 2024"}
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* ─── Breakdown Column ─────────────────────────────────────────── */}
+          <div className="lg:col-span-2 space-y-6">
+            {taxPaid === 0 ? (
+              <Card className="border-border/60 bg-card/60">
+                <CardContent className="p-8 text-center text-muted-foreground">
+                  <p className="text-sm">
+                    {isAr
+                      ? "راتبك أقل من الحد الأدنى الخاضع للضريبة (١٥,٠٠٠ جنيه)"
+                      : "Your salary is below the taxable threshold (15,000 EGP)"}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
+                  <CardContent className="p-6">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-5">
+                      {isAr ? "كيف تُوزَّع ضرائبك" : "How Your Taxes Are Distributed"}
+                    </p>
+                    <div className="space-y-3">
+                      {SPENDING.map((cat) => (
+                        <SpendingBar key={cat.key} category={cat} taxPaid={taxPaid} isAr={isAr} />
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Highlight callout */}
+                <Card className="border-[#E5484D]/30 bg-[#E5484D]/5">
+                  <CardContent className="p-5 flex items-start gap-4">
+                    <AlertTriangle size={18} className="text-[#E5484D] flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-foreground mb-1">
+                        {isAr
+                          ? `${fmtEGP(debtAmount)} جنيه من ضرائبك تذهب لفوائد الديون`
+                          : `${fmtEGP(debtAmount)} EGP of your taxes goes to debt interest`}
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        {isAr
+                          ? `أكثر من التعليم (${fmtEGP(eduAmount)} جنيه) والصحة (${fmtEGP(healthAmount)} جنيه) مجتمعَين.`
+                          : `More than education (${fmtEGP(eduAmount)} EGP) and health (${fmtEGP(healthAmount)} EGP) combined.`}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Category cards grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {SPENDING.map((cat) => {
+                    const amount = (taxPaid * cat.pct) / 100;
+                    return (
+                      <Card key={cat.key} className="border-border/60 bg-card/60">
+                        <CardContent className="p-4">
+                          <div className="w-2 h-2 rounded-full mb-2" style={{ background: cat.color }} />
+                          <p className="text-[0.625rem] text-muted-foreground mb-1 leading-tight">
+                            {isAr ? cat.nameAr : cat.nameEn}
+                          </p>
+                          <p className="font-mono text-base font-bold text-foreground leading-tight">
+                            {fmtEGP(amount)}
+                          </p>
+                          <p className="text-[0.625rem] text-muted-foreground">EGP / {isAr ? "سنة" : "yr"}</p>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+
+                <p className="text-[0.625rem] text-muted-foreground/60">
+                  {isAr
+                    ? "البيانات: وزارة المالية — الموازنة العامة للدولة ٢٠٢٤/٢٠٢٥"
+                    : "Source: Ministry of Finance — General State Budget 2024/2025"}
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
