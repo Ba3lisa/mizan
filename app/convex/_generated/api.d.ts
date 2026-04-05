@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as adminDashboard from "../adminDashboard.js";
 import type * as agents_dataAgent from "../agents/dataAgent.js";
+import type * as agents_githubAgent from "../agents/githubAgent.js";
 import type * as agents_validators from "../agents/validators.js";
 import type * as budget from "../budget.js";
 import type * as constitution from "../constitution.js";
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   adminDashboard: typeof adminDashboard;
   "agents/dataAgent": typeof agents_dataAgent;
+  "agents/githubAgent": typeof agents_githubAgent;
   "agents/validators": typeof agents_validators;
   budget: typeof budget;
   constitution: typeof constitution;

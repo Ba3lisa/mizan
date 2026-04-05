@@ -444,6 +444,10 @@ export const orchestrateRefresh = internalAction({
     }
 
     console.log("[dataAgent] orchestrateRefresh completed.");
+
+    // After all category refreshes, process community corrections from GitHub
+    await ctx.runAction(internal.agents.githubAgent.processGitHubIssues, {});
+
     return null;
   },
 });

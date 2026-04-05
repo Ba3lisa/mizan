@@ -61,7 +61,7 @@ const recentRuns: RefreshRun[] = [
     id: "r4", timestamp: "2026-04-05 12:00 UTC", timestampAr: "٥ أبريل ٢٠٢٦ — ١٢:٠٠",
     category: "parliament", categoryAr: "البرلمان", status: "success", recordsUpdated: 0, duration: "1.2s",
     changes: [
-      { action: "flagged", table: "parliamentMembers", descriptionEn: "⚠ Parliament.gov.eg returned 594 members — expected 596. Flagged for human review.", descriptionAr: "⚠ موقع البرلمان أظهر ٥٩٤ عضواً — المتوقع ٥٩٦. تم الإشارة للمراجعة البشرية." },
+      { action: "flagged", table: "parliamentMembers", descriptionEn: "⚠ Parliament.gov.eg returned 594 members — expected 596. AI created GitHub Issue #12 for community verification.", descriptionAr: "⚠ موقع البرلمان أظهر ٥٩٤ عضواً — المتوقع ٥٩٦. تم إنشاء Issue #12 على GitHub للتحقق المجتمعي." },
     ],
   },
   {

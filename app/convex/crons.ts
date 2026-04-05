@@ -11,4 +11,12 @@ crons.interval(
   {}
 );
 
+// Process GitHub Issues every 6 hours (runs after data refresh).
+crons.interval(
+  "process-github-issues",
+  { hours: 6 },
+  internal.agents.githubAgent.processGitHubIssues,
+  {}
+);
+
 export default crons;

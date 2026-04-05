@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Search, X, Users, Building2, MapPin, ExternalLink, ChevronDown, Filter } from "lucide-react";
+import { Search, Users, Building2, MapPin, ExternalLink } from "lucide-react";
 import { useLanguage } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -154,7 +154,7 @@ function OfficialCard({ official, size = "md" }: { official: Official; size?: "l
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function GovernmentPage() {
-  const { t, lang, dir } = useLanguage();
+  const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
   const [ministrySearch, setMinistrySearch] = useState("");
   const [sectorFilter, setSectorFilter] = useState("all");

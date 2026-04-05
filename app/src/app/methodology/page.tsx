@@ -77,8 +77,8 @@ const dataSources: DataSource[] = [
     nameAr: "مجلس الوزراء",
     nameEn: "Cabinet of Egypt",
     provides: "Ministers, government structure",
-    method: "AI-parsed, human reviewed",
-    methodAr: "تحليل ذكاء اصطناعي، مراجعة بشرية",
+    method: "AI-parsed + AI verified",
+    methodAr: "تحليل وتحقق بالذكاء الاصطناعي",
     frequency: "On cabinet changes",
     frequencyAr: "عند التغييرات الوزارية",
     url: "https://www.cabinet.gov.eg/English/TheMinistry/Pages/default.aspx",
@@ -376,10 +376,10 @@ export default function MethodologyPage() {
               },
               {
                 icon: AlertTriangle,
-                titleAr: "مراجعة بشرية للتغييرات الحكومية",
+                titleAr: "مراجعة ذكاء اصطناعي للتغييرات الحكومية",
                 titleEn: "Human Review for Gov Changes",
-                descAr: "التغييرات الوزارية وتشكيل الحكومة تُشار دائماً للمراجعة البشرية — لا تُكتب تلقائياً.",
-                descEn: "Cabinet reshuffles and government changes are always flagged for human review — never auto-written.",
+                descAr: "التغييرات الوزارية يتم التحقق منها بالذكاء الاصطناعي ومقارنتها بمصادر متعددة. يتم إنشاء GitHub Issue تلقائياً عند وجود تعارض.",
+                descEn: "Cabinet changes are AI-verified against multiple sources. A GitHub Issue is auto-created when discrepancies are found for community verification.",
               },
             ].map((item, i) => {
               const Icon = item.icon;

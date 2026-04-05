@@ -39,8 +39,18 @@
 1. Create production deployment: `npx convex deploy --prod`
 2. Set environment variables in Convex dashboard:
    - `ANTHROPIC_API_KEY` = (your key)
+   - `GITHUB_TOKEN` = GitHub personal access token with `issues:write` permission on `Ba3lisa/mizan` (required for the GitHub Issues AI agent to read and comment on community data corrections)
 3. The 6-hour cron job will start automatically
 4. Seed production data: `npx convex run --prod seedData:seed`
+
+### GitHub Token Setup
+
+The `GITHUB_TOKEN` is used by `convex/agents/githubAgent.ts` to:
+- Read open issues labelled `data-correction` or `stale-data`
+- Post automated verification comments
+- Apply the `verified` label when a correction is confirmed
+
+Create a fine-grained personal access token at https://github.com/settings/tokens and grant it **Read and Write** access to Issues on the `Ba3lisa/mizan` repository. If the token is absent the GitHub agent skips all operations gracefully without failing.
 
 ## GitHub Secrets Required
 

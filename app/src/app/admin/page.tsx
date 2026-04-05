@@ -306,15 +306,10 @@ function CategorySection({ cat, isAr }: { cat: DataCategory; isAr: boolean }) {
                 </a>
               </div>
 
-              <Button
-                variant="outline"
-                size="sm"
-                disabled
-                className="flex items-center gap-2 text-xs text-muted-foreground cursor-not-allowed opacity-60"
-              >
-                <RefreshCw size={13} />
-                {isAr ? "تحديث الآن — يتطلب وصول API" : "Refresh Now — Requires API Access"}
-              </Button>
+              <p className="text-[0.625rem] text-muted-foreground flex items-center gap-1">
+                <RefreshCw size={10} />
+                {isAr ? "يتم التحديث تلقائياً كل ٦ ساعات" : "Auto-refreshed every 6 hours"}
+              </p>
             </div>
 
             {/* Notes */}

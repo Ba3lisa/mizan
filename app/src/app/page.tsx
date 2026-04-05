@@ -3,15 +3,12 @@
 import Link from "next/link";
 import {
   Building2, Users, BookOpen, BarChart3, TrendingDown, Landmark,
-  ArrowRight, ArrowLeft, ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
+  ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
   LineChart, CheckSquare, MapPin, Calculator,
 } from "lucide-react";
 import { useLanguage } from "@/components/providers";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
 
 function Stat({ value, label, source, sourceUrl }: {
   value: number; label: string; source: string; sourceUrl: string;
@@ -109,7 +106,7 @@ export default function HomePage() {
       <section className="border-y border-border bg-card/50">
         <div className="container-page">
           <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-border rtl:divide-x-reverse">
-            {stats.map((s, i) => (
+            {stats.map((s) => (
               <Stat key={s.source} value={s.value}
                 label={isAr ? s.ar : s.en} source={s.source} sourceUrl={s.url}
               />

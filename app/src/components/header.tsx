@@ -19,7 +19,7 @@ import {
 export function Header() {
   const { theme, toggleTheme } = useTheme();
   const { t, toggleLang, lang, dir } = useLanguage();
-  const { currency, toggleCurrency, symbol } = useCurrency();
+  const { currency, toggleCurrency } = useCurrency();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
 
@@ -36,7 +36,7 @@ export function Header() {
     { href: "/constitution", label: t.navConstitution },
     { href: "/budget", label: t.navBudget },
     { href: "/debt", label: t.navDebt },
-    { href: "/methodology", label: t.navMethodology },
+    { href: "/transparency", label: t.navTransparency },
   ];
 
   const moreNav = [
@@ -45,7 +45,7 @@ export function Header() {
     { href: "/promises", label: t.navPromises },
     { href: "/governorate", label: t.navGovernorate },
     { href: "/budget/your-share", label: t.navTaxCalculator },
-    { href: "/transparency", label: t.navTransparency },
+    { href: "/methodology", label: t.navMethodology },
     { href: "/admin", label: t.navAdmin },
   ];
 
