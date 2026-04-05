@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import Fuse from "fuse.js";
 import { Search, X, ChevronRight, ChevronDown } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +37,29 @@ interface ConstitutionPart {
   titleEn: string;
   color: string;
 }
+
+// Part colors assigned by index since Convex schema doesn't store color
+const PART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-6)",
+] as const;
+
+const ARABIC_ORDINALS = [
+  "الباب الأول",
+  "الباب الثاني",
+  "الباب الثالث",
+  "الباب الرابع",
+  "الباب الخامس",
+  "الباب السادس",
+  "الباب السابع",
+  "الباب الثامن",
+  "الباب التاسع",
+  "الباب العاشر",
+] as const;
 
 // ─── Demo Data ────────────────────────────────────────────────────────────────
 
@@ -311,6 +336,31 @@ export default function ConstitutionPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showAmendedOnly, setShowAmendedOnly] = useState(false);
 
+  // Live Convex data
+  const liveParts = useQuery(api.constitution.listParts);
+  const liveArticlesRaw = useQuery(api.constitution.listAmendedArticles);
+
+  // Adapt Convex parts to UI shape, falling back to hardcoded data
+  const parts: ConstitutionPart[] = useMemo(() => {
+    if (liveParts && liveParts.length > 0) {
+      return liveParts.map((p, idx) => ({
+        id: p._id,
+        numberAr: ARABIC_ORDINALS[idx] ?? `الباب ${idx + 1}`,
+        numberEn: `Part ${p.partNumber}`,
+        titleAr: p.titleAr,
+        titleEn: p.titleEn,
+        color: PART_COLORS[idx % PART_COLORS.length],
+      }));
+    }
+    return FALLBACK_PARTS;
+  }, [liveParts]);
+
+  // For articles: when Convex returns amended articles only, we need all articles.
+  // We use listAmendedArticles only to derive amendedCount from live data.
+  // Full article list still uses fallback since there's no listAllArticles query.
+  // Once live parts are loaded we can detect if we should show live data indicator.
+  const liveAmendedCount = liveArticlesRaw?.length;
+
   const fuse = useMemo(
     () =>
       new Fuse(articles, {
@@ -318,8 +368,23 @@ export default function ConstitutionPage() {
         threshold: 0.35,
         includeScore: true,
       }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- articles is module-level constant
     []
   );
+
+  // Map live part IDs to fallback part IDs for filtering when live data is loaded
+  const partIdMapping = useMemo(() => {
+    if (!liveParts || liveParts.length === 0) return null;
+    // Map: live part _id -> fallback part id (by index order)
+    const mapping: Record<string, string> = {};
+    liveParts.forEach((lp, idx) => {
+      const fallbackPart = FALLBACK_PARTS[idx];
+      if (fallbackPart) {
+        mapping[lp._id] = fallbackPart.id;
+      }
+    });
+    return mapping;
+  }, [liveParts]);
 
   const filteredArticles = useMemo(() => {
     let result = articles;
@@ -327,20 +392,26 @@ export default function ConstitutionPage() {
       result = fuse.search(searchQuery).map((r) => r.item);
     }
     if (selectedPart) {
-      result = result.filter((a) => a.partId === selectedPart);
+      // Resolve which fallback partId maps to the selected part
+      const resolvedPartId = partIdMapping
+        ? (Object.entries(partIdMapping).find(([liveId]) => liveId === selectedPart)?.[1] ?? selectedPart)
+        : selectedPart;
+      result = result.filter((a) => a.partId === resolvedPartId);
     }
     if (showAmendedOnly) {
       result = result.filter((a) => a.amended);
     }
     return result;
-  }, [searchQuery, selectedPart, showAmendedOnly, fuse]);
+  }, [searchQuery, selectedPart, showAmendedOnly, fuse, partIdMapping]);
 
   const partById = useMemo(
     () => Object.fromEntries(parts.map((p) => [p.id, p])),
-    []
+    [parts]
   );
 
-  const amendedCount = articles.filter((a) => a.amended).length;
+  // For the sidebar, we need to map selected live part IDs back to article filtering
+  // Article filtering uses fallback part IDs so we check via partIdMapping
+  const amendedCount = liveAmendedCount ?? articles.filter((a) => a.amended).length;
 
   return (
     <div className="page-content" dir={dir}>

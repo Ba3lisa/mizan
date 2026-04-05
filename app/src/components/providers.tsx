@@ -9,6 +9,9 @@ import React, {
 } from "react";
 import { type Lang, type Translations, getTranslations } from "@/lib/translations";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ConvexProvider, ConvexReactClient } from "convex/react";
+
+const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
 // ─── Theme ──────────────────────────────────────────────────────────────────
 
@@ -229,14 +232,16 @@ export function useCurrency(): CurrencyContextValue {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <CurrencyProvider>
-          <TooltipProvider delayDuration={300}>
-            {children}
-          </TooltipProvider>
-        </CurrencyProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <ConvexProvider client={convex}>
+      <ThemeProvider>
+        <LanguageProvider>
+          <CurrencyProvider>
+            <TooltipProvider delayDuration={300}>
+              {children}
+            </TooltipProvider>
+          </CurrencyProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </ConvexProvider>
   );
 }

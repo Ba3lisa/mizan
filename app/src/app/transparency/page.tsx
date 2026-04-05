@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Bot, CheckCircle2, AlertTriangle, XCircle, Clock, ExternalLink, Activity, Database, Shield, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

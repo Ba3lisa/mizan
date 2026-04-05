@@ -306,12 +306,13 @@ function InteractiveHemicycle({ chamber }: { chamber: "house" | "senate" }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="relative flex justify-center" dir="ltr">
+      <div className="relative w-full" dir="ltr">
         <svg
           ref={svgRef}
-          viewBox={`0 0 ${width} ${height}`}
-          className="w-full max-w-xl mx-auto max-h-[320px]"
+          viewBox="100 80 400 240"
+          className="w-full max-h-80 block"
           preserveAspectRatio="xMidYMid meet"
+          suppressHydrationWarning
           onMouseLeave={() => setHoveredSeat(null)}
         >
           {dotPositions.map((pos, i) => {
