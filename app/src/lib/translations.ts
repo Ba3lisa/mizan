@@ -28,6 +28,7 @@ const translations = {
     navTaxCalculator: "حاسبة الضريبة",
     navMore: "المزيد",
     navAdmin: "الإدارة",
+    navMethodology: "المنهجية",
 
     // Theme/Language
     toggleTheme: "تبديل السمة",
@@ -193,6 +194,7 @@ const translations = {
     navTaxCalculator: "Tax Calculator",
     navMore: "More",
     navAdmin: "Admin",
+    navMethodology: "Methodology",
 
     // Theme/Language
     toggleTheme: "Toggle Theme",

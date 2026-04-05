@@ -36,14 +36,16 @@ export function Header() {
     { href: "/constitution", label: t.navConstitution },
     { href: "/budget", label: t.navBudget },
     { href: "/debt", label: t.navDebt },
+    { href: "/methodology", label: t.navMethodology },
   ];
 
   const moreNav = [
+    { href: "/elections", label: t.navElections },
     { href: "/economy", label: t.navEconomy },
     { href: "/promises", label: t.navPromises },
     { href: "/governorate", label: t.navGovernorate },
     { href: "/budget/your-share", label: t.navTaxCalculator },
-    { href: "/elections", label: t.navElections },
+    { href: "/transparency", label: t.navTransparency },
     { href: "/admin", label: t.navAdmin },
   ];
 

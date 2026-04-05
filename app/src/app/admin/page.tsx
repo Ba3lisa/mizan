@@ -9,6 +9,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   Clock,
+  Building2,
+  Users,
+  BookOpen,
+  BarChart3,
+  TrendingDown,
+  Landmark,
+  type LucideIcon,
 } from "lucide-react";
 import { useLanguage } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +32,7 @@ interface DataCategory {
   key: string;
   nameAr: string;
   nameEn: string;
-  icon: string;
+  icon: LucideIcon;
   sourceUrl: string;
   sourceLabel: string;
   lastRefreshAr: string;
@@ -42,7 +49,7 @@ const categories: DataCategory[] = [
     key: "government",
     nameAr: "الحكومة",
     nameEn: "Government",
-    icon: "🏛",
+    icon: Building2,
     sourceUrl: "https://www.cabinet.gov.eg/English/TheMinistry/Pages/default.aspx",
     sourceLabel: "cabinet.gov.eg",
     lastRefreshAr: "٥ أبريل ٢٠٢٦ — ١٨:٠٠",
@@ -62,7 +69,7 @@ const categories: DataCategory[] = [
     key: "parliament",
     nameAr: "البرلمان",
     nameEn: "Parliament",
-    icon: "⚖",
+    icon: Users,
     sourceUrl: "https://www.parliament.gov.eg",
     sourceLabel: "parliament.gov.eg",
     lastRefreshAr: "٥ أبريل ٢٠٢٦ — ١٢:٠٠",
@@ -83,7 +90,7 @@ const categories: DataCategory[] = [
     key: "constitution",
     nameAr: "الدستور",
     nameEn: "Constitution",
-    icon: "📜",
+    icon: BookOpen,
     sourceUrl: "https://www.presidency.eg",
     sourceLabel: "presidency.eg",
     lastRefreshAr: "ثابت — دستور ٢٠١٤ / تعديلات ٢٠١٩",
@@ -103,7 +110,7 @@ const categories: DataCategory[] = [
     key: "budget",
     nameAr: "الميزانية",
     nameEn: "Budget",
-    icon: "💰",
+    icon: BarChart3,
     sourceUrl: "https://www.mof.gov.eg/en/posts/statementsAndReports/5",
     sourceLabel: "mof.gov.eg",
     lastRefreshAr: "٥ أبريل ٢٠٢٦ — ١٨:٠٠",
@@ -124,7 +131,7 @@ const categories: DataCategory[] = [
     key: "debt",
     nameAr: "الدين العام",
     nameEn: "Debt",
-    icon: "📊",
+    icon: TrendingDown,
     sourceUrl: "https://api.worldbank.org/v2/country/EGY/indicator/DT.DOD.DECT.CD",
     sourceLabel: "worldbank.org / api",
     lastRefreshAr: "٥ أبريل ٢٠٢٦ — ١٨:٠٠",
@@ -144,7 +151,7 @@ const categories: DataCategory[] = [
     key: "elections",
     nameAr: "الانتخابات",
     nameEn: "Elections",
-    icon: "🗳",
+    icon: Landmark,
     sourceUrl: "https://www.elections.eg",
     sourceLabel: "elections.eg",
     lastRefreshAr: "ثابت — آخر تحديث ديسمبر ٢٠٢٣",
@@ -204,7 +211,7 @@ function HealthCard({ cat, isAr }: { cat: DataCategory; isAr: boolean }) {
       <CardContent className="p-4">
         <div className="flex items-start justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
-            <span className="text-lg" aria-hidden="true">{cat.icon}</span>
+            <cat.icon size={18} className="text-primary" />
             <span className="text-sm font-semibold text-foreground">
               {isAr ? cat.nameAr : cat.nameEn}
             </span>
@@ -237,7 +244,7 @@ function CategorySection({ cat, isAr }: { cat: DataCategory; isAr: boolean }) {
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-4 px-5 py-4 hover:bg-muted/40 transition-colors text-start"
       >
-        <span className="text-xl flex-shrink-0" aria-hidden="true">{cat.icon}</span>
+        <cat.icon size={20} className="text-primary flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-foreground text-sm">

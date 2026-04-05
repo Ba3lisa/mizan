@@ -175,9 +175,14 @@ export default function HomePage() {
           </CardContent>
         </Card>
 
-        <p className="text-xs text-muted-foreground/60 mt-3 inline-flex items-center gap-1.5">
-          <Clock size={11} /> {isAr ? "تحديث تلقائي كل ٦ ساعات" : "Auto-refreshed every 6 hours"}
-        </p>
+        <div className="flex items-center justify-between mt-3 flex-wrap gap-3">
+          <p className="text-xs text-muted-foreground/60 inline-flex items-center gap-1.5">
+            <Clock size={11} /> {isAr ? "تحديث تلقائي كل ٦ ساعات" : "Auto-refreshed every 6 hours"}
+          </p>
+          <Link href="/methodology" className="text-xs text-primary no-underline hover:underline inline-flex items-center gap-1 font-medium">
+            {isAr ? "تعرف على منهجيتنا ←" : "Learn more about our methodology →"}
+          </Link>
+        </div>
       </section>
     </div>
   );

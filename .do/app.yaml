@@ -1,0 +1,28 @@
+name: mizan
+region: fra
+services:
+  - name: web
+    github:
+      repo: Ba3lisa/mizan
+      branch: main
+      deploy_on_push: true
+    source_dir: app
+    build_command: npm ci --legacy-peer-deps && npm run build
+    run_command: npm start
+    environment_slug: node-js
+    instance_size_slug: professional-xs
+    instance_count: 1
+    http_port: 3000
+    envs:
+      - key: NEXT_PUBLIC_CONVEX_URL
+        value: ${NEXT_PUBLIC_CONVEX_URL}
+        scope: RUN_AND_BUILD_TIME
+      - key: NODE_ENV
+        value: production
+        scope: RUN_AND_BUILD_TIME
+    routes:
+      - path: /
+    health_check:
+      http_path: /
+      initial_delay_seconds: 10
+      period_seconds: 30

@@ -617,14 +617,6 @@ export default function BudgetPage() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0 flex-wrap">
-            {/* Currency toggle */}
-            <button
-              onClick={toggleCurrency}
-              className="text-xs font-mono px-2.5 py-1.5 rounded border border-border text-muted-foreground hover:text-foreground hover:border-primary/60 transition-colors"
-            >
-              {currency === "EGP" ? "Switch to USD" : "Switch to EGP"}
-            </button>
-
             <span className="text-sm text-muted-foreground">{t.fiscalYear}</span>
             <Select value={selectedYear} onValueChange={(v) => setSelectedYear(v as FiscalYear)}>
               <SelectTrigger className="w-36 text-sm">
