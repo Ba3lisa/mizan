@@ -312,17 +312,26 @@ export default function TransparencyPage() {
       }))
     : recentRuns;
 
-  const activeCategoryHealth = convexCategoryHealth
-    ? convexCategoryHealth.map((ch: ConvexCategoryHealth) => ({
-        key: ch.category,
-        ar: ch.category,
-        en: ch.category.charAt(0).toUpperCase() + ch.category.slice(1),
-        lastRefresh: formatRelativeTime(ch.lastRefreshTime),
-        lastRefreshAr: formatRelativeTime(ch.lastRefreshTime),
-        status: mapConvexStatus(ch.lastStatus),
-        records: ch.recordsUpdated ?? 0,
-        source: ch.sourceUrl ?? "",
-      }))
+  // Known record counts for each category (from seed data)
+  const knownCounts: Record<string, number> = {
+    government: 49, parliament: 596, constitution: 247,
+    budget: 18, debt: 5, elections: 3,
+  };
+
+  const activeCategoryHealth = convexCategoryHealth && convexCategoryHealth.length > 0
+    ? convexCategoryHealth.map((ch: ConvexCategoryHealth) => {
+        const demo = categoryHealth.find(c => c.key === ch.category);
+        return {
+          key: ch.category,
+          ar: demo?.ar ?? ch.category,
+          en: demo?.en ?? ch.category.charAt(0).toUpperCase() + ch.category.slice(1),
+          lastRefresh: formatRelativeTime(ch.lastRefreshTime),
+          lastRefreshAr: formatRelativeTime(ch.lastRefreshTime),
+          status: mapConvexStatus(ch.lastStatus),
+          records: knownCounts[ch.category] ?? demo?.records ?? 0,
+          source: ch.sourceUrl ?? demo?.source ?? "",
+        };
+      })
     : categoryHealth;
 
   return (
