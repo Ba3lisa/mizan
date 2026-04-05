@@ -50,7 +50,11 @@ export function Footer() {
         </div>
       </div>
       <div className="py-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">{isAr ? "ميزان — منصة شفافية مدنية." : "Mizan — civic transparency."}</p>
+        <p className="text-xs text-muted-foreground">
+          {isAr ? "ميزان — منصة شفافية مدنية." : "Mizan — civic transparency."}{" "}
+          {isAr ? "بناء" : "Built by"}{" "}
+          <a href="https://egouda.xyz/" target="_blank" rel="noopener noreferrer" className="text-primary no-underline hover:underline">Essam Gouda</a>
+        </p>
         <p className="text-xs text-muted-foreground font-mono">© {new Date().getFullYear()}</p>
       </div>
     </footer>

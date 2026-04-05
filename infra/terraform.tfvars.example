@@ -1,0 +1,10 @@
+# Copy this to terraform.tfvars and fill in values
+# DO NOT commit terraform.tfvars to git!
+
+cloudflare_api_token = ""
+cloudflare_zone_id   = ""
+digitalocean_token   = ""
+github_token         = ""
+convex_url           = "https://YOUR_CONVEX_DEPLOYMENT.convex.cloud"
+convex_deploy_key    = ""
+domain               = "mizanmasr.com"
