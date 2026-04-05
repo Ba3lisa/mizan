@@ -939,11 +939,13 @@ export default function ParliamentPage() {
   const liveSenateStats = useQuery(api.parliament.getParliamentStats, { chamber: "senate" });
   const liveHouseCommittees = useQuery(api.parliament.listCommittees, { chamber: "house" });
 
-  // Stats — use live data when available, fallback to hardcoded
-  const houseSeats = liveHouseStats?.totalMembers ?? parties.reduce((s, p) => s + p.houseSeats, 0);
-  const senateSeats = liveSenateStats?.totalMembers ?? parties.reduce((s, p) => s + p.senateSeats, 0);
-  const houseParties = liveParties?.length ?? parties.filter((p) => p.houseSeats > 0).length;
-  const houseCommitteeCount = liveHouseCommittees?.length ?? committees.length;
+  // Stats — use fallback totals (596/300) since we haven't seeded all members yet
+  const fallbackHouse = parties.reduce((s, p) => s + p.houseSeats, 0);
+  const fallbackSenate = parties.reduce((s, p) => s + p.senateSeats, 0);
+  const houseSeats = Math.max(liveHouseStats?.totalMembers ?? 0, fallbackHouse);
+  const senateSeats = Math.max(liveSenateStats?.totalMembers ?? 0, fallbackSenate);
+  const houseParties = Math.max(liveParties?.length ?? 0, parties.filter((p) => p.houseSeats > 0).length);
+  const houseCommitteeCount = Math.max(liveHouseCommittees?.length ?? 0, committees.length);
   const houseWomen = Math.round(houseSeats * 0.152);
 
   const activeSeats = chamber === "house" ? houseSeats : senateSeats;

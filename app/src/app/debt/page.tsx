@@ -304,23 +304,23 @@ function DebtTimeline() {
 
           {/* Tooltip */}
           {hovered && (() => {
-            const tx = Math.min(xScale(hovered.year) + 16, svgW - 170);
-            const ty = Math.max(yScale(hovered.externalDebt) - 75, 4);
-            const boxH = hovered.event ? 72 : 52;
+            const hx = xScale(hovered.year);
+            const hy = yScale(hovered.externalDebt);
+            const boxW = 140;
+            const boxH = hovered.event ? 62 : 46;
+            const tx = Math.min(Math.max(hx - boxW / 2, 4), svgW - boxW - 4);
+            const ty = Math.max(hy - boxH - 14, 4);
             return (
               <g style={{ pointerEvents: "none" }}>
-                <rect x={tx} y={ty} width={160} height={boxH} rx={6} fill="#1E2330" fillOpacity={0.95} stroke="#333A4A" strokeWidth={0.5} />
-                <text x={tx + 10} y={ty + 16} fill="#C9A84C" fontSize={11} fontFamily="var(--font-mono)" fontWeight="600">
+                <rect x={tx} y={ty} width={boxW} height={boxH} rx={6} fill="#1E2330" fillOpacity={0.92} stroke="#333A4A" strokeWidth={0.5} />
+                <text x={tx + 8} y={ty + 14} fill="#C9A84C" fontSize={10} fontFamily="var(--font-mono)" fontWeight="600">
                   {hovered.year}
                 </text>
-                <text x={tx + 10} y={ty + 30} fill="#E8ECF4" fontSize={10} fontFamily="var(--font-mono)">
-                  ${hovered.externalDebt}B {isAr ? "ديون خارجية" : "external debt"}
-                </text>
-                <text x={tx + 10} y={ty + 44} fill="#7A8299" fontSize={9} fontFamily="var(--font-mono)">
-                  {hovered.debtToGDP}% {isAr ? "من الناتج المحلي" : "of GDP"}
+                <text x={tx + 8} y={ty + 27} fill="#E8ECF4" fontSize={9} fontFamily="var(--font-mono)">
+                  ${hovered.externalDebt}B · {hovered.debtToGDP}% GDP
                 </text>
                 {hovered.event && (
-                  <text x={tx + 10} y={ty + 62} fill="#E76F51" fontSize={8} fontFamily="var(--font-sans)">
+                  <text x={tx + 8} y={ty + 40} fill="#E76F51" fontSize={7} fontFamily="var(--font-sans)">
                     {isAr ? hovered.eventAr : hovered.event}
                   </text>
                 )}
