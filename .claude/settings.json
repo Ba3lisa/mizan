@@ -1,0 +1,92 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "Bash(./dev *)",
+      "Bash(dev *)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(node *)",
+      "Bash(uv *)",
+      "Bash(python *)",
+      "Bash(git status*)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git checkout *)",
+      "Bash(git branch *)",
+      "Bash(git worktree *)",
+      "Bash(git stash*)",
+      "Bash(git merge *)",
+      "Bash(git rebase *)",
+      "Bash(gh issue *)",
+      "Bash(gh pr *)",
+      "Bash(ls *)",
+      "Bash(mkdir *)",
+      "Bash(cp *)",
+      "Bash(mv *)",
+      "Bash(chmod *)",
+      "Bash(cat *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(find *)",
+      "Bash(grep *)",
+      "Bash(sed *)",
+      "Bash(curl *)",
+      "Bash(jq *)",
+      "Bash(codex *)",
+      "Bash(lsof *)",
+      "Bash(kill *)",
+      "Bash(pwd)",
+      "Bash(which *)",
+      "Bash(echo *)",
+      "Bash(wc *)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)",
+      "Bash(rm -rf /)*",
+      "Bash(sudo *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/enforce-research-first.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "WebSearch|WebFetch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/hooks/mark-research-done.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "[ -n \"$CLAUDE_FILE\" ] && grep -rn '@ts-nocheck\\|@ts-ignore\\|@ts-expect-error\\|eslint-disable' \"$CLAUDE_FILE\" 2>/dev/null && echo 'WARNING: Suppression comment detected! Fix the actual issue.' && exit 2 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

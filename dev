@@ -1,0 +1,22 @@
+#!/bin/sh
+# Child project dev CLI shim
+SELF="$0"
+while [ -L "$SELF" ]; do
+  DIR="$(cd "$(dirname "$SELF")" && pwd)"
+  SELF="$(readlink "$SELF")"
+  case "$SELF" in /*) ;; *) SELF="$DIR/$SELF" ;; esac
+done
+ROOT="$(cd "$(dirname "$SELF")" && pwd)"
+
+VENV="$ROOT/scripts/dev/.venv/bin/python"
+if [ ! -x "$VENV" ]; then
+  MAIN_ROOT="$(cd "$ROOT" && git worktree list --porcelain 2>/dev/null | head -1 | sed 's/^worktree //')"
+  if [ -n "$MAIN_ROOT" ] && [ -x "$MAIN_ROOT/scripts/dev/.venv/bin/python" ]; then
+    VENV="$MAIN_ROOT/scripts/dev/.venv/bin/python"
+  else
+    echo "Error: dev venv not found. Run: cd scripts/dev && uv venv && uv pip install -e ." >&2
+    exit 1
+  fi
+fi
+
+exec "$VENV" -m dev "$@"

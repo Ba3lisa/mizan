@@ -1,0 +1,18 @@
+[project]
+name = "dev"
+version = "0.1.0"
+description = "Project dev CLI"
+requires-python = ">=3.11"
+dependencies = [
+    "typer[all]>=0.15",
+    "rich>=14.0",
+    "python-dotenv>=1.1",
+]
+
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = [".."]
+include = ["dev", "dev.*"]

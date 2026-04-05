@@ -1,0 +1,18 @@
+repos:
+  - repo: local
+    hooks:
+      - id: trailing-whitespace
+        name: Trailing whitespace
+        entry: bash -c 'git diff --cached --name-only | xargs -I {} sed -i "" "s/[[:space:]]*$//" {}'
+        language: system
+        types: [text]
+
+      - id: merge-conflicts
+        name: Merge conflict markers
+        entry: bash -c 'grep -rn "<<<<<<" --include="*.ts" --include="*.tsx" . && exit 1 || exit 0'
+        language: system
+
+      - id: large-files
+        name: Large file check
+        entry: bash -c 'git diff --cached --name-only --diff-filter=d | while read f; do [ "$(wc -c < "$f" 2>/dev/null)" -gt 1048576 ] && echo "LARGE: $f" && exit 1; done; exit 0'
+        language: system

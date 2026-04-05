@@ -1,0 +1,29 @@
+name: Lint
+
+on:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'convex/**'
+      - '.github/workflows/lint.yml'
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+        working-directory: app
+      - name: ESLint
+        run: npx eslint --max-warnings 0 .
+        working-directory: app
+      - name: TypeScript
+        run: npx tsc --noEmit
+        working-directory: app
