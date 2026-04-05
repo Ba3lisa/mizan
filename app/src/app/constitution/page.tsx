@@ -61,9 +61,9 @@ const ARABIC_ORDINALS = [
   "الباب العاشر",
 ] as const;
 
-// ─── Demo Data ────────────────────────────────────────────────────────────────
+// ─── Fallback Data ────────────────────────────────────────────────────────────
 
-const parts: ConstitutionPart[] = [
+const FALLBACK_PARTS: ConstitutionPart[] = [
   { id: "p1", numberAr: "الباب الأول", numberEn: "Part I", titleAr: "الدولة", titleEn: "The State", color: "var(--chart-1)" },
   { id: "p2", numberAr: "الباب الثاني", numberEn: "Part II", titleAr: "الحقوق والحريات والواجبات العامة", titleEn: "Rights, Freedoms & Public Duties", color: "var(--chart-2)" },
   { id: "p3", numberAr: "الباب الثالث", numberEn: "Part III", titleAr: "السيادة", titleEn: "Sovereignty", color: "var(--chart-3)" },
@@ -332,19 +332,22 @@ function ArticleRow({
 export default function ConstitutionPage() {
   const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
+  // selectedPart stores a fallback part ID (p1..p6) for article filtering
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAmendedOnly, setShowAmendedOnly] = useState(false);
 
   // Live Convex data
   const liveParts = useQuery(api.constitution.listParts);
-  const liveArticlesRaw = useQuery(api.constitution.listAmendedArticles);
+  const liveAmendedArticles = useQuery(api.constitution.listAmendedArticles);
 
-  // Adapt Convex parts to UI shape, falling back to hardcoded data
+  // Adapt Convex parts to UI shape. Each live part maps to a fallback part by
+  // sort order so article filtering (which uses fallback IDs) stays consistent.
   const parts: ConstitutionPart[] = useMemo(() => {
     if (liveParts && liveParts.length > 0) {
       return liveParts.map((p, idx) => ({
-        id: p._id,
+        // Use the fallback ID so part filtering against article.partId works
+        id: FALLBACK_PARTS[idx]?.id ?? p._id,
         numberAr: ARABIC_ORDINALS[idx] ?? `الباب ${idx + 1}`,
         numberEn: `Part ${p.partNumber}`,
         titleAr: p.titleAr,
@@ -355,11 +358,7 @@ export default function ConstitutionPage() {
     return FALLBACK_PARTS;
   }, [liveParts]);
 
-  // For articles: when Convex returns amended articles only, we need all articles.
-  // We use listAmendedArticles only to derive amendedCount from live data.
-  // Full article list still uses fallback since there's no listAllArticles query.
-  // Once live parts are loaded we can detect if we should show live data indicator.
-  const liveAmendedCount = liveArticlesRaw?.length;
+  const amendedCount = liveAmendedArticles?.length ?? articles.filter((a) => a.amended).length;
 
   const fuse = useMemo(
     () =>
@@ -368,23 +367,8 @@ export default function ConstitutionPage() {
         threshold: 0.35,
         includeScore: true,
       }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- articles is module-level constant
     []
   );
-
-  // Map live part IDs to fallback part IDs for filtering when live data is loaded
-  const partIdMapping = useMemo(() => {
-    if (!liveParts || liveParts.length === 0) return null;
-    // Map: live part _id -> fallback part id (by index order)
-    const mapping: Record<string, string> = {};
-    liveParts.forEach((lp, idx) => {
-      const fallbackPart = FALLBACK_PARTS[idx];
-      if (fallbackPart) {
-        mapping[lp._id] = fallbackPart.id;
-      }
-    });
-    return mapping;
-  }, [liveParts]);
 
   const filteredArticles = useMemo(() => {
     let result = articles;
@@ -392,26 +376,18 @@ export default function ConstitutionPage() {
       result = fuse.search(searchQuery).map((r) => r.item);
     }
     if (selectedPart) {
-      // Resolve which fallback partId maps to the selected part
-      const resolvedPartId = partIdMapping
-        ? (Object.entries(partIdMapping).find(([liveId]) => liveId === selectedPart)?.[1] ?? selectedPart)
-        : selectedPart;
-      result = result.filter((a) => a.partId === resolvedPartId);
+      result = result.filter((a) => a.partId === selectedPart);
     }
     if (showAmendedOnly) {
       result = result.filter((a) => a.amended);
     }
     return result;
-  }, [searchQuery, selectedPart, showAmendedOnly, fuse, partIdMapping]);
+  }, [searchQuery, selectedPart, showAmendedOnly, fuse]);
 
   const partById = useMemo(
     () => Object.fromEntries(parts.map((p) => [p.id, p])),
     [parts]
   );
-
-  // For the sidebar, we need to map selected live part IDs back to article filtering
-  // Article filtering uses fallback part IDs so we check via partIdMapping
-  const amendedCount = liveAmendedCount ?? articles.filter((a) => a.amended).length;
 
   return (
     <div className="page-content" dir={dir}>

@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Search, Users, Building2, MapPin, ExternalLink } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,12 +49,12 @@ interface Governorate {
   regionEn: string;
 }
 
-// ─── Data ────────────────────────────────────────────────────────────────────
+// ─── Fallback Data ───────────────────────────────────────────────────────────
 
-const president: Official = { id: "p", nameAr: "عبد الفتاح السيسي", nameEn: "Abdel Fattah el-Sisi", titleAr: "رئيس الجمهورية", titleEn: "President of Egypt", appointedAr: "يونيو ٢٠١٤", appointedEn: "Jun 2014", level: "president" };
-const pm: Official = { id: "pm", nameAr: "مصطفى مدبولي", nameEn: "Mostafa Madbouly", titleAr: "رئيس مجلس الوزراء", titleEn: "Prime Minister", appointedAr: "يونيو ٢٠١٨", appointedEn: "Jun 2018", level: "pm" };
+const FALLBACK_PRESIDENT: Official = { id: "p", nameAr: "عبد الفتاح السيسي", nameEn: "Abdel Fattah el-Sisi", titleAr: "رئيس الجمهورية", titleEn: "President of Egypt", appointedAr: "يونيو ٢٠١٤", appointedEn: "Jun 2014", level: "president" };
+const FALLBACK_PM: Official = { id: "pm", nameAr: "مصطفى مدبولي", nameEn: "Mostafa Madbouly", titleAr: "رئيس مجلس الوزراء", titleEn: "Prime Minister", appointedAr: "يونيو ٢٠١٨", appointedEn: "Jun 2018", level: "pm" };
 
-const ministries: Ministry[] = [
+const FALLBACK_MINISTRIES: Ministry[] = [
   { id: "1", nameAr: "وزارة الخارجية", nameEn: "Foreign Affairs", ministerAr: "بدر عبد العاطي", ministerEn: "Badr Abdelatty", employees: 8200, sector: "sovereignty" },
   { id: "2", nameAr: "وزارة الداخلية", nameEn: "Interior", ministerAr: "اللواء كمال الوزير", ministerEn: "Gen. Kamal el-Wazir", employees: 520000, sector: "sovereignty" },
   { id: "3", nameAr: "وزارة الدفاع", nameEn: "Defence", ministerAr: "الفريق عباس كامل", ministerEn: "Gen. Abbas Kamel", employees: 450000, sector: "sovereignty" },
@@ -73,7 +75,7 @@ const ministries: Ministry[] = [
   { id: "18", nameAr: "وزارة السياحة والآثار", nameEn: "Tourism & Antiquities", ministerAr: "أحمد عيسى", ministerEn: "Ahmed Issa", employees: 28000, sector: "social" },
 ];
 
-const governorates: Governorate[] = [
+const FALLBACK_GOVERNORATES: Governorate[] = [
   { id: "1", nameAr: "القاهرة", nameEn: "Cairo", governorAr: "إبراهيم الشهابي", governorEn: "Ibrahim el-Shehabi", capitalAr: "القاهرة", capitalEn: "Cairo", population: 10142000, regionAr: "مصر السفلى", regionEn: "Lower Egypt" },
   { id: "2", nameAr: "الإسكندرية", nameEn: "Alexandria", governorAr: "محمد الشريف", governorEn: "Mohamed el-Sherif", capitalAr: "الإسكندرية", capitalEn: "Alexandria", population: 5200000, regionAr: "الساحل الشمالي", regionEn: "Northern Coast" },
   { id: "3", nameAr: "الجيزة", nameEn: "Giza", governorAr: "أحمد راشد", governorEn: "Ahmed Rashed", capitalAr: "الجيزة", capitalEn: "Giza", population: 9250000, regionAr: "مصر السفلى", regionEn: "Lower Egypt" },
@@ -111,7 +113,7 @@ const sectors = [
   { key: "infrastructure", ar: "بنية تحتية", en: "Infrastructure", color: "#2EC4B6" },
 ];
 
-const maxEmployees = Math.max(...ministries.map(m => m.employees));
+// maxEmployees is computed dynamically in the component from live or fallback data
 
 // ─── Org Chart Card ──────────────────────────────────────────────────────────
 
@@ -160,6 +162,68 @@ export default function GovernmentPage() {
   const [sectorFilter, setSectorFilter] = useState("all");
   const [govSearch, setGovSearch] = useState("");
 
+  // Live Convex data
+  const liveHierarchy = useQuery(api.government.getGovernmentHierarchy);
+  const liveGovernorates = useQuery(api.government.listGovernorates);
+
+  // Adapt Convex officials to UI Official shape
+  const president: Official = liveHierarchy?.president
+    ? {
+        id: liveHierarchy.president._id,
+        nameAr: liveHierarchy.president.nameAr,
+        nameEn: liveHierarchy.president.nameEn,
+        titleAr: liveHierarchy.president.titleAr,
+        titleEn: liveHierarchy.president.titleEn,
+        appointedAr: liveHierarchy.president.appointmentDate ?? undefined,
+        appointedEn: liveHierarchy.president.appointmentDate ?? undefined,
+        level: "president",
+      }
+    : FALLBACK_PRESIDENT;
+
+  const pm: Official = liveHierarchy?.primeMinister
+    ? {
+        id: liveHierarchy.primeMinister._id,
+        nameAr: liveHierarchy.primeMinister.nameAr,
+        nameEn: liveHierarchy.primeMinister.nameEn,
+        titleAr: liveHierarchy.primeMinister.titleAr,
+        titleEn: liveHierarchy.primeMinister.titleEn,
+        appointedAr: liveHierarchy.primeMinister.appointmentDate ?? undefined,
+        appointedEn: liveHierarchy.primeMinister.appointmentDate ?? undefined,
+        level: "pm",
+      }
+    : FALLBACK_PM;
+
+  // Adapt Convex ministries — Convex schema has no sector field, default to "other"
+  const ministries: Ministry[] = liveHierarchy?.ministries && liveHierarchy.ministries.length > 0
+    ? liveHierarchy.ministries.map((m) => ({
+        id: m._id,
+        nameAr: m.nameAr,
+        nameEn: m.nameEn,
+        ministerAr: m.minister?.nameAr ?? "—",
+        ministerEn: m.minister?.nameEn ?? "—",
+        employees: m.employeeCount ?? 0,
+        sector: "other" as Ministry["sector"],
+      }))
+    : FALLBACK_MINISTRIES;
+
+  // Adapt Convex governorates
+  const governorates: Governorate[] = liveGovernorates && liveGovernorates.length > 0
+    ? liveGovernorates.map((g) => ({
+        id: g._id,
+        nameAr: g.nameAr,
+        nameEn: g.nameEn,
+        governorAr: "—",
+        governorEn: "—",
+        capitalAr: g.capitalAr,
+        capitalEn: g.capitalEn,
+        population: g.population ?? 0,
+        regionAr: g.regionAr ?? "",
+        regionEn: g.regionEn ?? "",
+      }))
+    : FALLBACK_GOVERNORATES;
+
+  const maxEmployees = ministries.length > 0 ? Math.max(...ministries.map(m => m.employees), 1) : 1;
+
   const filteredMinistries = ministries.filter(m => {
     const q = ministrySearch.toLowerCase();
     const matchSearch = !q || m.nameAr.includes(q) || m.nameEn.toLowerCase().includes(q) || m.ministerAr.includes(q) || m.ministerEn.toLowerCase().includes(q);
@@ -173,8 +237,8 @@ export default function GovernmentPage() {
   });
 
   const regionGroups = filteredGovernorates.reduce<Record<string, { label: string; govs: Governorate[] }>>((acc, gov) => {
-    const key = gov.regionEn;
-    if (!acc[key]) acc[key] = { label: isAr ? gov.regionAr : gov.regionEn, govs: [] };
+    const key = gov.regionEn || "Other";
+    if (!acc[key]) acc[key] = { label: isAr ? (gov.regionAr || "أخرى") : (gov.regionEn || "Other"), govs: [] };
     acc[key].govs.push(gov);
     return acc;
   }, {});

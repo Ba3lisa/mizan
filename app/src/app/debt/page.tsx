@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -185,6 +187,17 @@ function DebtTimeline() {
   const isAr = lang === "ar";
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
 
+  // Wire to Convex — fall back to demo data when empty or loading
+  const convexTimeline = useQuery(api.debt.getDebtTimeline);
+  const activeTimelineData: TimelineDataPoint[] =
+    convexTimeline && convexTimeline.length > 0
+      ? convexTimeline.map((r) => ({
+          year: new Date(r.date).getFullYear(),
+          externalDebt: r.totalExternalDebt ?? 0,
+          debtToGDP: r.debtToGdpRatio ?? 0,
+        }))
+      : timelineData;
+
   const svgW = 700;
   const svgH = 300;
   const padL = 55;
@@ -194,21 +207,21 @@ function DebtTimeline() {
   const innerW = svgW - padL - padR;
   const innerH = svgH - padT - padB;
 
-  const maxDebt = Math.max(...timelineData.map((d) => d.externalDebt)) * 1.1;
-  const minYear = timelineData[0].year;
-  const maxYear = timelineData[timelineData.length - 1].year;
-  const yearRange = maxYear - minYear;
+  const maxDebt = Math.max(...activeTimelineData.map((d) => d.externalDebt)) * 1.1;
+  const minYear = activeTimelineData[0]?.year ?? 2015;
+  const maxYear = activeTimelineData[activeTimelineData.length - 1]?.year ?? 2024;
+  const yearRange = maxYear - minYear || 1;
 
   const xScale = (year: number) => padL + ((year - minYear) / yearRange) * innerW;
   const yScale = (val: number) => padT + (1 - val / maxDebt) * innerH;
 
-  const linePath = timelineData
+  const linePath = activeTimelineData
     .map((d, i) => `${i === 0 ? "M" : "L"} ${xScale(d.year)} ${yScale(d.externalDebt)}`)
     .join(" ");
 
   const areaPath = `${linePath} L ${xScale(maxYear)} ${padT + innerH} L ${xScale(minYear)} ${padT + innerH} Z`;
 
-  const hovered = hoveredYear ? timelineData.find((d) => d.year === hoveredYear) : null;
+  const hovered = hoveredYear ? activeTimelineData.find((d) => d.year === hoveredYear) : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -240,7 +253,7 @@ function DebtTimeline() {
           <path d={linePath} fill="none" stroke="#C9A84C" strokeWidth={2} />
 
           {/* Event vertical lines */}
-          {timelineData
+          {activeTimelineData
             .filter((d) => d.event)
             .map((d) => (
               <line
@@ -257,7 +270,7 @@ function DebtTimeline() {
             ))}
 
           {/* Data points */}
-          {timelineData.map((d) => {
+          {activeTimelineData.map((d) => {
             const isHov = hoveredYear === d.year;
             return (
               <circle
@@ -275,7 +288,7 @@ function DebtTimeline() {
           })}
 
           {/* Year labels */}
-          {timelineData.filter((_, i) => i % 2 === 0 || timelineData[i].event).map((d) => (
+          {activeTimelineData.filter((_, i) => i % 2 === 0 || activeTimelineData[i].event).map((d) => (
             <text
               key={d.year}
               x={xScale(d.year)}
@@ -343,9 +356,26 @@ function CreditorBreakdown() {
   const isAr = lang === "ar";
   const [sortBy, setSortBy] = useState<"amount" | "rate">("amount");
 
-  const totalOwed = creditors.reduce((s, c) => s + c.amount, 0);
+  // Wire to Convex latest debt record for creditor breakdown
+  const convexLatest = useQuery(api.debt.getLatestDebtRecord);
+  const CREDITOR_COLORS = ["#6C8EEF", "#2EC4B6", "#C9A84C", "#E76F51", "#9B72CF", "#E5484D", "#525C72"];
+  const activeCreditors: Creditor[] =
+    convexLatest && convexLatest.creditors && convexLatest.creditors.length > 0
+      ? convexLatest.creditors.map((c, i) => ({
+          nameAr: c.creditorAr,
+          nameEn: c.creditorEn,
+          amount: c.amount,
+          interestRate: 0,
+          annualPayment: 0,
+          totalBorrowed: c.amount,
+          yearStarted: 2010,
+          color: CREDITOR_COLORS[i % CREDITOR_COLORS.length],
+        }))
+      : creditors;
 
-  const sorted = [...creditors].sort((a, b) =>
+  const totalOwed = activeCreditors.reduce((s, c) => s + c.amount, 0);
+
+  const sorted = [...activeCreditors].sort((a, b) =>
     sortBy === "amount" ? b.amount - a.amount : b.interestRate - a.interestRate
   );
 
@@ -688,11 +718,30 @@ export default function DebtPage() {
   const isAr = lang === "ar";
   const [activeTab, setActiveTab] = useState<"timeline" | "creditors" | "service" | "regional">("timeline");
 
-  const latestData = timelineData[timelineData.length - 1];
-  const baseData = timelineData[0];
+  // Wire to Convex
+  const convexTimeline = useQuery(api.debt.getDebtTimeline);
+  const convexLatest = useQuery(api.debt.getLatestDebtRecord);
+
+  const activeTimelineForPage: TimelineDataPoint[] =
+    convexTimeline && convexTimeline.length > 0
+      ? convexTimeline.map((r) => ({
+          year: new Date(r.date).getFullYear(),
+          externalDebt: r.totalExternalDebt ?? 0,
+          debtToGDP: r.debtToGdpRatio ?? 0,
+        }))
+      : timelineData;
+
+  const latestData =
+    convexLatest
+      ? { externalDebt: convexLatest.totalExternalDebt ?? 0, debtToGDP: convexLatest.debtToGdpRatio ?? 0, year: new Date(convexLatest.date).getFullYear() }
+      : activeTimelineForPage[activeTimelineForPage.length - 1] ?? timelineData[timelineData.length - 1];
+
+  const baseData = activeTimelineForPage[0] ?? timelineData[0];
   const increasePercent = Math.round(
     ((latestData.externalDebt - baseData.externalDebt) / baseData.externalDebt) * 100
   );
+
+  // debtByCreditor schema has no annualPayment field — fall back to demo total when using Convex data
   const totalAnnualPayments = creditors.reduce((s, c) => s + c.annualPayment, 0);
 
   const tabs = [

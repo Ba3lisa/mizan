@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import {
   ChevronDown,
   ChevronRight,
@@ -332,13 +334,95 @@ function CategorySection({ cat, isAr }: { cat: DataCategory; isAr: boolean }) {
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
 
+// ─── Convex data overview type ────────────────────────────────────────────────
+
+interface DataCategoryOverview {
+  tableName: string;
+  recordCount: number;
+  lastRefreshAt: number | null;
+  lastRefreshStatus: "success" | "failed" | null;
+  sourceUrl: string;
+}
+
+function formatAdminRefreshTime(timestamp: number | null, isAr: boolean): string {
+  if (!timestamp) return isAr ? "غير محدد" : "Unknown";
+  return new Date(timestamp).toLocaleString(isAr ? "ar-EG" : "en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function mapOverviewStatus(status: "success" | "failed" | null): DataStatus {
+  if (status === "success") return "success";
+  if (status === "failed") return "failed";
+  return "stale";
+}
+
+// Maps table names (from adminDashboard) to the DataCategory key they enrich
+const TABLE_TO_CATEGORY: Record<string, string> = {
+  officials: "government",
+  ministries: "government",
+  governorates: "government",
+  parliamentMembers: "parliament",
+  parties: "parliament",
+  constitutionArticles: "constitution",
+  fiscalYears: "budget",
+  budgetItems: "budget",
+  debtRecords: "debt",
+  elections: "elections",
+};
+
 export default function AdminPage() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
-  const successCount = categories.filter((c) => c.status === "success").length;
-  const staleCount = categories.filter((c) => c.status === "stale").length;
-  const failedCount = categories.filter((c) => c.status === "failed").length;
+  // ─── Wire to Convex ───────────────────────────────────────────────────────
+  const convexOverview = useQuery(api.adminDashboard.getDataOverview);
+
+  // Enrich each demo category with live Convex record counts / refresh times
+  const enrichedCategories: DataCategory[] = categories.map((cat) => {
+    if (!convexOverview) return cat;
+
+    // Find the primary table for this category
+    const primaryTable = Object.entries(TABLE_TO_CATEGORY).find(
+      ([, catKey]) => catKey === cat.key
+    )?.[0];
+
+    if (!primaryTable) return cat;
+
+    const overview = convexOverview[primaryTable] as DataCategoryOverview | undefined;
+    if (!overview) return cat;
+
+    // Aggregate record counts for all tables in this category
+    const allTablesForCat = Object.entries(TABLE_TO_CATEGORY)
+      .filter(([, catKey]) => catKey === cat.key)
+      .map(([tableName]) => (convexOverview[tableName] as DataCategoryOverview | undefined)?.recordCount ?? 0);
+    const totalRecords = allTablesForCat.reduce((s, n) => s + n, 0);
+
+    const refreshTime = formatAdminRefreshTime(overview.lastRefreshAt, isAr);
+    const status = mapOverviewStatus(overview.lastRefreshStatus);
+
+    const enrichedStats = cat.stats.map((s, i) => {
+      if (i === 0) {
+        return { ...s, value: totalRecords > 0 ? totalRecords : s.value };
+      }
+      return s;
+    });
+
+    return {
+      ...cat,
+      status,
+      lastRefreshAr: overview.lastRefreshAt ? refreshTime : cat.lastRefreshAr,
+      lastRefreshEn: overview.lastRefreshAt ? refreshTime : cat.lastRefreshEn,
+      stats: enrichedStats,
+    };
+  });
+
+  const activeCategories = convexOverview ? enrichedCategories : categories;
+
+  const successCount = activeCategories.filter((c) => c.status === "success").length;
+  const staleCount = activeCategories.filter((c) => c.status === "stale").length;
+  const failedCount = activeCategories.filter((c) => c.status === "failed").length;
 
   return (
     <div className="page-content" dir={dir}>
@@ -393,7 +477,7 @@ export default function AdminPage() {
             {isAr ? "نظرة سريعة" : "Quick Overview"}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories.map((cat) => (
+            {activeCategories.map((cat) => (
               <HealthCard key={cat.key} cat={cat} isAr={isAr} />
             ))}
           </div>
@@ -405,7 +489,7 @@ export default function AdminPage() {
             {isAr ? "تفاصيل كل قسم" : "Category Details"}
           </p>
           <div className="flex flex-col gap-3">
-            {categories.map((cat) => (
+            {activeCategories.map((cat) => (
               <CategorySection key={cat.key} cat={cat} isAr={isAr} />
             ))}
           </div>

@@ -233,9 +233,97 @@ function DataRegistry({ isAr }: { isAr: boolean }) {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
+// ─── Types for Convex data ───────────────────────────────────────────────────
+
+interface ConvexRefreshLog {
+  _id: string;
+  category: string;
+  status: string;
+  startedAt: number;
+  completedAt?: number;
+  recordsUpdated?: number;
+  sourceUrl?: string;
+  changes: Array<{
+    action: string;
+    tableName: string;
+    descriptionAr: string;
+    descriptionEn: string;
+    previousValue?: string;
+    newValue?: string;
+    sourceUrl?: string;
+  }>;
+}
+
+interface ConvexCategoryHealth {
+  category: string;
+  lastRefreshTime: number | null;
+  lastAttemptTime: number | null;
+  lastStatus: string | null;
+  recordsUpdated: number | null;
+  sourceUrl: string | null;
+}
+
+function formatRelativeTime(timestamp: number | null): string {
+  if (!timestamp) return "Never";
+  const diff = Date.now() - timestamp;
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours < 1) return "< 1h ago";
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function mapConvexStatus(status: string | null): "success" | "failed" | "flagged" {
+  if (status === "success") return "success";
+  if (status === "failed") return "failed";
+  return "flagged";
+}
+
 export default function TransparencyPage() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
+
+  // ─── Convex queries ───────────────────────────────────────────────────────
+  const convexActivity = useQuery(api.transparency.getRecentActivity, { limit: 10 });
+  const convexCategoryHealth = useQuery(api.transparency.getCategoryHealth);
+
+  // ─── Map Convex data or fall back to demo data ────────────────────────────
+  const activeRuns: RefreshRun[] = convexActivity
+    ? (convexActivity as unknown as ConvexRefreshLog[]).map((log) => ({
+        id: log._id,
+        timestamp: new Date(log.startedAt).toISOString().replace("T", " ").slice(0, 16) + " UTC",
+        timestampAr: new Date(log.startedAt).toLocaleString("ar-EG"),
+        category: log.category,
+        categoryAr: log.category,
+        status: log.status as "success" | "failed" | "in_progress",
+        recordsUpdated: log.recordsUpdated ?? 0,
+        duration: log.completedAt
+          ? `${((log.completedAt - log.startedAt) / 1000).toFixed(1)}s`
+          : "...",
+        changes: (log.changes ?? []).map((c) => ({
+          action: c.action as Change["action"],
+          table: c.tableName,
+          descriptionAr: c.descriptionAr,
+          descriptionEn: c.descriptionEn,
+          sourceUrl: c.sourceUrl,
+          previousValue: c.previousValue,
+          newValue: c.newValue,
+        })),
+      }))
+    : recentRuns;
+
+  const activeCategoryHealth = convexCategoryHealth
+    ? convexCategoryHealth.map((ch: ConvexCategoryHealth) => ({
+        key: ch.category,
+        ar: ch.category,
+        en: ch.category.charAt(0).toUpperCase() + ch.category.slice(1),
+        lastRefresh: formatRelativeTime(ch.lastRefreshTime),
+        lastRefreshAr: formatRelativeTime(ch.lastRefreshTime),
+        status: mapConvexStatus(ch.lastStatus),
+        records: ch.recordsUpdated ?? 0,
+        source: ch.sourceUrl ?? "",
+      }))
+    : categoryHealth;
 
   return (
     <div className="page-content" dir={dir}>
@@ -264,7 +352,7 @@ export default function TransparencyPage() {
 
         {/* Category Health */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
-          {categoryHealth.map(cat => (
+          {activeCategoryHealth.map(cat => (
             <Card key={cat.key} className="border-border/60">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -288,7 +376,7 @@ export default function TransparencyPage() {
         <h2 className="text-sm font-bold mb-6">{isAr ? "سجل النشاط" : "Activity Feed"}</h2>
 
         <div className="space-y-4">
-          {recentRuns.map(run => (
+          {activeRuns.map(run => (
             <Card key={run.id} className={cn(
               "border-border/60",
               run.status === "failed" && "border-red-500/30"

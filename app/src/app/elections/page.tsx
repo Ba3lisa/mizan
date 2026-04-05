@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Check } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -563,9 +565,49 @@ function ReferendumsTab() {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+// ─── Type for Convex presidential elections ──────────────────────────────────
+
+interface ConvexElectionResult {
+  candidateNameEn: string;
+  candidateNameAr: string;
+  votes: number;
+  percentage: number;
+  isWinner: boolean;
+}
+
+interface ConvexElection {
+  _id: string;
+  year: number;
+  dateHeld: string;
+  turnoutPercentage?: number;
+  totalVotesCast?: number;
+  results: ConvexElectionResult[];
+}
+
 export default function ElectionsPage() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
+
+  // ─── Wire to Convex ───────────────────────────────────────────────────────
+  const convexPresidential = useQuery(api.elections.listPresidentialElections);
+
+  const activePresidentialElections: PresidentialElection[] =
+    convexPresidential && convexPresidential.length > 0
+      ? (convexPresidential as unknown as ConvexElection[]).map((e) => ({
+          year: e.year,
+          dateAr: e.dateHeld,
+          dateEn: e.dateHeld,
+          turnout: e.turnoutPercentage ?? 0,
+          totalVotes: e.totalVotesCast ?? 0,
+          candidates: (e.results ?? []).map((r) => ({
+            nameAr: r.candidateNameAr,
+            nameEn: r.candidateNameEn,
+            votes: r.votes,
+            pct: r.percentage,
+            winner: r.isWinner,
+          })),
+        }))
+      : presidentialElections;
 
   return (
     <div className="page-content" dir={dir}>
@@ -603,7 +645,7 @@ export default function ElectionsPage() {
                   {isAr ? "الانتخابات الرئاسية" : "Presidential Elections"} — 2014 · 2018 · 2024
                 </h2>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {presidentialElections.map((election) => (
+                  {activePresidentialElections.map((election) => (
                     <ElectionCard key={election.year} election={election} />
                   ))}
                 </div>

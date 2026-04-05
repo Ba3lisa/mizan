@@ -2,6 +2,8 @@
 
 import { useState, useMemo, useRef, Fragment } from "react";
 import { Search, X, ChevronDown, ChevronUp } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import {
   useReactTable,
   getCoreRowModel,
@@ -70,7 +72,10 @@ interface Committee {
   memberIds: string[];
 }
 
-// ─── Demo Data ────────────────────────────────────────────────────────────────
+// ─── Fallback / Demo Data ─────────────────────────────────────────────────────
+// Sub-components use these module-level arrays directly. Live Convex data is
+// used at the page level for stats and passed as props where sub-components
+// have been updated to accept them.
 
 const parties: Party[] = [
   { id: "nfp", nameAr: "مستقبل وطن", nameEn: "Nation's Future Party", color: "#1B4F72", houseSeats: 315, senateSeats: 147, ideologyAr: "قومية، وسط يمين", ideologyEn: "Nationalism, Centre-right" },
@@ -356,9 +361,9 @@ function InteractiveHemicycle({ chamber }: { chamber: "house" | "senate" }) {
           <div
             className="absolute z-20 bg-popover border border-border rounded-lg shadow-xl px-3 py-2 pointer-events-none text-xs max-w-[200px]"
             style={{
-              left: `${(hoveredSeat.x / width) * 100}%`,
-              top: `${(hoveredSeat.y / height) * 100}%`,
-              transform: "translate(-50%, -110%)",
+              left: `${((hoveredSeat.x - 100) / 400) * 100}%`,
+              top: `${((hoveredSeat.y - 80) / 240) * 100}%`,
+              transform: "translate(-50%, calc(-100% - 12px))",
             }}
           >
             {hoveredMember ? (
@@ -928,9 +933,17 @@ export default function ParliamentPage() {
   const [directoryPartyFilter, setDirectoryPartyFilter] = useState("all");
   const [subTab, setSubTab] = useState("hemicycle");
 
-  const houseSeats = parties.reduce((s, p) => s + p.houseSeats, 0);
-  const senateSeats = parties.reduce((s, p) => s + p.senateSeats, 0);
-  const houseParties = parties.filter((p) => p.houseSeats > 0).length;
+  // Live Convex data — used for stats and party list
+  const liveParties = useQuery(api.parliament.listParties);
+  const liveHouseStats = useQuery(api.parliament.getParliamentStats, { chamber: "house" });
+  const liveSenateStats = useQuery(api.parliament.getParliamentStats, { chamber: "senate" });
+  const liveHouseCommittees = useQuery(api.parliament.listCommittees, { chamber: "house" });
+
+  // Stats — use live data when available, fallback to hardcoded
+  const houseSeats = liveHouseStats?.totalMembers ?? parties.reduce((s, p) => s + p.houseSeats, 0);
+  const senateSeats = liveSenateStats?.totalMembers ?? parties.reduce((s, p) => s + p.senateSeats, 0);
+  const houseParties = liveParties?.length ?? parties.filter((p) => p.houseSeats > 0).length;
+  const houseCommitteeCount = liveHouseCommittees?.length ?? committees.length;
   const houseWomen = Math.round(houseSeats * 0.152);
 
   const activeSeats = chamber === "house" ? houseSeats : senateSeats;
@@ -960,11 +973,11 @@ export default function ParliamentPage() {
           <TabsList className="mb-2">
             <TabsTrigger value="house">
               {isAr ? "مجلس النواب" : "House"}{" "}
-              <span className="ms-1.5 font-mono text-xs opacity-60">596</span>
+              <span className="ms-1.5 font-mono text-xs opacity-60">{houseSeats}</span>
             </TabsTrigger>
             <TabsTrigger value="senate">
               {isAr ? "مجلس الشيوخ" : "Senate"}{" "}
-              <span className="ms-1.5 font-mono text-xs opacity-60">300</span>
+              <span className="ms-1.5 font-mono text-xs opacity-60">{senateSeats}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -980,7 +993,7 @@ export default function ParliamentPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">{t.committees}</p>
-              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{committees.length}</p>
+              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{houseCommitteeCount}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">{isAr ? "نسبة المرأة" : "Women %"}</p>

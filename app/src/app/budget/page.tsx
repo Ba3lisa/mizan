@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { TrendingUp, TrendingDown, Users, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 import { useCurrency } from "@/components/providers";
 import {
@@ -587,6 +589,15 @@ export default function BudgetPage() {
   const isAr = lang === "ar";
 
   const [selectedYear, setSelectedYear] = useState<FiscalYear>("2024-2025");
+
+  // ─── Convex queries ───────────────────────────────────────────────────────
+  // NOTE: The Sankey and breakdown components use the hardcoded demo data
+  // structure (BudgetCategory with sub-items) which requires restructuring
+  // the flat Convex budgetItems before they can replace the demo data.
+  // Fiscal year list is fetched to allow future year-selector wiring.
+  const _convexFiscalYears = useQuery(api.budget.listFiscalYears);
+  // Future: use _convexFiscalYears to populate the year selector when
+  // the budgetItems data structure is refactored to match BudgetCategory shape.
 
   const gdp = FISCAL_YEAR_GDP[selectedYear];
   const population = FISCAL_YEAR_POPULATION[selectedYear];
