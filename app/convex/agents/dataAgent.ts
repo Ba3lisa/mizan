@@ -472,6 +472,66 @@ const WB_INDICATORS: Array<{
     unit: "egp_per_usd",
     sourceNameEn: "World Bank — Official exchange rate (LCU per USD, period average)",
   },
+  {
+    code: "BX.TRF.PWKR.CD.DT",
+    indicator: "remittances",
+    unit: "billion_usd",
+    scaleFactor: 1e9,
+    sourceNameEn: "World Bank",
+  },
+  {
+    code: "BX.KLT.DINV.CD.WD",
+    indicator: "fdi_inflows",
+    unit: "billion_usd",
+    scaleFactor: 1e9,
+    sourceNameEn: "World Bank",
+  },
+  {
+    code: "ST.INT.RCPT.CD",
+    indicator: "tourism_receipts",
+    unit: "billion_usd",
+    scaleFactor: 1e9,
+    sourceNameEn: "World Bank",
+  },
+  {
+    code: "BN.CAB.XOKA.CD",
+    indicator: "current_account",
+    unit: "billion_usd",
+    scaleFactor: 1e9,
+    sourceNameEn: "World Bank",
+  },
+  {
+    code: "NY.GDP.MKTP.CD",
+    indicator: "gdp_nominal",
+    unit: "billion_usd",
+    scaleFactor: 1e9,
+    sourceNameEn: "World Bank",
+  },
+  {
+    code: "NY.GDP.PCAP.CD",
+    indicator: "gdp_per_capita",
+    unit: "usd",
+    sourceNameEn: "World Bank",
+  },
+  {
+    code: "SP.POP.TOTL",
+    indicator: "population",
+    unit: "millions",
+    scaleFactor: 1e6,
+    sourceNameEn: "World Bank",
+  },
+  {
+    code: "SI.POV.NAHC",
+    indicator: "poverty_rate",
+    unit: "percent",
+    sourceNameEn: "World Bank",
+  },
+  {
+    code: "DT.TDS.DECT.EX.ZS",
+    indicator: "debt_service_exports",
+    unit: "percent",
+    sourceNameEn: "World Bank",
+  },
 ];
 
 async function refreshEconomyData(
@@ -527,10 +587,241 @@ async function refreshEconomyData(
     }
   }
 
+  // Also refresh EGX 30 stock market index
+  const stockResult = await refreshStockMarket(ctx);
+  totalUpdated += stockResult.recordsUpdated;
+
   return {
     recordsUpdated: totalUpdated,
     sourceUrl: "https://api.worldbank.org/v2/country/EGY/indicator",
   };
+}
+
+// ─── STOCK MARKET REFRESH ─────────────────────────────────────────────────────
+
+async function refreshStockMarket(
+  ctx: ActionCtx
+): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
+  const SOURCE_URL = "https://countryeconomy.com/stock-exchange/egypt";
+
+  let pageText = "";
+  try {
+    const response = await fetch(SOURCE_URL, { signal: AbortSignal.timeout(15000) });
+    if (!response.ok) {
+      console.warn(
+        `[dataAgent/stock] countryeconomy.com returned status ${response.status}`
+      );
+      return { recordsUpdated: 0 };
+    }
+    pageText = await response.text();
+  } catch (err) {
+    console.warn(`[dataAgent/stock] Failed to fetch stock page: ${String(err)}`);
+    return { recordsUpdated: 0 };
+  }
+
+  // Try regex to extract EGX 30 value from a <td> tag
+  // The page typically has patterns like: <td>EGX 30</td><td>30,000.00</td>
+  // or a number like 30123.45 near "EGX 30"
+  let egx30Value: number | null = null;
+
+  const egxRegex = /EGX\s*30[^<]*<\/td>\s*<td[^>]*>([0-9,]+(?:\.[0-9]+)?)/i;
+  const match = egxRegex.exec(pageText);
+  if (match) {
+    const raw = match[1].replace(/,/g, "");
+    const parsed = parseFloat(raw);
+    if (!isNaN(parsed) && parsed > 0) {
+      egx30Value = parsed;
+    }
+  }
+
+  // Fallback: try a broader pattern for any number near EGX 30
+  if (egx30Value === null) {
+    const broadRegex = /EGX[\s\-_]*30[^0-9]*([0-9]{4,6}(?:[.,][0-9]+)?)/i;
+    const broadMatch = broadRegex.exec(pageText.slice(0, 20000));
+    if (broadMatch) {
+      const raw = broadMatch[1].replace(/,/g, "");
+      const parsed = parseFloat(raw);
+      if (!isNaN(parsed) && parsed > 0) {
+        egx30Value = parsed;
+      }
+    }
+  }
+
+  // Fallback to Claude if regex fails
+  if (egx30Value === null) {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (apiKey) {
+      const snippet = pageText.slice(0, 10000);
+      const claudeResponse = await callClaude(
+        `Extract the current EGX 30 (Egyptian Stock Exchange index) value from this page.
+Return only the number as plain text, no units, no commas, no prose.
+If you cannot find the value, return null.
+
+Page content:
+${snippet}`,
+        "You are a data extraction assistant. Return only a number or null."
+      );
+      if (claudeResponse) {
+        const trimmed = claudeResponse.trim();
+        if (trimmed !== "null" && trimmed !== "") {
+          const cleaned = trimmed.replace(/,/g, "");
+          const parsed = parseFloat(cleaned);
+          if (!isNaN(parsed) && parsed > 0) {
+            egx30Value = parsed;
+          }
+        }
+      }
+    } else {
+      console.warn("[dataAgent/stock] Regex extraction failed and ANTHROPIC_API_KEY not set — skipping EGX 30.");
+    }
+  }
+
+  if (egx30Value === null) {
+    console.warn("[dataAgent/stock] Could not extract EGX 30 value from page.");
+    return { recordsUpdated: 0, sourceUrl: SOURCE_URL };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const year = today.slice(0, 4);
+
+  const updated: number = await ctx.runMutation(
+    internal.dataRefresh.upsertEconomicIndicator,
+    {
+      indicator: "egx30",
+      date: today,
+      year,
+      value: egx30Value,
+      unit: "points",
+      sourceUrl: SOURCE_URL,
+      sourceNameEn: "Country Economy — EGX 30",
+    }
+  );
+
+  console.log(`[dataAgent/stock] EGX 30 = ${egx30Value} (updated: ${updated})`);
+  return { recordsUpdated: updated, sourceUrl: SOURCE_URL };
+}
+
+// ─── ECONOMIC NARRATIVE GENERATOR ─────────────────────────────────────────────
+
+async function generateEconomicNarrative(ctx: ActionCtx): Promise<void> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.warn("[dataAgent/narrative] Skipping narrative — ANTHROPIC_API_KEY not set.");
+    return;
+  }
+
+  // Collect the latest value for each indicator
+  const indicatorKeys = [
+    "gdp_growth",
+    "inflation",
+    "unemployment",
+    "exchange_rate",
+    "reserves",
+    "remittances",
+    "fdi_inflows",
+    "tourism_receipts",
+    "current_account",
+    "gdp_nominal",
+    "gdp_per_capita",
+    "population",
+    "poverty_rate",
+    "debt_service_exports",
+    "egx30",
+  ] as const;
+
+  const indicatorData: Record<string, { value: number; unit: string; date: string }> = {};
+
+  for (const key of indicatorKeys) {
+    const record: { indicator: string; date: string; year?: string; value: number; unit: string } | null =
+      await ctx.runQuery(internal.dataRefresh.getLatestIndicator, { indicator: key });
+    if (record) {
+      indicatorData[key] = { value: record.value, unit: record.unit, date: record.date };
+    }
+  }
+
+  if (Object.keys(indicatorData).length === 0) {
+    console.warn("[dataAgent/narrative] No indicator data available for narrative generation.");
+    return;
+  }
+
+  const indicatorSummary = Object.entries(indicatorData)
+    .map(([k, v]) => `${k}: ${v.value} ${v.unit} (as of ${v.date})`)
+    .join("\n");
+
+  const systemPrompt = `You are an economic analyst for Mizan, Egypt's government transparency platform.
+Generate concise, factual, apolitical economic insights based on data.
+Always respond with valid JSON only — no markdown, no prose.`;
+
+  const prompt = `Based on these latest Egyptian economic indicators, generate 3-5 concise economic insights.
+Each insight must:
+- Tell a data-driven story
+- Be apolitical and factual
+- Cite the specific numbers from the data
+- Be bilingual (English and Arabic)
+
+Indicators:
+${indicatorSummary}
+
+Return a JSON object with this structure:
+{
+  "titleEn": "Egypt Economic Update <year>",
+  "titleAr": "تحديث الاقتصاد المصري <year>",
+  "summaryEn": "Brief 1-2 sentence summary in English",
+  "summaryAr": "ملخص موجز بالعربية",
+  "contentEn": "Full narrative with 3-5 insights in English, each citing specific numbers",
+  "contentAr": "السرد الكامل بالعربية مع 3-5 رؤى مع ذكر الأرقام المحددة"
+}`;
+
+  const claudeResponse = await callClaude(prompt, systemPrompt);
+  if (!claudeResponse) {
+    console.warn("[dataAgent/narrative] Claude returned no narrative.");
+    return;
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    let jsonStr = claudeResponse;
+    const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fence) jsonStr = fence[1];
+    parsed = JSON.parse(jsonStr.trim()) as Record<string, unknown>;
+  } catch {
+    console.warn("[dataAgent/narrative] Could not parse Claude narrative response as JSON.");
+    return;
+  }
+
+  const titleEn = typeof parsed.titleEn === "string" ? parsed.titleEn : "Egypt Economic Update";
+  const titleAr = typeof parsed.titleAr === "string" ? parsed.titleAr : "تحديث الاقتصاد المصري";
+  const summaryEn = typeof parsed.summaryEn === "string" ? parsed.summaryEn : "";
+  const summaryAr = typeof parsed.summaryAr === "string" ? parsed.summaryAr : "";
+  const contentEn = typeof parsed.contentEn === "string" ? parsed.contentEn : "";
+  const contentAr = typeof parsed.contentAr === "string" ? parsed.contentAr : "";
+
+  if (!summaryEn || !contentEn) {
+    console.warn("[dataAgent/narrative] Incomplete narrative from Claude — skipping insert.");
+    return;
+  }
+
+  const sourcesChecked = Object.keys(indicatorData).map((k) => ({
+    nameEn: `World Bank — ${k}`,
+    url: "https://api.worldbank.org/v2/country/EGY/indicator",
+    accessible: true,
+  }));
+
+  await ctx.runMutation(internal.dataRefresh.insertAiResearchReport, {
+    titleEn,
+    titleAr,
+    category: "economy" as const,
+    summaryEn,
+    summaryAr,
+    contentEn,
+    contentAr,
+    sourcesChecked,
+    findingsCount: Object.keys(indicatorData).length,
+    discrepanciesFound: 0,
+    agentModel: "claude-haiku-4-5-20251001",
+  });
+
+  console.log("[dataAgent/narrative] Economic narrative inserted successfully.");
 }
 
 // ─── CATEGORY DISPATCHER ─────────────────────────────────────────────────────
@@ -722,6 +1013,15 @@ export const orchestrateRefresh = internalAction({
     } catch (err) {
       console.warn(
         `[dataAgent] Constitution refresh failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+
+    // After all category refreshes, generate AI economic narrative
+    try {
+      await generateEconomicNarrative(ctx);
+    } catch (err) {
+      console.warn(
+        `[dataAgent] Economic narrative generation failed: ${err instanceof Error ? err.message : String(err)}`
       );
     }
 

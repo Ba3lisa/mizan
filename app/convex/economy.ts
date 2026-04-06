@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { Doc } from "./_generated/dataModel";
 
 /**
  * Get the latest N values for a given indicator, ordered newest-first.
@@ -35,6 +36,16 @@ export const getAllLatest = query({
       "exchange_rate",
       "reserves",
       "suez_revenue",
+      "remittances",
+      "fdi_inflows",
+      "tourism_receipts",
+      "current_account",
+      "gdp_nominal",
+      "gdp_per_capita",
+      "population",
+      "poverty_rate",
+      "debt_service_exports",
+      "egx30",
     ] as const;
 
     const result: Record<string, {
@@ -89,5 +100,20 @@ export const getIndicatorTimeline = query({
       )
       .order("asc")
       .collect();
+  },
+});
+
+/**
+ * Get the most recent AI-generated economic narrative for Egypt.
+ * Returns the latest aiResearchReports document with category "economy".
+ */
+export const getLatestNarrative = query({
+  args: {},
+  handler: async (ctx): Promise<Doc<"aiResearchReports"> | null> => {
+    return await ctx.db
+      .query("aiResearchReports")
+      .withIndex("by_category", (q) => q.eq("category", "economy"))
+      .order("desc")
+      .first();
   },
 });

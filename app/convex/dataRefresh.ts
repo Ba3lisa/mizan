@@ -578,6 +578,76 @@ export const logChange = internalMutation({
   },
 });
 
+/**
+ * Returns the most recent record for a given economic indicator.
+ * Used by the narrative generator in the data agent.
+ */
+export const getLatestIndicator = internalQuery({
+  args: {
+    indicator: v.string(),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("economicIndicators")
+      .withIndex("by_indicator_and_date", (q) =>
+        q.eq("indicator", args.indicator)
+      )
+      .order("desc")
+      .first();
+  },
+});
+
+/**
+ * Inserts a new AI research report into the aiResearchReports table.
+ * Called by the narrative generator after generating economic insights.
+ */
+export const insertAiResearchReport = internalMutation({
+  args: {
+    titleEn: v.string(),
+    titleAr: v.string(),
+    category: v.union(
+      v.literal("government"),
+      v.literal("parliament"),
+      v.literal("constitution"),
+      v.literal("budget"),
+      v.literal("debt"),
+      v.literal("elections"),
+      v.literal("economy")
+    ),
+    summaryEn: v.string(),
+    summaryAr: v.string(),
+    contentEn: v.string(),
+    contentAr: v.string(),
+    sourcesChecked: v.array(
+      v.object({
+        nameEn: v.string(),
+        url: v.string(),
+        accessible: v.boolean(),
+      })
+    ),
+    findingsCount: v.number(),
+    discrepanciesFound: v.number(),
+    agentModel: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.insert("aiResearchReports", {
+      titleEn: args.titleEn,
+      titleAr: args.titleAr,
+      category: args.category,
+      summaryEn: args.summaryEn,
+      summaryAr: args.summaryAr,
+      contentEn: args.contentEn,
+      contentAr: args.contentAr,
+      sourcesChecked: args.sourcesChecked,
+      findingsCount: args.findingsCount,
+      discrepanciesFound: args.discrepanciesFound,
+      generatedAt: Date.now(),
+      agentModel: args.agentModel,
+    });
+    return null;
+  },
+});
+
 // ─── INTERNAL ACTIONS ────────────────────────────────────────────────────────
 
 export const refreshDebtData = internalAction({
