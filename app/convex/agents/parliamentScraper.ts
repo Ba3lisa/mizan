@@ -121,41 +121,86 @@ export const scrapeMemberBatch = internalAction({
 });
 
 /**
- * Orchestrates scraping all parliament members in batches.
- * Each batch is a separate action call to avoid timeout.
+ * Scrape a single batch and schedule the next one.
+ * Uses scheduler to chain batches, avoiding action timeout.
+ * Call with startId=1 to begin the full scrape.
+ */
+export const scrapeAndContinue = internalAction({
+  args: {
+    startId: v.number(),
+    maxId: v.number(),
+    batchSize: v.number(),
+    totalSaved: v.number(),
+  },
+  handler: async (ctx, args) => {
+    if (args.startId > args.maxId) {
+      // All batches done -- log completion
+      console.log(
+        `[parliamentScraper] All batches complete: ${args.totalSaved} members saved`
+      );
+      const logId = await ctx.runMutation(
+        internal.dataRefresh.logRefreshStart,
+        { category: "parliament" }
+      );
+      await ctx.runMutation(internal.dataRefresh.logRefreshComplete, {
+        logId,
+        recordsUpdated: args.totalSaved,
+        sourceUrl: "https://www.parliament.gov.eg/members.aspx",
+      });
+      return;
+    }
+
+    // Run this batch
+    let batchSaved = 0;
+    try {
+      const result: { scraped: number; saved: number } = await ctx.runAction(
+        internal.agents.parliamentScraper.scrapeMemberBatch,
+        {
+          startId: args.startId,
+          batchSize: Math.min(args.batchSize, args.maxId - args.startId + 1),
+        }
+      );
+      batchSaved = result.saved;
+    } catch (err) {
+      console.warn(`[parliamentScraper] Batch ${args.startId} failed: ${err}`);
+    }
+
+    // Schedule next batch (runs immediately after this action completes)
+    await ctx.scheduler.runAfter(
+      0,
+      internal.agents.parliamentScraper.scrapeAndContinue,
+      {
+        startId: args.startId + args.batchSize,
+        maxId: args.maxId,
+        batchSize: args.batchSize,
+        totalSaved: args.totalSaved + batchSaved,
+      }
+    );
+  },
+});
+
+/**
+ * Start scraping all parliament members.
+ * Kicks off the first batch, which chains to subsequent batches via scheduler.
  */
 export const scrapeAllMembers = internalAction({
   args: { maxId: v.optional(v.number()) },
   handler: async (ctx, args) => {
     const maxId = args.maxId ?? 600;
-    const batchSize = 20; // 20 members per batch (10s per member = ~200s per batch)
-    let totalSaved = 0;
+    console.log(`[parliamentScraper] Starting full scrape (ids 1-${maxId})...`);
 
-    for (let startId = 1; startId <= maxId; startId += batchSize) {
-      try {
-        const result: { scraped: number; saved: number } = await ctx.runAction(
-          internal.agents.parliamentScraper.scrapeMemberBatch,
-          { startId, batchSize: Math.min(batchSize, maxId - startId + 1) }
-        );
-        totalSaved += result.saved;
-        console.log(`[parliamentScraper] Progress: ${startId + batchSize - 1}/${maxId}, total saved: ${totalSaved}`);
-      } catch (err) {
-        console.warn(`[parliamentScraper] Batch starting at ${startId} failed: ${err}`);
+    // Schedule first batch -- it will chain the rest
+    await ctx.scheduler.runAfter(
+      0,
+      internal.agents.parliamentScraper.scrapeAndContinue,
+      {
+        startId: 1,
+        maxId,
+        batchSize: 10, // 10 per batch to stay within action timeout
+        totalSaved: 0,
       }
-    }
-
-    // Log the refresh
-    const logId = await ctx.runMutation(
-      internal.dataRefresh.logRefreshStart,
-      { category: "parliament" }
     );
-    await ctx.runMutation(internal.dataRefresh.logRefreshComplete, {
-      logId,
-      recordsUpdated: totalSaved,
-      sourceUrl: "https://www.parliament.gov.eg/members.aspx",
-    });
 
-    console.log(`[parliamentScraper] Complete: ${totalSaved} members scraped from parliament.gov.eg`);
-    return { totalSaved };
+    return { status: "started", maxId };
   },
 });
