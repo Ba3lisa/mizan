@@ -84,10 +84,15 @@ export default function HomePage() {
             <p className="text-base md:text-lg text-muted-foreground mb-2">
               {isAr ? "الحكومة المصرية، مرئية للجميع." : "Egypt's government, made visible."}
             </p>
-            <p className="text-sm text-muted-foreground/60 mx-auto mb-10 max-w-sm leading-relaxed">
+            <p className="text-sm text-muted-foreground/60 mx-auto mb-6 max-w-sm leading-relaxed">
               {isAr
                 ? "بيانات موثّقة عن البرلمان والوزارات والدستور والميزانية والديون."
                 : "Cited data on parliament, ministries, constitution, budget, and debt."}
+            </p>
+            <p className="text-xs text-muted-foreground/40 mx-auto mb-10 max-w-md leading-relaxed">
+              {isAr
+                ? "هذا الموقع يُدار بالكامل بواسطة الذكاء الاصطناعي — من جمع البيانات إلى التحقق والعرض. اعرف المزيد في صفحات الشفافية والمنهجية."
+                : "This site is fully managed by AI — from data collection to verification and display. Learn more on the Transparency and Methodology pages."}
             </p>
             <div className="flex flex-wrap justify-center gap-3">
               <Button asChild size="lg" className="gap-2 rounded-full px-7 font-bold">
@@ -143,6 +148,55 @@ export default function HomePage() {
               </Link>
             );
           })}
+        </div>
+      </section>
+
+      {/* ════════ AI-MANAGED ════════ */}
+      <section className="border-y border-border bg-card/30">
+        <div className="container-page py-12 md:py-16">
+          <div className="flex items-center gap-2 mb-2">
+            <Bot size={16} className="text-primary" />
+            <h2 className="text-sm font-bold">
+              {isAr ? "موقع يُدار بالذكاء الاصطناعي" : "AI-Managed Platform"}
+            </h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-6 max-w-lg">
+            {isAr
+              ? "كل البيانات تُجمع وتُحقق وتُحدث تلقائياً كل ٦ ساعات بواسطة وكلاء ذكاء اصطناعي. الكود نفسه يُكتب بواسطة الذكاء الاصطناعي ويُراجع آلياً."
+              : "All data is collected, verified, and refreshed every 6 hours by AI agents. The code itself is written by AI and auto-reviewed."}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <Link href="/transparency" className="no-underline group">
+              <div className="border border-border rounded-lg p-4 hover:border-primary/40 transition-colors">
+                <p className="text-sm font-semibold group-hover:text-primary transition-colors">
+                  {isAr ? "الشفافية" : "Transparency"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isAr ? "سجل كامل لكل تحديث بيانات وقرارات الوكلاء" : "Full audit log of every data update and agent decision"}
+                </p>
+              </div>
+            </Link>
+            <Link href="/methodology" className="no-underline group">
+              <div className="border border-border rounded-lg p-4 hover:border-primary/40 transition-colors">
+                <p className="text-sm font-semibold group-hover:text-primary transition-colors">
+                  {isAr ? "المنهجية" : "Methodology"}
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isAr ? "كيف نجمع البيانات ونتحقق منها من مصادر رسمية" : "How we collect and verify data from official sources"}
+                </p>
+              </div>
+            </Link>
+            <a href="https://github.com/Ba3lisa/mizan" target="_blank" rel="noopener noreferrer" className="no-underline group">
+              <div className="border border-border rounded-lg p-4 hover:border-primary/40 transition-colors">
+                <p className="text-sm font-semibold group-hover:text-primary transition-colors inline-flex items-center gap-1.5">
+                  GitHub <ExternalLink size={12} />
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {isAr ? "الكود مفتوح المصدر — ساهم أو راجع بنفسك" : "Open source — contribute or audit the code yourself"}
+                </p>
+              </div>
+            </a>
+          </div>
         </div>
       </section>
 

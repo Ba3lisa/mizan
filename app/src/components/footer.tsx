@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Scale, ExternalLink } from "lucide-react";
+import { Scale, ExternalLink, Github } from "lucide-react";
 import { useLanguage } from "@/components/providers";
 
 const nav = [
@@ -10,6 +10,8 @@ const nav = [
   { href: "/constitution", ar: "الدستور", en: "Constitution" },
   { href: "/budget", ar: "الميزانية", en: "Budget" },
   { href: "/debt", ar: "الدين العام", en: "Debt" },
+  { href: "/transparency", ar: "الشفافية", en: "Transparency" },
+  { href: "/methodology", ar: "المنهجية", en: "Methodology" },
 ];
 
 const srcs = [
@@ -32,9 +34,13 @@ export function Footer() {
             <div className="w-5 h-5 rounded bg-primary text-primary-foreground flex items-center justify-center"><Scale size={10} strokeWidth={2} /></div>
             <span className="font-bold text-sm">{isAr ? "ميزان" : "Mizan"}</span>
           </div>
-          <p className="text-xs text-muted-foreground leading-relaxed max-w-xs">
-            {isAr ? "بيانات مفتوحة عن الحكومة المصرية." : "Open data about the Egyptian government."}
+          <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mb-3">
+            {isAr ? "بيانات مفتوحة عن الحكومة المصرية. يُدار بالكامل بواسطة الذكاء الاصطناعي." : "Open data about the Egyptian government. Fully AI-managed."}
           </p>
+          <a href="https://github.com/Ba3lisa/mizan" target="_blank" rel="noopener noreferrer"
+            className="text-xs text-muted-foreground no-underline hover:text-primary transition-colors inline-flex items-center gap-1.5">
+            <Github size={14} /> GitHub
+          </a>
         </div>
         <div>
           <h4 className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{isAr ? "التصفح" : "Navigation"}</h4>
