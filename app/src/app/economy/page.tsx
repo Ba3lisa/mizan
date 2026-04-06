@@ -3,7 +3,7 @@
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Skeleton } from "boneyard-js/react";
-import { useLanguage, useCurrency } from "@/components/providers";
+import { useLanguage } from "@/components/providers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -594,7 +594,6 @@ function AiNarrativeSection({ isAr }: { isAr: boolean }) {
 
 export default function EconomyPage() {
   const { lang, dir } = useLanguage();
-  const { currency, toggleCurrency, symbol } = useCurrency();
   const isAr = lang === "ar";
 
   const allLatest = useQuery(api.economy.getAllLatest);

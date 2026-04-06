@@ -1,20 +1,18 @@
-name: Lint
+name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
-    paths:
-      - 'app/**'
-      - 'convex/**'
-      - '.github/workflows/lint.yml'
+    types: [opened, synchronize, reopened, ready_for_review]
 
 concurrency:
-  group: lint-${{ github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint:
+  ci:
+    if: github.event.pull_request.draft == false || github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,11 +21,21 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: app/package-lock.json
-      - run: npm ci --legacy-peer-deps
+
+      - name: Install
         working-directory: app
-      - name: ESLint
+        run: npm ci --legacy-peer-deps
+
+      - name: ESLint (0 warnings)
+        working-directory: app
         run: npx eslint --max-warnings 0 .
+
+      - name: TypeScript (0 errors)
         working-directory: app
-      - name: TypeScript
         run: npx tsc --noEmit
+
+      - name: Build
         working-directory: app
+        run: npx next build
+        env:
+          NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
