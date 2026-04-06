@@ -129,7 +129,6 @@ function useCountdown(lastCompletedAt: number | null, steps: PipelineStep[]): { 
     return () => clearInterval(id);
   }, []);
 
-  // Check if any step is actually running
   const isRunning = steps.some((s) => s.status === "running");
 
   if (lastCompletedAt === null) {
@@ -198,8 +197,8 @@ export function AiPipelineStatus() {
 
   const progress = rawProgress as PipelineProgress | null | undefined;
 
-  const steps = progress?.steps ?? [];
-  const { msUntilNext, isRunning } = useCountdown(progress?.lastCompletedAt ?? null, steps);
+  const progressSteps = progress?.steps ?? [];
+  const { msUntilNext, isRunning } = useCountdown(progress?.lastCompletedAt ?? null, progressSteps);
 
   // Determine whether to start expanded (a run is in progress) or collapsed
   const hasActiveRun = progress?.steps?.some((s) => s.status === "running") ?? false;
@@ -235,8 +234,8 @@ export function AiPipelineStatus() {
     return null;
   }
 
-  const successCount = steps.filter((s) => s.status === "success").length;
-  const failedCount = steps.filter((s) => s.status === "failed").length;
+  const successCount = progressSteps.filter((s) => s.status === "success").length;
+  const failedCount = progressSteps.filter((s) => s.status === "failed").length;
 
   return (
     <section className="container-page py-4" dir={dir}>
@@ -256,7 +255,7 @@ export function AiPipelineStatus() {
               <Bot size={14} className="text-primary opacity-70" />
             )}
             <span className="text-sm font-semibold">
-              {isAr ? "حالة تدفق البيانات (الذكاء الاصطناعي)" : "AI Data Pipeline"}
+              {isAr ? "حالة خط أنابيب البيانات" : "AI Data Pipeline"}
             </span>
 
             {/* Status badges */}
@@ -303,7 +302,7 @@ export function AiPipelineStatus() {
         </div>
 
         {/* Collapsible table */}
-        {expanded && steps.length > 0 && (
+        {expanded && progressSteps.length > 0 && (
           <div className="border-t border-border/40 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -323,7 +322,7 @@ export function AiPipelineStatus() {
                 </tr>
               </thead>
               <tbody>
-                {steps.map((step, i) => (
+                {progressSteps.map((step, i) => (
                   <StepRow key={`${step.step}-${i}`} step={step} isAr={isAr} />
                 ))}
               </tbody>
@@ -332,7 +331,7 @@ export function AiPipelineStatus() {
         )}
 
         {/* Empty state when expanded but no steps */}
-        {expanded && steps.length === 0 && (
+        {expanded && progressSteps.length === 0 && (
           <div className="border-t border-border/40 px-5 py-6 text-center text-xs text-muted-foreground">
             {isAr ? "لا توجد بيانات متاحة للمراحل" : "No pipeline step data available"}
           </div>
