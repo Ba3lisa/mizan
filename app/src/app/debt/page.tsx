@@ -351,10 +351,16 @@ function CreditorBreakdown() {
       amount: c.amount ?? 0,
       creditorType: c.creditorType,
       percentageOfTotal: c.percentageOfTotal,
+      interestRate: c.interestRate as number | undefined,
+      annualDebtService: c.annualDebtService as number | undefined,
+      maturityYears: c.maturityYears as number | undefined,
+      termsNoteEn: c.termsNoteEn as string | undefined,
+      termsNoteAr: c.termsNoteAr as string | undefined,
       color: CREDITOR_COLORS[i % CREDITOR_COLORS.length],
     }))
     .sort((a, b) => b.amount - a.amount);
   const totalOwed = sorted.reduce((s, c) => s + c.amount, 0);
+  const totalAnnualInterest = sorted.reduce((s, c) => s + (c.annualDebtService ?? 0), 0);
 
   return (
     <Skeleton name="debt-creditors" loading={isCreditorLoading}>
@@ -385,10 +391,13 @@ function CreditorBreakdown() {
         <div className="flex flex-col gap-3">
           {sorted.map((creditor) => (
             <div key={creditor.creditorName} className="rounded-lg border border-border bg-card p-4">
-              <div className="flex items-start justify-between mb-3 gap-3 flex-wrap">
+              <div className="flex items-start justify-between mb-2 gap-3 flex-wrap">
                 <div>
                   <span className="text-sm font-semibold text-foreground">
                     {isAr ? (creditor.creditorNameAr ?? creditor.creditorName) : creditor.creditorName}
+                  </span>
+                  <span className="text-[0.625rem] text-muted-foreground ms-2">
+                    {creditor.creditorType}
                   </span>
                 </div>
                 <div className="text-right shrink-0">
@@ -397,6 +406,27 @@ function CreditorBreakdown() {
                   </p>
                 </div>
               </div>
+              {/* Interest rate + annual cost + maturity */}
+              {creditor.interestRate != null && (
+                <div className="flex flex-wrap gap-4 mb-2 text-xs text-muted-foreground">
+                  <span>
+                    <span className="font-semibold text-foreground">{creditor.interestRate}%</span>
+                    {" "}{isAr ? "فائدة" : "interest"}
+                  </span>
+                  {creditor.annualDebtService != null && (
+                    <span>
+                      <span className="font-semibold text-red-400">{fmtCreditor(creditor.annualDebtService)}</span>
+                      {" "}{isAr ? "فائدة سنوية" : "annual interest"}
+                    </span>
+                  )}
+                  {creditor.maturityYears != null && (
+                    <span>
+                      <span className="font-semibold text-foreground">{creditor.maturityYears}</span>
+                      {" "}{isAr ? "سنة استحقاق" : "yr maturity"}
+                    </span>
+                  )}
+                </div>
+              )}
               {/* Share bar */}
               <div className="h-2 bg-muted/50 rounded-full overflow-hidden">
                 <div
@@ -407,6 +437,25 @@ function CreditorBreakdown() {
             </div>
           ))}
         </div>
+
+        {/* Annual interest cost callout */}
+        {totalAnnualInterest > 0 && (
+          <Card className="border-red-900/30 bg-red-500/5">
+            <CardContent className="pt-4 pb-4 flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  {isAr ? "إجمالي الفوائد السنوية المقدرة" : "Estimated Total Annual Interest"}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isAr ? "المبلغ المقدر الذي تدفعه مصر سنوياً كفوائد على الدين الخارجي" : "Estimated amount Egypt pays annually in interest on external debt"}
+                </p>
+              </div>
+              <p className="font-mono text-2xl font-bold text-red-400">
+                {fmtCreditor(totalAnnualInterest)}
+              </p>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Summary table */}
         <div className="rounded-lg border border-border overflow-hidden">

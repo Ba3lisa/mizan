@@ -213,6 +213,8 @@ export default defineSchema({
     totalDomesticDebt: v.optional(v.number()),
     debtToGdpRatio: v.optional(v.number()),
     foreignReserves: v.optional(v.number()),
+    totalDebtService: v.optional(v.number()),
+    totalInterestPayments: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
   })
     .index("by_date", ["date"]),
@@ -229,6 +231,13 @@ export default defineSchema({
     ),
     amount: v.number(),
     percentageOfTotal: v.optional(v.number()),
+    // Interest and debt service fields
+    interestRate: v.optional(v.number()),
+    annualDebtService: v.optional(v.number()),
+    maturityYears: v.optional(v.number()),
+    termsNoteEn: v.optional(v.string()),
+    termsNoteAr: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
   })
     .index("by_debtRecordId", ["debtRecordId"])
     .index("by_creditorType", ["creditorType"]),
