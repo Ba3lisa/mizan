@@ -295,8 +295,8 @@ export default function GovernmentPage() {
               )}
 
               <p className="text-xs text-muted-foreground mt-8">
-                <a href="https://english.ahram.org.eg/News/562168.aspx" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-                  <ExternalLink size={10} /> ahram.org.eg
+                <a href="https://en.wikipedia.org/wiki/Madbouly_Cabinet" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
+                  <ExternalLink size={10} /> wikipedia.org
                 </a>
               </p>
             </div>
@@ -350,7 +350,7 @@ export default function GovernmentPage() {
             {filteredMinistries.length === 0 && ministries.length > 0 && <p className="text-sm text-muted-foreground py-12 text-center">{isAr ? "\u0644\u0627 \u062a\u0648\u062c\u062f \u0646\u062a\u0627\u0626\u062c" : "No results"}</p>}
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground">{filteredMinistries.length} {isAr ? "\u0648\u0632\u0627\u0631\u0629" : "ministries"}</p>
-              <a href="https://english.ahram.org.eg/News/562168.aspx" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1"><ExternalLink size={10} /> ahram.org.eg</a>
+              <a href="https://en.wikipedia.org/wiki/Madbouly_Cabinet" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1"><ExternalLink size={10} /> wikipedia.org</a>
             </div>
             </>
             </Skeleton>
