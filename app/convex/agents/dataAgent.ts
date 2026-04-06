@@ -20,7 +20,7 @@ import { callClaude } from "./providers/anthropic";
 
 type RefreshCategory = "government" | "parliament" | "budget" | "debt" | "economy";
 
-const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
+const STALE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 hours (matches cron interval)
 
 // ─── DEBT REFRESH ─────────────────────────────────────────────────────────────
 
@@ -466,12 +466,8 @@ const WB_INDICATORS: Array<{
     sourceNameEn: "World Bank — Total reserves (current USD)",
     scaleFactor: 1e9, // API returns raw USD; divide to get billions
   },
-  {
-    code: "PA.NUS.FCRF",
-    indicator: "exchange_rate",
-    unit: "egp_per_usd",
-    sourceNameEn: "World Bank — Official exchange rate (LCU per USD, period average)",
-  },
+  // Exchange rate removed from WB -- annual average is outdated.
+  // Live rate fetched separately from Frankfurter API (see refreshEconomyData).
   {
     code: "BX.TRF.PWKR.CD.DT",
     indicator: "remittances",
@@ -587,6 +583,36 @@ async function refreshEconomyData(
     }
   }
 
+  // Live exchange rate from ExchangeRate-API (free, no key, updated daily)
+  try {
+    const fxRes = await fetch("https://open.er-api.com/v6/latest/USD", {
+      signal: AbortSignal.timeout(10000),
+    });
+    if (fxRes.ok) {
+      const fxData = await fxRes.json() as { rates?: { EGP?: number }; time_last_update_utc?: string };
+      const egpRate = fxData?.rates?.EGP;
+      if (egpRate && egpRate > 0) {
+        const today = new Date().toISOString().slice(0, 10);
+        const updated: number = await ctx.runMutation(
+          internal.dataRefresh.upsertEconomicIndicator,
+          {
+            indicator: "exchange_rate",
+            date: today,
+            year: today.slice(0, 4),
+            value: egpRate,
+            unit: "egp_per_usd",
+            sourceUrl: "https://open.er-api.com",
+            sourceNameEn: "ExchangeRate-API (daily rates)",
+          }
+        );
+        totalUpdated += updated;
+        console.log(`[dataAgent/economy] Exchange rate: ${egpRate} EGP/USD (${today})`);
+      }
+    }
+  } catch {
+    console.warn("[dataAgent/economy] Frankfurter exchange rate fetch failed");
+  }
+
   // Also refresh EGX 30 stock market index
   const stockResult = await refreshStockMarket(ctx);
   totalUpdated += stockResult.recordsUpdated;
@@ -619,24 +645,24 @@ async function refreshStockMarket(
     return { recordsUpdated: 0 };
   }
 
-  // Try regex to extract EGX 30 value from a <td> tag
-  // The page typically has patterns like: <td>EGX 30</td><td>30,000.00</td>
-  // or a number like 30123.45 near "EGX 30"
+  // Extract EGX 30 value -- the page has numbers like "47,651.58"
+  // Look for 5-digit numbers with comma (stock index values are 20,000-60,000 range)
   let egx30Value: number | null = null;
 
-  const egxRegex = /EGX\s*30[^<]*<\/td>\s*<td[^>]*>([0-9,]+(?:\.[0-9]+)?)/i;
-  const match = egxRegex.exec(pageText);
+  // Primary: find the first large number in XX,XXX.XX format (stock index pattern)
+  const stockRegex = /([2-9]\d,\d{3}\.\d{2})/;
+  const match = stockRegex.exec(pageText);
   if (match) {
     const raw = match[1].replace(/,/g, "");
     const parsed = parseFloat(raw);
-    if (!isNaN(parsed) && parsed > 0) {
+    if (!isNaN(parsed) && parsed > 10000) {
       egx30Value = parsed;
     }
   }
 
-  // Fallback: try a broader pattern for any number near EGX 30
+  // Fallback: broader pattern
   if (egx30Value === null) {
-    const broadRegex = /EGX[\s\-_]*30[^0-9]*([0-9]{4,6}(?:[.,][0-9]+)?)/i;
+    const broadRegex = /(\d{2},\d{3}\.\d{2})/;
     const broadMatch = broadRegex.exec(pageText.slice(0, 20000));
     if (broadMatch) {
       const raw = broadMatch[1].replace(/,/g, "");
