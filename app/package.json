@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "rm -rf .next && next dev",
-    "build": "rm -rf .next && next build",
+    "dev": "next dev --turbopack",
+    "build": "next build",
     "clean": "rm -rf .next node_modules/.cache",
     "start": "next start",
     "lint": "eslint --max-warnings 0 .",

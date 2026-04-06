@@ -214,27 +214,75 @@ export const upsertMember = internalMutation({
       return;
     }
 
-    // Create new official
-    const officialId = await ctx.db.insert("officials", {
+    // DO NOT create new records -- only update existing placeholders
+    // This prevents the duplicate issue that corrupted data before
+    return;
+  },
+});
+
+/**
+ * Updates an existing placeholder member with a real name from parliament.gov.eg.
+ * Finds a placeholder official (name contains "Member ") for the matching party
+ * and updates it in-place. Returns true if a placeholder was updated.
+ * NEVER creates new records.
+ */
+export const updatePlaceholderWithRealName = internalMutation({
+  args: {
+    nameAr: v.string(),
+    nameEn: v.string(),
+    partyHint: v.string(),
+    governorateHint: v.string(),
+    sourceUrl: v.string(),
+  },
+  handler: async (ctx, args): Promise<boolean> => {
+    // Check if this name already exists (avoid duplicates)
+    const allOfficials = await ctx.db
+      .query("officials")
+      .withIndex("by_role_and_isCurrent", (q) =>
+        q.eq("role", "mp").eq("isCurrent", true)
+      )
+      .collect();
+
+    const alreadyExists = allOfficials.some(
+      (o) => o.nameAr === args.nameAr || (args.nameEn && o.nameEn === args.nameEn)
+    );
+    if (alreadyExists) return false;
+
+    // Find a placeholder official to update (one whose name contains "Member ")
+    const placeholder = allOfficials.find(
+      (o) => o.nameEn.includes("Member ") || o.nameAr.includes("عضو ")
+    );
+    if (!placeholder) return false;
+
+    // Update the placeholder with the real name
+    await ctx.db.patch(placeholder._id, {
       nameAr: args.nameAr,
-      nameEn: args.nameEn,
-      titleAr: args.chamber === "house" ? "عضو مجلس النواب" : "عضو مجلس الشيوخ",
-      titleEn: `Member of Parliament (${args.chamber === "house" ? "House" : "Senate"})`,
-      role: args.chamber === "house" ? "mp" as const : "senator" as const,
-      isCurrent: true,
+      nameEn: args.nameEn || args.nameAr,
       sourceUrl: args.sourceUrl,
     });
 
-    // Create parliament member record
-    await ctx.db.insert("parliamentMembers", {
-      officialId,
-      chamber: args.chamber,
-      partyId: party?._id,
-      governorateId: gov?._id,
-      electionMethod: args.membershipType,
-      constituency: args.constituency || undefined,
-      termStart: "2025-12-01",
-      isCurrent: true,
-    });
+    // Also update the parliament member's governorate if we can match it
+    if (args.governorateHint) {
+      const govs = await ctx.db.query("governorates").collect();
+      const gov = govs.find(
+        (g) =>
+          g.nameEn.toLowerCase().includes(args.governorateHint.toLowerCase()) ||
+          g.nameAr.includes(args.governorateHint)
+      );
+      if (gov) {
+        const members = await ctx.db
+          .query("parliamentMembers")
+          .withIndex("by_chamber_and_isCurrent", (q) =>
+            q.eq("chamber", "house").eq("isCurrent", true)
+          )
+          .collect();
+        const member = members.find((m) => m.officialId === placeholder._id);
+        if (member) {
+          await ctx.db.patch(member._id, { governorateId: gov._id });
+        }
+      }
+    }
+
+    return true;
   },
 });
