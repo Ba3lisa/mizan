@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from "@/components/providers";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
+import { WebMcpRegistration } from "@/components/web-mcp";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://mizanmasr.com"),
@@ -112,6 +113,7 @@ export default function RootLayout({
           <Header />
           <main>{children}</main>
           <Footer />
+          <WebMcpRegistration />
         </Providers>
       </body>
 
