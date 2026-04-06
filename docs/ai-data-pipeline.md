@@ -184,6 +184,62 @@ A GitHub Actions workflow (`health-check.yml`) runs every 12 hours and checks th
 
 A daily cron job deletes `dataRefreshLog` entries older than 30 days to prevent unbounded table growth. This runs independently of the 6-hour refresh cycle.
 
+## Sanad Reference Confidence System
+
+Sanad (سند — Arabic for "support" or "chain of authority") is the 5-level reference confidence system used across Mizan. Every data point displayed on the platform carries a Sanad level indicating how much trust should be placed in it based on its source.
+
+### The 5 Levels
+
+| Level | Key | Name (EN) | Name (AR) | Description |
+|-------|-----|-----------|-----------|-------------|
+| 1 | `gov_eg` | Official Government | حكومي رسمي | Direct from gov.eg domains (CAPMAS, Ministry of Finance, CBE, SIS) |
+| 2 | `international_org` | International Organization | منظمة دولية | World Bank, IMF, UNDP, Transparency International, FAO |
+| 3 | `news_media` | News & Media | أخبار وإعلام | Ahram Online, State Information Service, EgyptToday, Reuters |
+| 4 | `other` | Other Sources | مصادر أخرى | Wikipedia, academic papers, community-submitted data |
+| 5 | `derived` | Derived/Calculated | محسوب/مشتق | Computed from other data points (e.g., debt-to-GDP ratio, per-capita figures) |
+
+### Mapping to `dataSources.type`
+
+The Sanad levels map directly to the existing `type` field on the `dataSources` table used by the pipeline:
+
+| `dataSources.type` | Sanad Level |
+|---------------------|-------------|
+| `gov_eg` | 1 — Official Government |
+| `international_org` | 2 — International Organization |
+| `media` | 3 — News & Media |
+| `other` | 4 — Other Sources |
+| (no source record — computed inline) | 5 — Derived/Calculated |
+
+When the pipeline refreshes data, the Sanad level is determined by the `type` of the `dataSources` entry that provided the value. Derived values (level 5) are computed from other stored data and do not have their own source record — instead they reference the Sanad levels of their input values.
+
+### Conflict Resolution
+
+When multiple sources report different values for the same data point (e.g., World Bank and CAPMAS report different GDP figures), Mizan does NOT pick a winner. Instead:
+
+- ALL values are displayed on the page, each tagged with its Sanad level
+- The user sees the full picture and can judge for themselves
+- Higher Sanad levels (lower numbers) appear first but are not marked as "correct"
+- The discrepancy itself is valuable transparency information
+
+This approach ensures Mizan remains a mirror of available data rather than an arbiter of truth.
+
+### The Only Opinionated Part
+
+The assignment of Sanad levels to source types is the ONLY opinionated decision in Mizan. The hierarchy itself (government sources ranked above international organizations, which rank above media, etc.) reflects an editorial judgment about source reliability.
+
+Everything else on the platform — the data values, the visualizations, the comparisons — is presented without editorial interpretation.
+
+### Future: Automated Sanad Scoring via LLM Council
+
+The current manual assignment of Sanad levels will be replaced by automated scoring through the LLM Council (see below). The council will:
+
+1. Evaluate each source URL against known domain patterns and content quality signals
+2. Cross-reference claims across multiple sources to detect conflicts
+3. Assign Sanad levels through multi-model consensus voting
+4. Flag sources whose reliability has changed (e.g., a government page that starts returning stale data)
+
+This will remove the last remaining human opinion from the platform, making Mizan fully non-opinionated.
+
 ## LLM Council System
 
 The LLM Council is a multi-model voting system that verifies community-submitted data corrections before they are applied to the database. It adds a layer of automated fact-checking between community input and data changes.

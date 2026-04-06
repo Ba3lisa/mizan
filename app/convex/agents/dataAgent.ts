@@ -18,7 +18,7 @@ import { callClaude, callClaudeStructured } from "./providers/anthropic";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-type RefreshCategory = "government" | "parliament" | "budget" | "debt" | "economy";
+type RefreshCategory = "government" | "parliament" | "budget" | "debt" | "economy" | "governorate_stats";
 
 const STALE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 hours (matches cron interval)
 
@@ -1043,6 +1043,175 @@ ${indicatorSummary}`;
   console.log("[dataAgent/narrative] Economic narrative inserted successfully.");
 }
 
+// ─── GOVERNORATE STATS REFRESH ────────────────────────────────────────────────
+
+const GOVERNORATES_WIKI_URL = "https://en.wikipedia.org/wiki/Governorates_of_Egypt";
+const GOVERNORATES_HDI_URL = "https://en.wikipedia.org/wiki/List_of_governorates_of_Egypt_by_Human_Development_Index";
+
+async function refreshGovernorateStatsData(
+  ctx: ActionCtx
+): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.warn(
+      "[dataAgent] Skipping governorate stats AI refresh — ANTHROPIC_API_KEY not set."
+    );
+    return { recordsUpdated: 0 };
+  }
+
+  // Fetch main governorates page
+  let page1Html = "";
+  try {
+    const res = await fetch(GOVERNORATES_WIKI_URL, { signal: AbortSignal.timeout(15000) });
+    if (res.ok) {
+      const html = await res.text();
+      page1Html = html.slice(0, 15000);
+      console.log(`[dataAgent/govStats] Fetched main governorates page: ${page1Html.length} chars`);
+    } else {
+      console.warn(`[dataAgent/govStats] Governorates page returned ${res.status}`);
+    }
+  } catch (err) {
+    console.warn(`[dataAgent/govStats] Failed to fetch governorates page: ${String(err)}`);
+  }
+
+  // Fetch HDI page
+  let page2Html = "";
+  try {
+    const res = await fetch(GOVERNORATES_HDI_URL, { signal: AbortSignal.timeout(15000) });
+    if (res.ok) {
+      const html = await res.text();
+      page2Html = html.slice(0, 15000);
+      console.log(`[dataAgent/govStats] Fetched HDI page: ${page2Html.length} chars`);
+    } else {
+      console.warn(`[dataAgent/govStats] HDI page returned ${res.status}`);
+    }
+  } catch (err) {
+    console.warn(`[dataAgent/govStats] Failed to fetch HDI page: ${String(err)}`);
+  }
+
+  if (page1Html.length < 500 && page2Html.length < 500) {
+    console.warn("[dataAgent/govStats] Both pages returned insufficient content.");
+    return { recordsUpdated: 0 };
+  }
+
+  // Fetch all governorates from DB to match by name
+  const governorates: Array<{ _id: Id<"governorates">; nameEn: string; nameAr: string }> =
+    await ctx.runQuery(api.government.listGovernorates, {});
+
+  if (governorates.length === 0) {
+    console.warn("[dataAgent/govStats] No governorates found in DB — skipping.");
+    return { recordsUpdated: 0 };
+  }
+
+  const systemPrompt = `You are a data extraction assistant for Mizan, Egypt's government transparency platform.
+Extract structured governorate statistics from Wikipedia pages.
+Always respond with valid JSON only — no markdown, no prose.`;
+
+  const prompt = `Extract governorate statistics from these Wikipedia pages about Egyptian governorates.
+
+PAGE 1 (Governorates of Egypt):
+${page1Html || "(unavailable)"}
+
+PAGE 2 (HDI by governorate):
+${page2Html || "(unavailable)"}
+
+Return a JSON array where each element is:
+{
+  "governorateNameEn": "Cairo",
+  "indicators": [
+    { "indicator": "population", "year": "2023", "value": 10456284, "unit": "people" },
+    { "indicator": "area_km2", "year": "2023", "value": 3085, "unit": "km2" },
+    { "indicator": "density_per_km2", "year": "2023", "value": 3389, "unit": "per_km2" },
+    { "indicator": "hdi", "year": "2023", "value": 0.803, "unit": "index" }
+  ]
+}
+Only include indicators actually present in the source pages.
+Egypt has 27 governorates. Extract data for ALL of them.
+For HDI, some frontier governorates are grouped — skip those that don't have individual values.`;
+
+  const claudeResponse = await callClaude(prompt, systemPrompt);
+
+  if (!claudeResponse) {
+    console.warn("[dataAgent/govStats] Claude returned no data.");
+    return { recordsUpdated: 0 };
+  }
+
+  let parsed: Array<{
+    governorateNameEn: string;
+    indicators: Array<{ indicator: string; year: string; value: number; unit: string }>;
+  }>;
+  try {
+    let jsonStr = claudeResponse;
+    const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fence) jsonStr = fence[1];
+    const raw = JSON.parse(jsonStr.trim()) as unknown;
+    if (!Array.isArray(raw)) {
+      console.warn("[dataAgent/govStats] Claude response is not an array.");
+      return { recordsUpdated: 0 };
+    }
+    parsed = raw as typeof parsed;
+  } catch {
+    console.warn("[dataAgent/govStats] Could not parse Claude governorate stats response as JSON.");
+    return { recordsUpdated: 0 };
+  }
+
+  console.log(`[dataAgent/govStats] Claude returned data for ${parsed.length} governorates`);
+
+  // Build a lookup map: normalized nameEn -> governorate _id
+  const nameToId = new Map<string, Id<"governorates">>();
+  for (const gov of governorates) {
+    nameToId.set(gov.nameEn.toLowerCase().trim(), gov._id);
+  }
+
+  let totalCount = 0;
+
+  for (const govEntry of parsed) {
+    const normalizedName = govEntry.governorateNameEn.toLowerCase().trim();
+    const governorateId = nameToId.get(normalizedName);
+
+    if (!governorateId) {
+      console.warn(`[dataAgent/govStats] No DB match for "${govEntry.governorateNameEn}" — skipping.`);
+      continue;
+    }
+
+    for (const ind of govEntry.indicators) {
+      if (typeof ind.value !== "number" || isNaN(ind.value)) continue;
+
+      const isHdi = ind.indicator === "hdi";
+      const sourceUrl = isHdi ? GOVERNORATES_HDI_URL : GOVERNORATES_WIKI_URL;
+      const sourceNameEn = isHdi
+        ? "Wikipedia — HDI by Governorate"
+        : "Wikipedia — Governorates of Egypt";
+      const sourceNameAr = isHdi
+        ? "ويكيبيديا — مؤشر التنمية البشرية حسب المحافظة"
+        : "ويكيبيديا — محافظات مصر";
+
+      try {
+        const updated: number = await ctx.runMutation(
+          internal.dataRefresh.upsertGovernorateStat,
+          {
+            governorateId,
+            indicator: ind.indicator,
+            year: ind.year,
+            value: ind.value,
+            unit: ind.unit,
+            sourceUrl,
+            sourceNameEn,
+            sourceNameAr,
+            sanadLevel: 4,
+          }
+        );
+        totalCount += updated;
+      } catch (err) {
+        console.warn(`[dataAgent/govStats] Failed to upsert stat for ${govEntry.governorateNameEn}/${ind.indicator}: ${String(err)}`);
+      }
+    }
+  }
+
+  console.log(`[dataAgent/govStats] Total records updated: ${totalCount}`);
+  return { recordsUpdated: totalCount, sourceUrl: GOVERNORATES_WIKI_URL };
+}
+
 // ─── CATEGORY DISPATCHER ─────────────────────────────────────────────────────
 
 async function refreshCategory(
@@ -1075,6 +1244,9 @@ async function refreshCategory(
       case "economy":
         result = await refreshEconomyData(ctx);
         break;
+      case "governorate_stats":
+        result = await refreshGovernorateStatsData(ctx);
+        break;
     }
 
     const { recordsUpdated, sourceUrl } = result;
@@ -1086,6 +1258,7 @@ async function refreshCategory(
       budget: { nameEn: "Ministry of Finance", nameAr: "وزارة المالية", type: "official_government" },
       debt: { nameEn: "World Bank — Egypt External Debt", nameAr: "البنك الدولي — الدين الخارجي لمصر", type: "international_org" },
       economy: { nameEn: "World Bank — Egypt Economic Indicators", nameAr: "البنك الدولي — المؤشرات الاقتصادية لمصر", type: "international_org" },
+      governorate_stats: { nameEn: "Wikipedia — Governorates of Egypt", nameAr: "ويكيبيديا — محافظات مصر", type: "other" as const },
     };
     const categorySourceUrlMap: Record<RefreshCategory, string> = {
       government: "https://en.wikipedia.org/wiki/Madbouly_Cabinet",
@@ -1093,6 +1266,7 @@ async function refreshCategory(
       budget: "https://www.mof.gov.eg",
       debt: "https://data.worldbank.org",
       economy: "https://data.worldbank.org",
+      governorate_stats: "https://en.wikipedia.org/wiki/Governorates_of_Egypt",
     };
     const registryMeta = sourceRegistryMap[category];
     const registryUrl = sourceUrl ?? categorySourceUrlMap[category];
@@ -1120,6 +1294,7 @@ async function refreshCategory(
         government: `Flagged ${recordsUpdated} potential government change(s) for human review`,
         parliament: `Parliament refresh complete — ${recordsUpdated} record(s) updated`,
         economy: `Updated ${recordsUpdated} economic indicator(s) from World Bank API`,
+        governorate_stats: `Updated ${recordsUpdated} governorate stat(s) from Wikipedia`,
       };
       const descriptionArMap: Record<RefreshCategory, string> = {
         debt: `تم تحديث ${recordsUpdated} سجل ديون من بيانات البنك الدولي`,
@@ -1127,6 +1302,7 @@ async function refreshCategory(
         government: `تم الإشارة إلى ${recordsUpdated} تغيير محتمل في الحكومة للمراجعة البشرية`,
         parliament: `اكتمل تحديث البرلمان — ${recordsUpdated} سجل محدث`,
         economy: `تم تحديث ${recordsUpdated} مؤشر اقتصادي من بيانات البنك الدولي`,
+        governorate_stats: `تم تحديث ${recordsUpdated} إحصائية محافظة من ويكيبيديا`,
       };
       const tableNameMap: Record<RefreshCategory, string> = {
         debt: "debtRecords",
@@ -1134,6 +1310,7 @@ async function refreshCategory(
         government: "officials",
         parliament: "parliamentMembers",
         economy: "economicIndicators",
+        governorate_stats: "governorateStats",
       };
 
       await ctx.runMutation(internal.dataRefresh.logChange, {
@@ -1221,6 +1398,7 @@ export const orchestrateRefresh = internalAction({
       "budget",
       "debt",
       "economy",
+      "governorate_stats",
     ];
 
     // Check which tables are actually empty (force refresh even if "fresh")

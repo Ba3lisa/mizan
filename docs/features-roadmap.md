@@ -80,6 +80,15 @@
 - Schools/hospitals per capita
 - **Data needed**: CAPMAS governorate-level data, local government reports
 
+#### 9. "Automated Sanad Scoring" → LLM Council
+**What**: LLM Council automatically determines Sanad confidence levels for data sources
+- Currently Sanad levels are manually assigned (the only opinionated part of Mizan)
+- LLM Council (multi-model voting) would evaluate source reliability
+- Cross-reference multiple sources, detect conflicts, assign confidence
+- Reduce human opinion in the confidence scoring process
+- **Data needed**: Existing LLM Council infrastructure + source metadata
+- **Impact**: Makes the entire platform fully non-opinionated
+
 ## Priority Order
 1. 🔴 "Where Your Tax Dollars Go" — highest impact, makes data personal
 2. 🔴 Economic Tracker — uses available APIs, high utility
@@ -89,6 +98,7 @@
 6. 🟢 Legislation Tracker — important but data-heavy
 7. 🟢 Corruption Perception — sensitive but important
 8. 🟢 Great Egyptian Figures — editorial content
+9. 🔵 Automated Sanad Scoring — removes human opinion from confidence levels
 
 ## Data Availability Assessment
 | Feature | Data Source | API Available? | Auto-refreshable? |
@@ -99,3 +109,4 @@
 | Your Governorate | CAPMAS statistical yearbook | Partial | Yearly |
 | Legislation | Official Gazette | No (PDF extraction) | AI-assisted |
 | Corruption index | Transparency International | Yes (public data) | Yearly |
+| Automated Sanad | LLM Council + source metadata | Yes (internal) | Real-time |

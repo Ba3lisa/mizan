@@ -734,44 +734,69 @@ function CategoryDetailsCard({
   );
 }
 
-// ─── Row 3: Confidence Levels ─────────────────────────────────────────────────
+// ─── Row 3: Sanad Levels ──────────────────────────────────────────────────────
 
 function ConfidenceLevels({ isAr }: { isAr: boolean }) {
   const levels = [
     {
-      key: "high",
-      labelAr: "عالي",
-      labelEn: "High",
-      descAr: "مباشر من المصدر الرسمي",
-      descEn: "Direct from Official Source",
+      key: "official_government",
+      level: 1,
+      labelAr: "حكومي رسمي",
+      labelEn: "Official Government",
+      descAr: "مباشر من مصادر حكومية رسمية (.gov.eg)",
+      descEn: "Direct from gov.eg sources (CAPMAS, ministries)",
       color: "border-emerald-500/30 bg-emerald-500/5",
       dot: "bg-emerald-500",
       textColor: "text-emerald-600 dark:text-emerald-400",
     },
     {
-      key: "medium",
-      labelAr: "متوسط",
-      labelEn: "Medium",
-      descAr: "مستخرج بالذكاء الاصطناعي",
-      descEn: "AI-Extracted",
+      key: "international_org",
+      level: 2,
+      labelAr: "منظمة دولية",
+      labelEn: "International Org",
+      descAr: "البنك الدولي، صندوق النقد الدولي، الأمم المتحدة",
+      descEn: "World Bank, IMF, UNDP",
+      color: "border-blue-500/30 bg-blue-500/5",
+      dot: "bg-blue-500",
+      textColor: "text-blue-600 dark:text-blue-400",
+    },
+    {
+      key: "news_media",
+      level: 3,
+      labelAr: "إعلام",
+      labelEn: "News & Media",
+      descAr: "الأهرام، الهيئة العامة للاستعلامات، إيجيبت توداي",
+      descEn: "Ahram Online, SIS, EgyptToday",
       color: "border-amber-500/30 bg-amber-500/5",
       dot: "bg-amber-500",
       textColor: "text-amber-600 dark:text-amber-400",
     },
     {
-      key: "low",
-      labelAr: "منخفض",
-      labelEn: "Low",
-      descAr: "تقديري",
-      descEn: "Estimated",
+      key: "other",
+      level: 4,
+      labelAr: "مصادر أخرى",
+      labelEn: "Other Sources",
+      descAr: "ويكيبيديا، مصادر مجتمعية",
+      descEn: "Wikipedia, community-submitted",
       color: "border-border bg-muted/30",
       dot: "bg-muted-foreground",
       textColor: "text-muted-foreground",
     },
+    {
+      key: "derived",
+      level: 5,
+      labelAr: "محسوب",
+      labelEn: "Derived/Calculated",
+      descAr: "محسوب من بيانات أخرى",
+      descEn: "Computed from other data",
+      color: "border-violet-500/30 bg-violet-500/5",
+      dot: "bg-violet-500",
+      textColor: "text-violet-600 dark:text-violet-400",
+    },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
       {levels.map((lvl) => (
         <div
           key={lvl.key}
@@ -780,6 +805,9 @@ function ConfidenceLevels({ isAr }: { isAr: boolean }) {
             lvl.color
           )}
         >
+          <span className="text-[0.6rem] font-mono text-muted-foreground/60">
+            {lvl.level}
+          </span>
           <span
             className={cn("w-2.5 h-2.5 rounded-full shrink-0", lvl.dot)}
           />
@@ -1100,10 +1128,10 @@ export default function TransparencyPage() {
 
         <Separator className="my-6" />
 
-        {/* ─── Row 3: Confidence Levels ─── */}
+        {/* ─── Row 3: Sanad Levels ─── */}
         <div className="mb-6">
           <h2 className="text-sm font-bold mb-3">
-            {isAr ? "مستويات الثقة" : "Confidence Levels"}
+            {isAr ? "مستويات السند" : "Sanad Levels"}
           </h2>
           <ConfidenceLevels isAr={isAr} />
         </div>

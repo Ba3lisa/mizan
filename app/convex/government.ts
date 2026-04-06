@@ -51,6 +51,18 @@ export const getGovernorate = query({
   },
 });
 
+export const getGovernorateStats = query({
+  args: { governorateId: v.id("governorates") },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query("governorateStats")
+      .withIndex("by_governorateId", (q) =>
+        q.eq("governorateId", args.governorateId)
+      )
+      .collect();
+  },
+});
+
 export const listOfficialsByRole = query({
   args: {
     role: v.union(

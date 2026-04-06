@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export default function MethodologyPage() {
   const { lang, dir } = useLanguage();
@@ -169,6 +170,110 @@ export default function MethodologyPage() {
                 : "Your report will be automatically reviewed by the Mizan LLM Council. Government sources (.gov.eg) have the highest priority."}
             </p>
           </div>
+        </section>
+
+        <Separator className="mb-14" />
+
+        {/* ════════ SECTION 3: SANAD REFERENCE CONFIDENCE ════════ */}
+        <section className="mb-12" id="sanad">
+          <div className="flex items-center gap-2 mb-2">
+            <Shield size={16} className="text-primary" />
+            <h2 className="text-base font-bold uppercase tracking-widest text-primary">
+              {isAr ? "٣. السند — مستويات الثقة المرجعية" : "3. Sanad — Reference Confidence"}
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-6 max-w-xl">
+            {isAr
+              ? "كل بيان على ميزان مصحوب بمستوى سند يوضح مصدره ودرجة الثقة فيه. عند وجود تعارض بين المصادر، نعرض جميع القيم."
+              : "Every data point on Mizan carries a Sanad level indicating its source and confidence. When sources disagree, we show all values."}
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+            {[
+              {
+                level: 1,
+                labelAr: "حكومي رسمي",
+                labelEn: "Official Government",
+                descAr: "مباشر من مصادر حكومية رسمية (.gov.eg) — الجهاز المركزي للإحصاء، الوزارات",
+                descEn: "Direct from gov.eg sources — CAPMAS, ministries",
+                color: "border-emerald-500/30 bg-emerald-500/5",
+                dot: "bg-emerald-500",
+                textColor: "text-emerald-600 dark:text-emerald-400",
+              },
+              {
+                level: 2,
+                labelAr: "منظمة دولية",
+                labelEn: "International Org",
+                descAr: "البنك الدولي، صندوق النقد الدولي، برنامج الأمم المتحدة الإنمائي",
+                descEn: "World Bank, IMF, UNDP",
+                color: "border-blue-500/30 bg-blue-500/5",
+                dot: "bg-blue-500",
+                textColor: "text-blue-600 dark:text-blue-400",
+              },
+              {
+                level: 3,
+                labelAr: "إعلام",
+                labelEn: "News & Media",
+                descAr: "الأهرام، الهيئة العامة للاستعلامات، إيجيبت توداي",
+                descEn: "Ahram Online, SIS, EgyptToday",
+                color: "border-amber-500/30 bg-amber-500/5",
+                dot: "bg-amber-500",
+                textColor: "text-amber-600 dark:text-amber-400",
+              },
+              {
+                level: 4,
+                labelAr: "مصادر أخرى",
+                labelEn: "Other Sources",
+                descAr: "ويكيبيديا، بيانات مجتمعية",
+                descEn: "Wikipedia, community-submitted",
+                color: "border-border bg-muted/30",
+                dot: "bg-muted-foreground",
+                textColor: "text-muted-foreground",
+              },
+              {
+                level: 5,
+                labelAr: "محسوب",
+                labelEn: "Derived/Calculated",
+                descAr: "محسوب أو مشتق من بيانات أخرى",
+                descEn: "Computed from other data",
+                color: "border-violet-500/30 bg-violet-500/5",
+                dot: "bg-violet-500",
+                textColor: "text-violet-600 dark:text-violet-400",
+              },
+            ].map((lvl) => (
+              <Card key={lvl.level} className={cn("border", lvl.color)}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[0.6rem] font-mono text-muted-foreground/60">{lvl.level}</span>
+                    <span className={cn("w-2 h-2 rounded-full", lvl.dot)} />
+                    <span className={cn("text-xs font-bold", lvl.textColor)}>
+                      {isAr ? lvl.labelAr : lvl.labelEn}
+                    </span>
+                  </div>
+                  <p className="text-[0.65rem] text-muted-foreground leading-relaxed">
+                    {isAr ? lvl.descAr : lvl.descEn}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Disclaimer */}
+          <Card className="border-amber-500/20 bg-amber-500/5">
+            <CardContent className="p-4 flex items-start gap-3">
+              <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1">
+                  {isAr ? "ملاحظة الشفافية" : "Transparency Note"}
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {isAr
+                    ? "تصنيف مستويات السند هو الجزء الوحيد في ميزان الذي يتضمن رأياً بشرياً. نعمل على أتمتة هذا التصنيف عبر مجلس الذكاء الاصطناعي (LLM Council) لجعل المنصة أقل اعتماداً على الآراء."
+                    : "Sanad level assignment is the only opinionated part of Mizan. We are working on automating this via the LLM Council to make the platform less opinion-dependent."}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
       </div>

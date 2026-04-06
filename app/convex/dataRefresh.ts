@@ -15,6 +15,7 @@ const categoryValidator = v.union(
   v.literal("budget"),
   v.literal("debt"),
   v.literal("economy"),
+  v.literal("governorate_stats"),
   v.literal("all")
 );
 
@@ -50,6 +51,7 @@ export const getAllLastUpdated = query({
       "budget",
       "debt",
       "economy",
+      "governorate_stats",
       "all",
     ] as const;
 
@@ -107,6 +109,7 @@ export const checkEmptyTables = internalQuery({
     const debtRecords = await ctx.db.query("debtRecords").take(1);
     const members = await ctx.db.query("parliamentMembers").take(1);
     const econ = await ctx.db.query("economicIndicators").take(1);
+    const govStats = await ctx.db.query("governorateStats").take(1);
 
     return {
       government: govOfficials.length === 0,
@@ -114,6 +117,7 @@ export const checkEmptyTables = internalQuery({
       debt: debtRecords.length === 0,
       parliament: members.length === 0,
       economy: econ.length === 0,
+      governorate_stats: govStats.length === 0,
     };
   },
 });
@@ -539,6 +543,63 @@ export const upsertGovernmentOfficials = internalMutation({
   },
 });
 
+// ─── INTERNAL MUTATION: upsertGovernorateStat ─────────────────────────────
+
+export const upsertGovernorateStat = internalMutation({
+  args: {
+    governorateId: v.id("governorates"),
+    indicator: v.string(),
+    year: v.string(),
+    value: v.number(),
+    unit: v.string(),
+    sourceUrl: v.string(),
+    sourceNameEn: v.optional(v.string()),
+    sourceNameAr: v.optional(v.string()),
+    sanadLevel: v.number(),
+  },
+  handler: async (ctx, args) => {
+    // Dedup by governorateId + indicator + year, then match by sourceUrl
+    const existing = await ctx.db
+      .query("governorateStats")
+      .withIndex("by_governorateId_indicator_year", (q) =>
+        q.eq("governorateId", args.governorateId)
+          .eq("indicator", args.indicator)
+          .eq("year", args.year)
+      )
+      .collect();
+
+    const match = existing.find((e) => e.sourceUrl === args.sourceUrl);
+
+    if (!match) {
+      await ctx.db.insert("governorateStats", {
+        governorateId: args.governorateId,
+        indicator: args.indicator,
+        year: args.year,
+        value: args.value,
+        unit: args.unit,
+        sourceUrl: args.sourceUrl,
+        sourceNameEn: args.sourceNameEn,
+        sourceNameAr: args.sourceNameAr,
+        sanadLevel: args.sanadLevel,
+      });
+      return 1;
+    }
+
+    if (match.value !== args.value) {
+      await ctx.db.patch(match._id, {
+        value: args.value,
+        unit: args.unit,
+        sourceNameEn: args.sourceNameEn,
+        sourceNameAr: args.sourceNameAr,
+        sanadLevel: args.sanadLevel,
+      });
+      return 1;
+    }
+
+    return 0;
+  },
+});
+
 // ─── INTERNAL MUTATION: logChange ───────────────────────────────────────────
 
 const changeCategoryValidator = v.union(
@@ -548,7 +609,8 @@ const changeCategoryValidator = v.union(
   v.literal("budget"),
   v.literal("debt"),
   v.literal("elections"),
-  v.literal("economy")
+  v.literal("economy"),
+  v.literal("governorate_stats")
 );
 
 const changeActionValidator = v.union(

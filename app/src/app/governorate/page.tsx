@@ -16,7 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Users, MapPin, Database } from "lucide-react";
+import {
+  Users,
+  MapPin,
+  Database,
+  Ruler,
+  BarChart3,
+  Activity,
+  ExternalLink,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // ─── Stat tile ─────────────────────────────────────────────────────────────────
 
@@ -61,6 +70,147 @@ function StatTile({
   );
 }
 
+// ─── Multi-source stat display with Sanad badges ─────────────────────────────
+
+interface GovernorateStatDoc {
+  _id: string;
+  indicator: string;
+  year: string;
+  value: number;
+  unit: string;
+  sourceUrl: string;
+  sourceNameEn?: string;
+  sourceNameAr?: string;
+  sanadLevel: number;
+}
+
+function GovernorateStatsGrid({
+  stats,
+  isAr,
+}: {
+  stats: GovernorateStatDoc[];
+  isAr: boolean;
+}) {
+  // Group stats by indicator — multiple sources per indicator are shown together
+  const grouped: Record<string, GovernorateStatDoc[]> = {};
+  for (const s of stats) {
+    if (!grouped[s.indicator]) grouped[s.indicator] = [];
+    grouped[s.indicator].push(s);
+  }
+  // Sort each group by sanadLevel (best first)
+  for (const key of Object.keys(grouped)) {
+    grouped[key].sort((a, b) => a.sanadLevel - b.sanadLevel);
+  }
+
+  const indicatorOrder = ["population", "area_km2", "density_per_km2", "hdi"];
+  const sortedKeys = Object.keys(grouped).sort((a, b) => {
+    const ia = indicatorOrder.indexOf(a);
+    const ib = indicatorOrder.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {sortedKeys.map((indicator) => {
+        const entries = grouped[indicator];
+        const meta = INDICATOR_META[indicator];
+        const Icon = meta?.icon ?? Database;
+        const label = meta
+          ? isAr ? meta.labelAr : meta.labelEn
+          : indicator;
+        const hasMultipleSources = entries.length > 1;
+
+        return (
+          <div
+            key={indicator}
+            className="rounded-xl border border-border/60 bg-card/60 p-4"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Icon size={14} className="text-muted-foreground" />
+              <p className="text-[0.625rem] text-muted-foreground uppercase tracking-widest">
+                {label}
+              </p>
+            </div>
+            <div className="space-y-2">
+              {entries.map((entry, i) => {
+                const sanad = SANAD_CONFIG[entry.sanadLevel] ?? SANAD_CONFIG[4];
+                return (
+                  <div
+                    key={entry._id}
+                    className={cn(
+                      "flex items-center justify-between gap-2",
+                      hasMultipleSources && i > 0 && "pt-2 border-t border-border/30"
+                    )}
+                  >
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-mono text-lg font-black tracking-tight text-foreground">
+                        {formatStatValue(entry.value, entry.unit)}
+                      </span>
+                      <span className="text-[0.6rem] text-muted-foreground font-mono">
+                        {entry.year}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className={cn("w-1.5 h-1.5 rounded-full", sanad.dot)} />
+                      <span className="text-[0.55rem] text-muted-foreground">
+                        {isAr ? sanad.labelAr : sanad.labelEn}
+                      </span>
+                      {entry.sourceUrl && (
+                        <a
+                          href={entry.sourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-muted-foreground/40 hover:text-primary"
+                        >
+                          <ExternalLink size={9} />
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {hasMultipleSources && (
+              <p className="text-[0.55rem] text-amber-600 dark:text-amber-400 mt-2">
+                {isAr
+                  ? "⚠ مصادر متعددة — القيم تختلف"
+                  : "⚠ Multiple sources — values differ"}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Sanad level config ──────────────────────────────────────────────────────
+
+const SANAD_CONFIG: Record<number, { dot: string; labelEn: string; labelAr: string }> = {
+  1: { dot: "bg-emerald-500", labelEn: "Official Gov", labelAr: "حكومي رسمي" },
+  2: { dot: "bg-blue-500", labelEn: "Intl Org", labelAr: "منظمة دولية" },
+  3: { dot: "bg-amber-500", labelEn: "News", labelAr: "إعلام" },
+  4: { dot: "bg-muted-foreground", labelEn: "Other", labelAr: "أخرى" },
+  5: { dot: "bg-violet-500", labelEn: "Derived", labelAr: "محسوب" },
+};
+
+const INDICATOR_META: Record<string, { icon: typeof Users; labelEn: string; labelAr: string }> = {
+  population: { icon: Users, labelEn: "Population", labelAr: "السكان" },
+  area_km2: { icon: Ruler, labelEn: "Area", labelAr: "المساحة" },
+  density_per_km2: { icon: BarChart3, labelEn: "Pop. Density", labelAr: "الكثافة السكانية" },
+  hdi: { icon: Activity, labelEn: "Human Dev. Index", labelAr: "مؤشر التنمية البشرية" },
+};
+
+function formatStatValue(value: number, unit: string): string {
+  if (unit === "percent") return `${value.toFixed(1)}%`;
+  if (unit === "index") return value.toFixed(3);
+  if (unit === "per_km2") return `${Math.round(value).toLocaleString()}/km²`;
+  if (unit === "km2") return `${Math.round(value).toLocaleString()} km²`;
+  if (unit === "people" && value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
+  return value.toLocaleString();
+}
+
 // ─── Governorate detail panel ─────────────────────────────────────────────────
 
 function GovernorateDetail({
@@ -74,6 +224,7 @@ function GovernorateDetail({
   const members = useQuery(api.parliament.getMembersByGovernorate, {
     governorateId,
   });
+  const stats = useQuery(api.government.getGovernorateStats, { governorateId });
 
   const isLoading = governorate === undefined || members === undefined;
 
@@ -168,12 +319,15 @@ function GovernorateDetail({
         </CardContent>
       </Card>
 
-      {/* Key stats — population only (other stats not in schema) */}
-      {governorate.population && (
-        <div>
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-            {isAr ? "المؤشرات الرئيسية" : "Key Indicators"}
-          </p>
+      {/* Key stats from pipeline with Sanad levels */}
+      <div>
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+          {isAr ? "المؤشرات الرئيسية" : "Key Indicators"}
+        </p>
+        {stats && stats.length > 0 ? (
+          <GovernorateStatsGrid stats={stats} isAr={isAr} />
+        ) : stats !== undefined && stats.length === 0 && governorate.population ? (
+          /* Fallback to inline population from governorates table while pipeline hasn't run */
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             <StatTile
               icon={Users}
@@ -182,18 +336,17 @@ function GovernorateDetail({
               value={`${(governorate.population / 1_000_000).toFixed(1)}M`}
               isAr={isAr}
             />
-            {/* Poverty rate, literacy, hospital beds, schools are not yet in the DB schema */}
             <div className="col-span-1 sm:col-span-2 rounded-xl p-4 border border-border/40 bg-card/40 flex items-center gap-3">
               <Database size={14} className="text-muted-foreground/40 flex-shrink-0" />
               <p className="text-[0.625rem] text-muted-foreground/60 leading-relaxed">
                 {isAr
-                  ? "إحصائيات التعليم والصحة والفقر ستُضاف قريباً بواسطة وكيل البيانات"
-                  : "Education, health, and poverty stats will be added by the data agent"}
+                  ? "المزيد من الإحصائيات ستُضاف بواسطة وكيل البيانات"
+                  : "More stats will be added by the data agent"}
               </p>
             </div>
           </div>
-        </div>
-      )}
+        ) : null}
+      </div>
 
       {/* MPs / Senators */}
       <div>

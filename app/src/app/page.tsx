@@ -6,23 +6,33 @@ import {
   ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
   LineChart, Heart, MapPin, Calculator, Bot, BookMarked,
 } from "lucide-react";
-import { useLanguage } from "@/components/providers";
+import { useLanguage, useCurrency } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AiPipelineStatus } from "@/components/ai-pipeline-status";
 
-function Stat({ value, label, source, sourceUrl }: {
+function Stat({ value, label, source, sourceUrl, currencyUnit, symbol, fromUSD, fromEGP, fmtNum }: {
   value: number; label: string; source: string; sourceUrl: string;
+  currencyUnit?: "usd" | "egp";
+  symbol: string; fromUSD: (v: number) => number; fromEGP: (v: number) => number;
+  fmtNum: (v: number, opts?: { decimals?: number }) => string;
 }) {
-  const display = Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  let display: string;
+  if (currencyUnit === "usd") {
+    display = `${symbol}${fmtNum(fromUSD(value), { decimals: 1 })}`;
+  } else if (currencyUnit === "egp") {
+    display = `${symbol}${fmtNum(fromEGP(value), { decimals: 1 })}`;
+  } else {
+    display = Number.isInteger(value) ? value.toLocaleString() : value.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  }
   return (
-    <div className="text-center py-6">
-      <div className="font-mono text-4xl md:text-5xl font-bold tracking-tighter tabular-nums text-foreground" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
+    <div className="text-center py-5">
+      <div className="font-mono text-3xl md:text-4xl font-bold tracking-tighter tabular-nums text-foreground" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
         {display}
       </div>
-      <p className="text-xs text-muted-foreground mt-2 uppercase tracking-widest font-medium">{label}</p>
+      <p className="text-[0.65rem] text-muted-foreground mt-1.5 uppercase tracking-widest font-medium">{label}</p>
       <a href={sourceUrl} target="_blank" rel="noopener noreferrer"
-        className="text-[0.625rem] text-primary/60 hover:text-primary no-underline hover:underline inline-flex items-center gap-0.5 mt-1.5 transition-colors">
+        className="text-[0.625rem] text-primary/60 hover:text-primary no-underline hover:underline inline-flex items-center gap-0.5 mt-1 transition-colors">
         <ExternalLink size={8} /> {source}
       </a>
     </div>
@@ -44,11 +54,11 @@ const features = [
   { icon: BookMarked, href: "/methodology", ar: "المنهجية", en: "Methodology", descAr: "كيف نجمع البيانات · مصادر رسمية", descEn: "How we gather data · Official sources" },
 ];
 
-const stats = [
+const stats: Array<{ value: number; ar: string; en: string; source: string; url: string; currencyUnit?: "usd" | "egp"; suffix?: { ar: string; en: string } }> = [
   { value: 596, ar: "عضو برلمان", en: "Parliamentarians", source: "parliament.gov.eg", url: "https://www.parliament.gov.eg" },
-  { value: 27, ar: "محافظة", en: "Governorates", source: "ahram.org.eg", url: "https://english.ahram.org.eg" },
-  { value: 247, ar: "مادة دستورية", en: "Articles", source: "presidency.eg", url: "https://www.presidency.eg" },
-  { value: 155.2, ar: "مليار دولار ديون خارجية", en: "Billion USD Ext. Debt", source: "cbe.org.eg", url: "https://www.cbe.org.eg" },
+  { value: 27, ar: "محافظة", en: "Governorates", source: "capmas.gov.eg", url: "https://www.capmas.gov.eg" },
+  { value: 247, ar: "مادة دستورية", en: "Constitutional Articles", source: "presidency.eg", url: "https://www.presidency.eg" },
+  { value: 155.2, ar: "مليار ديون خارجية", en: "B External Debt", source: "cbe.org.eg", url: "https://www.cbe.org.eg", currencyUnit: "usd" },
 ];
 
 const sources = [
@@ -62,6 +72,7 @@ const sources = [
 
 export default function HomePage() {
   const { lang, dir } = useLanguage();
+  const { symbol, fromUSD, fromEGP, fmt: fmtNum } = useCurrency();
   const isAr = lang === "ar";
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
 
@@ -70,7 +81,7 @@ export default function HomePage() {
 
       {/* ════════ HERO ════════ */}
       <section className="container-page">
-        <div className="relative max-w-2xl mx-auto text-center py-20 md:py-32">
+        <div className="relative max-w-2xl mx-auto text-center py-12 md:py-20">
           {/* Subtle radial glow behind title */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden>
             <div className="w-96 h-96 rounded-full opacity-[0.07]"
@@ -120,6 +131,7 @@ export default function HomePage() {
             {stats.map((s) => (
               <Stat key={s.source} value={s.value}
                 label={isAr ? s.ar : s.en} source={s.source} sourceUrl={s.url}
+                currencyUnit={s.currencyUnit} symbol={symbol} fromUSD={fromUSD} fromEGP={fromEGP} fmtNum={fmtNum}
               />
             ))}
           </div>

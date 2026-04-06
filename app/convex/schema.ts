@@ -323,8 +323,10 @@ export default defineSchema({
       v.literal("debt"),
       v.literal("elections"),
       v.literal("economy"),
+      v.literal("governorate_stats"),
       v.literal("general")
     )),
+    sanadLevel: v.optional(v.number()), // 1=official_gov, 2=intl_org, 3=news, 4=other, 5=derived
   })
     .index("by_type", ["type"])
     .index("by_category", ["category"])
@@ -343,6 +345,23 @@ export default defineSchema({
     .index("by_indicator", ["indicator"])
     .index("by_indicator_and_date", ["indicator", "date"]),
 
+  // GOVERNORATE STATS (time-series indicators per governorate, multi-source)
+  governorateStats: defineTable({
+    governorateId: v.id("governorates"),
+    indicator: v.string(), // "population", "area_km2", "density_per_km2", "hdi"
+    year: v.string(), // "2023"
+    value: v.number(),
+    unit: v.string(), // "people", "km2", "per_km2", "index"
+    sourceUrl: v.string(),
+    sourceNameEn: v.optional(v.string()),
+    sourceNameAr: v.optional(v.string()),
+    sanadLevel: v.number(), // 1=official_gov, 2=intl_org, 3=news, 4=other, 5=derived
+  })
+    .index("by_governorateId", ["governorateId"])
+    .index("by_governorateId_and_indicator", ["governorateId", "indicator"])
+    .index("by_indicator_and_year", ["indicator", "year"])
+    .index("by_governorateId_indicator_year", ["governorateId", "indicator", "year"]),
+
   // DATA CHANGE LOG (detailed per-operation audit trail)
   dataChangeLog: defineTable({
     refreshLogId: v.id("dataRefreshLog"),
@@ -353,7 +372,8 @@ export default defineSchema({
       v.literal("budget"),
       v.literal("debt"),
       v.literal("elections"),
-      v.literal("economy")
+      v.literal("economy"),
+      v.literal("governorate_stats")
     ),
     action: v.union(
       v.literal("created"),
@@ -427,7 +447,8 @@ export default defineSchema({
       v.literal("budget"),
       v.literal("debt"),
       v.literal("elections"),
-      v.literal("economy")
+      v.literal("economy"),
+      v.literal("governorate_stats")
     ),
     summaryAr: v.string(),
     summaryEn: v.string(),
@@ -455,6 +476,7 @@ export default defineSchema({
       v.literal("budget"),
       v.literal("debt"),
       v.literal("economy"),
+      v.literal("governorate_stats"),
       v.literal("all")
     ),
     status: v.union(
@@ -488,7 +510,8 @@ export default defineSchema({
       v.literal("constitution"),
       v.literal("budget"),
       v.literal("debt"),
-      v.literal("elections")
+      v.literal("elections"),
+      v.literal("governorate_stats")
     ),
     tableName: v.string(),
     fieldName: v.optional(v.string()),

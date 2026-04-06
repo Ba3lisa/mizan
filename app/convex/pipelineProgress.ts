@@ -10,6 +10,7 @@ const PIPELINE_STEPS = [
   "budget",
   "debt",
   "economy",
+  "governorate_stats",
   "constitution",
   "github_issues",
   "narrative",
