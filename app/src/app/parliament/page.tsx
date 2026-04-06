@@ -408,28 +408,52 @@ export default function ParliamentPage() {
 
   const isLoading = liveParties === undefined || liveHouseStats === undefined || liveSenateStats === undefined || liveHouseCommittees === undefined;
 
-  // Adapt Convex parties to local Party shape
-  interface ConvexParty {
-    _id: string;
-    nameAr: string;
-    nameEn: string;
-    color?: string;
-    houseSeats?: number;
-    senateSeats?: number;
-    ideologyAr?: string;
-    ideologyEn?: string;
-  }
+  // Build seat counts from stats queries, then merge with party data
   const DEFAULT_COLORS = ["#1B4F72", "#C0392B", "#27AE60", "#8E44AD", "#E67E22", "#16A085", "#7F8C8D"];
-  const parties: Party[] = (liveParties as unknown as ConvexParty[] | undefined ?? []).map((p, i) => ({
-    id: p._id,
-    nameAr: p.nameAr,
-    nameEn: p.nameEn,
-    color: p.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length],
-    houseSeats: p.houseSeats ?? 0,
-    senateSeats: p.senateSeats ?? 0,
-    ideologyAr: p.ideologyAr ?? "",
-    ideologyEn: p.ideologyEn ?? "",
-  }));
+
+  // Extract seat counts per party from stats
+  const houseSeatsByParty: Record<string, number> = {};
+  const senateSeatsByParty: Record<string, number> = {};
+  if (liveHouseStats?.parties) {
+    for (const p of liveHouseStats.parties) {
+      if (p.party?._id) houseSeatsByParty[p.party._id] = p.count;
+    }
+  }
+  if (liveSenateStats?.parties) {
+    for (const p of liveSenateStats.parties) {
+      if (p.party?._id) senateSeatsByParty[p.party._id] = p.count;
+    }
+  }
+
+  // Also add independent counts
+  const houseIndependents = liveHouseStats?.independentCount ?? 0;
+  const senateIndependents = liveSenateStats?.independentCount ?? 0;
+
+  const parties: Party[] = [
+    ...(liveParties ?? []).map((p, i) => ({
+      id: p._id,
+      nameAr: p.nameAr,
+      nameEn: p.nameEn,
+      color: p.color ?? DEFAULT_COLORS[i % DEFAULT_COLORS.length],
+      houseSeats: houseSeatsByParty[p._id] ?? 0,
+      senateSeats: senateSeatsByParty[p._id] ?? 0,
+      ideologyAr: p.ideology ?? "",
+      ideologyEn: p.ideology ?? "",
+    })),
+    // Add independents as a virtual party if any exist
+    ...(houseIndependents > 0 || senateIndependents > 0
+      ? [{
+          id: "independent",
+          nameAr: "مستقل",
+          nameEn: "Independent",
+          color: "#7F8C8D",
+          houseSeats: houseIndependents,
+          senateSeats: senateIndependents,
+          ideologyAr: "",
+          ideologyEn: "",
+        }]
+      : []),
+  ];
 
   const houseSeats = liveHouseStats?.totalMembers ?? 0;
   const senateSeats = liveSenateStats?.totalMembers ?? 0;
