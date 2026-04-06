@@ -2,6 +2,11 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 
+// Today's date in ISO format (YYYY-MM-DD) used to detect forecast vs historical
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 /**
  * Get the latest N values for a given indicator, ordered newest-first.
  */
@@ -46,6 +51,11 @@ export const getAllLatest = query({
       "poverty_rate",
       "debt_service_exports",
       "egx30",
+      // IMF DataMapper indicators (include forecasts through 2030)
+      "imf_gdp_growth_forecast",
+      "imf_inflation_forecast",
+      "imf_current_account_forecast",
+      "imf_gov_debt_gdp",
     ] as const;
 
     const result: Record<string, {
@@ -115,5 +125,59 @@ export const getLatestNarrative = query({
       .withIndex("by_category", (q) => q.eq("category", "economy"))
       .order("desc")
       .first();
+  },
+});
+
+/**
+ * Returns all economic indicator records whose date is strictly after today.
+ * These are forecast data points (e.g. IMF WEO projections through 2030).
+ * Ordered by indicator name then date ascending.
+ */
+export const getForecasts = query({
+  args: {},
+  handler: async (ctx) => {
+    const today = todayIso();
+
+    // IMF forecast indicators
+    const forecastIndicators = [
+      "imf_gdp_growth_forecast",
+      "imf_inflation_forecast",
+      "imf_current_account_forecast",
+      "imf_gov_debt_gdp",
+    ] as const;
+
+    const results: Array<{
+      indicator: string;
+      date: string;
+      year: string | undefined;
+      value: number;
+      unit: string;
+      sourceUrl: string | undefined;
+      sourceNameEn: string | undefined;
+    }> = [];
+
+    for (const indicator of forecastIndicators) {
+      const records = await ctx.db
+        .query("economicIndicators")
+        .withIndex("by_indicator_and_date", (q) =>
+          q.eq("indicator", indicator).gt("date", today)
+        )
+        .order("asc")
+        .collect();
+
+      for (const r of records) {
+        results.push({
+          indicator: r.indicator,
+          date: r.date,
+          year: r.year,
+          value: r.value,
+          unit: r.unit,
+          sourceUrl: r.sourceUrl,
+          sourceNameEn: r.sourceNameEn,
+        });
+      }
+    }
+
+    return results;
   },
 });

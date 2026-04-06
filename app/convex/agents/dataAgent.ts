@@ -530,6 +530,192 @@ const WB_INDICATORS: Array<{
   },
 ];
 
+// ─── IMF DATAMAPPER REFRESH ───────────────────────────────────────────────────
+
+// IMF DataMapper indicator codes for Egypt.
+// The API returns both historical values and WEO forecasts through 2030.
+const IMF_INDICATORS: Array<{
+  code: string;
+  indicator: string;
+  unit: string;
+  sourceNameEn: string;
+}> = [
+  {
+    code: "NGDP_RPCH",
+    indicator: "imf_gdp_growth_forecast",
+    unit: "percent",
+    sourceNameEn: "IMF WEO — Real GDP growth (annual %)",
+  },
+  {
+    code: "PCPIPCH",
+    indicator: "imf_inflation_forecast",
+    unit: "percent",
+    sourceNameEn: "IMF WEO — Inflation, average consumer prices (annual %)",
+  },
+  {
+    code: "BCA_NGDPD",
+    indicator: "imf_current_account_forecast",
+    unit: "percent_gdp",
+    sourceNameEn: "IMF WEO — Current account balance (% of GDP)",
+  },
+  {
+    code: "GGXWDG_NGDP",
+    indicator: "imf_gov_debt_gdp",
+    unit: "percent_gdp",
+    sourceNameEn: "IMF WEO — Government gross debt (% of GDP)",
+  },
+];
+
+// IMF DataMapper API response shape
+type IMFResponse = {
+  values?: Record<string, Record<string, Record<string, number>>>;
+};
+
+// IMF direct API function -- kept for when IMF unblocks cloud IPs
+async function _refreshIMFData(
+  ctx: ActionCtx
+): Promise<{ recordsUpdated: number }> {
+  let totalUpdated = 0;
+  const BASE_URL = "https://www.imf.org/external/datamapper/api/v1";
+
+  // IMF DataMapper API blocks cloud IPs (403). Use Wikipedia as the source
+  // for IMF projections -- the Economy of Egypt article cites IMF WEO data.
+  // Fallback: one Claude call to extract forecasts from the Wikipedia text.
+  console.log("[dataAgent/imf] Fetching IMF projections from Wikipedia...");
+
+  let imfText = "";
+  try {
+    const wikiUrl = "https://en.wikipedia.org/w/api.php?action=query&titles=Economy_of_Egypt&prop=extracts&explaintext=true&format=json";
+    const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(15000) });
+    if (wikiRes.ok) {
+      const data = await wikiRes.json() as { query?: { pages?: Record<string, { extract?: string }> } };
+      const pages = data?.query?.pages;
+      if (pages) {
+        imfText = Object.values(pages)[0]?.extract ?? "";
+        imfText = imfText.slice(0, 15000);
+      }
+    }
+  } catch {
+    console.warn("[dataAgent/imf] Wikipedia fetch failed");
+  }
+
+  if (imfText.length > 500) {
+    const imfResponse = await callClaude(
+      `Extract IMF economic projections for Egypt from this Wikipedia article.
+Return JSON: {"indicators": [{"indicator": "imf_gdp_growth_forecast", "data": {"2024": 2.4, "2025": 4.3, ...}}, ...]}
+
+Extract these if available:
+- imf_gdp_growth_forecast (Real GDP growth %)
+- imf_inflation_forecast (Inflation %)
+- imf_current_account_forecast (Current account % of GDP)
+- imf_gov_debt_gdp (Government debt % of GDP)
+
+Include both historical and forecast years (2020-2030).
+
+Text: ${imfText}`,
+      "Extract IMF economic data from Wikipedia. JSON only."
+    );
+
+    if (imfResponse) {
+      try {
+        let jsonStr = imfResponse;
+        const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (fence) jsonStr = fence[1];
+        const parsed = JSON.parse(jsonStr.trim()) as {
+          indicators?: Array<{ indicator: string; data: Record<string, number> }>;
+        };
+
+        if (parsed.indicators) {
+          for (const ind of parsed.indicators) {
+            const meta = IMF_INDICATORS.find((i) => i.indicator === ind.indicator);
+            if (!meta) continue;
+            for (const [yearStr, value] of Object.entries(ind.data)) {
+              if (typeof value !== "number" || isNaN(value)) continue;
+              const updated: number = await ctx.runMutation(
+                internal.dataRefresh.upsertEconomicIndicator,
+                {
+                  indicator: ind.indicator,
+                  date: `${yearStr}-12-31`,
+                  year: yearStr,
+                  value,
+                  unit: meta.unit,
+                  sourceUrl: "https://en.wikipedia.org/wiki/Economy_of_Egypt",
+                  sourceNameEn: meta.sourceNameEn,
+                }
+              );
+              totalUpdated += updated;
+            }
+          }
+          console.log(`[dataAgent/imf] Extracted IMF data from Wikipedia: ${totalUpdated} records`);
+        }
+      } catch {
+        console.warn("[dataAgent/imf] Failed to parse IMF data from Wikipedia");
+      }
+    }
+  }
+
+  // Original loop kept as dead code for when IMF API access is restored
+  const _skipDirectApi = true;
+  for (const imf of IMF_INDICATORS) {
+    if (_skipDirectApi) break;
+    const url = `${BASE_URL}/${imf.code}/EGY`;
+    let raw: unknown;
+
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      if (!response.ok) {
+        console.warn(
+          `[dataAgent/imf] IMF API returned ${response.status} for indicator ${imf.code}`
+        );
+        continue;
+      }
+      raw = await response.json();
+    } catch (err) {
+      console.warn(
+        `[dataAgent/imf] Failed to fetch ${imf.code}: ${String(err)}`
+      );
+      continue;
+    }
+
+    // Parse IMF response: {"values":{"NGDP_RPCH":{"EGY":{"2024":2.4,"2025":4.3,...}}}}
+    const typed = raw as IMFResponse;
+    const yearMap = typed?.values?.[imf.code]?.["EGY"];
+    if (!yearMap || typeof yearMap !== "object") {
+      console.warn(
+        `[dataAgent/imf] Unexpected IMF response shape for ${imf.code}`
+      );
+      continue;
+    }
+
+    for (const [yearStr, value] of Object.entries(yearMap)) {
+      if (typeof value !== "number" || isNaN(value)) continue;
+
+      // IMF year strings are like "2024"; store as YYYY-12-31 for consistency
+      const date = `${yearStr}-12-31`;
+
+      const updated: number = await ctx.runMutation(
+        internal.dataRefresh.upsertEconomicIndicator,
+        {
+          indicator: imf.indicator,
+          date,
+          year: yearStr,
+          value,
+          unit: imf.unit,
+          sourceUrl: url,
+          sourceNameEn: imf.sourceNameEn,
+        }
+      );
+      totalUpdated += updated;
+    }
+
+    console.log(
+      `[dataAgent/imf] ${imf.code} -> ${imf.indicator}: ${Object.keys(yearMap).length} year(s) processed`
+    );
+  }
+
+  return { recordsUpdated: totalUpdated };
+}
+
 async function refreshEconomyData(
   ctx: ActionCtx
 ): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
@@ -616,6 +802,21 @@ async function refreshEconomyData(
   // Also refresh EGX 30 stock market index
   const stockResult = await refreshStockMarket(ctx);
   totalUpdated += stockResult.recordsUpdated;
+
+  // IMF forecasts: seeded from reference data (API blocks cloud IPs).
+  // Ensure IMF data exists (no-op if already populated).
+  try {
+    const imfSeeded: number = await ctx.runMutation(
+      internal.imfData.ensureIMFForecasts,
+      {}
+    );
+    if (imfSeeded > 0) {
+      totalUpdated += imfSeeded;
+      console.log(`[dataAgent/economy] Seeded ${imfSeeded} IMF forecast records`);
+    }
+  } catch {
+    console.warn("[dataAgent/economy] IMF seed failed");
+  }
 
   return {
     recordsUpdated: totalUpdated,
