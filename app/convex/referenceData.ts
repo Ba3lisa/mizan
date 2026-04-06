@@ -9,7 +9,7 @@
 import { internalMutation, MutationCtx } from "./_generated/server";
 
 import {
-  ref_officials,
+  ref_officials as _ref_officials,
   ref_governorates,
   ref_parties,
   ref_constitutionParts,
@@ -21,7 +21,7 @@ import {
   ref_committees,
   ref_committeeMemberships,
   ref_dataSources,
-  ref_ministries,
+  ref_ministries as _ref_ministries,
   ref_parliamentMembers,
   ref_budgetItems,
   ref_debtByCreditor,
@@ -81,7 +81,13 @@ async function loadMetadata(ctx: MutationCtx): Promise<GroupReport> {
   return { group: "metadata", skipped: false, tablesLoaded: ["dataSources"], recordsInserted: count };
 }
 
-async function loadGovernmentStructure(ctx: MutationCtx): Promise<GroupReport> {
+async function loadGovernmentStructure(_ctx: MutationCtx): Promise<GroupReport> {
+  // Government officials are NEVER seeded from reference data.
+  // They come exclusively from the AI pipeline (cabinet.gov.eg + Claude).
+  // This ensures the data is always current and verifiable.
+  return { group: "government", skipped: true, tablesLoaded: [], recordsInserted: 0 };
+
+  /* REMOVED: Reference data seeding for officials/ministries
   const existingOfficials = await ctx.db.query("officials").collect();
   if (existingOfficials.length > 0) {
     return { group: "government", skipped: true, tablesLoaded: [], recordsInserted: 0 };
@@ -117,6 +123,7 @@ async function loadGovernmentStructure(ctx: MutationCtx): Promise<GroupReport> {
     tablesLoaded: ["officials", "ministries"],
     recordsInserted: count,
   };
+  END OF REMOVED CODE */
 }
 
 async function loadGeographicData(ctx: MutationCtx): Promise<GroupReport> {

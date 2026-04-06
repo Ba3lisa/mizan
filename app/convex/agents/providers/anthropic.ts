@@ -25,7 +25,7 @@ export async function callClaude(
 
   const body: Record<string, unknown> = {
     model: CLAUDE_MODEL,
-    max_tokens: 1024,
+    max_tokens: 4096,
     messages: [{ role: "user", content: prompt }],
   };
   if (systemPrompt) {

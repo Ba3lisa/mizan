@@ -34,6 +34,7 @@ import type * as elections from "../elections.js";
 import type * as funding from "../funding.js";
 import type * as githubIssueQueries from "../githubIssueQueries.js";
 import type * as government from "../government.js";
+import type * as governmentCleanup from "../governmentCleanup.js";
 import type * as lineage from "../lineage.js";
 import type * as maintenance from "../maintenance.js";
 import type * as parliament from "../parliament.js";
@@ -79,6 +80,7 @@ declare const fullApi: ApiFromModules<{
   funding: typeof funding;
   githubIssueQueries: typeof githubIssueQueries;
   government: typeof government;
+  governmentCleanup: typeof governmentCleanup;
   lineage: typeof lineage;
   maintenance: typeof maintenance;
   parliament: typeof parliament;

@@ -1,5 +1,6 @@
 import {
   query,
+  internalQuery,
   internalMutation,
   internalAction,
 } from "./_generated/server";
@@ -86,6 +87,34 @@ export const getRefreshHistory = query({
       )
       .order("desc")
       .take(limit);
+  },
+});
+
+/**
+ * Checks which main data tables are empty. Used by the orchestrator
+ * to force refresh even if the staleness check says "fresh".
+ */
+export const checkEmptyTables = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const govOfficials = await ctx.db
+      .query("officials")
+      .withIndex("by_role_and_isCurrent", (q) =>
+        q.eq("role", "minister").eq("isCurrent", true)
+      )
+      .take(1);
+    const budgetItems = await ctx.db.query("budgetItems").take(1);
+    const debtRecords = await ctx.db.query("debtRecords").take(1);
+    const members = await ctx.db.query("parliamentMembers").take(1);
+    const econ = await ctx.db.query("economicIndicators").take(1);
+
+    return {
+      government: govOfficials.length === 0,
+      budget: budgetItems.length === 0,
+      debt: debtRecords.length === 0,
+      parliament: members.length === 0,
+      economy: econ.length === 0,
+    };
   },
 });
 
@@ -363,6 +392,96 @@ export const flagGovernmentChanges = internalMutation({
     }
 
     return discrepancies;
+  },
+});
+
+/**
+ * Upserts government officials from AI-extracted cabinet data.
+ * Matches by English name. Creates new officials if not found.
+ * Marks officials no longer in the list as isCurrent=false.
+ * This is the SOLE source of truth for government officials -- no seed data.
+ */
+export const upsertGovernmentOfficials = internalMutation({
+  args: {
+    officials: v.array(
+      v.object({
+        nameEn: v.string(),
+        nameAr: v.string(),
+        titleEn: v.string(),
+        titleAr: v.string(),
+        role: v.union(
+          v.literal("president"),
+          v.literal("prime_minister"),
+          v.literal("minister")
+        ),
+      })
+    ),
+    sourceUrl: v.string(),
+  },
+  handler: async (ctx, args) => {
+    let updated = 0;
+
+    // Get all current officials (president, PM, ministers)
+    const currentOfficials = await ctx.db
+      .query("officials")
+      .withIndex("by_isCurrent", (q) => q.eq("isCurrent", true))
+      .collect();
+
+    // Filter to only government roles (not MPs/senators)
+    const govOfficials = currentOfficials.filter(
+      (o) => o.role === "president" || o.role === "prime_minister" || o.role === "minister" || o.role === "deputy_minister"
+    );
+
+    const existingByName = new Map(
+      govOfficials.map((o) => [o.nameEn.toLowerCase(), o])
+    );
+
+    const newNames = new Set(
+      args.officials.map((o) => o.nameEn.toLowerCase())
+    );
+
+    // Upsert each official from the extracted list
+    for (const official of args.officials) {
+      const existing = existingByName.get(official.nameEn.toLowerCase());
+
+      if (existing) {
+        // Update title if changed
+        if (existing.titleEn !== official.titleEn || existing.titleAr !== official.titleAr) {
+          await ctx.db.patch(existing._id, {
+            titleEn: official.titleEn,
+            titleAr: official.titleAr,
+            role: official.role,
+            sourceUrl: args.sourceUrl,
+          });
+          updated++;
+        }
+      } else {
+        // New official -- create
+        await ctx.db.insert("officials", {
+          nameEn: official.nameEn,
+          nameAr: official.nameAr,
+          titleEn: official.titleEn,
+          titleAr: official.titleAr,
+          role: official.role,
+          isCurrent: true,
+          sourceUrl: args.sourceUrl,
+        });
+        updated++;
+      }
+    }
+
+    // Mark officials NOT in the new list as no longer current
+    for (const existing of govOfficials) {
+      if (!newNames.has(existing.nameEn.toLowerCase())) {
+        await ctx.db.patch(existing._id, {
+          isCurrent: false,
+          endDate: new Date().toISOString().slice(0, 10),
+        });
+        updated++;
+      }
+    }
+
+    return updated;
   },
 });
 

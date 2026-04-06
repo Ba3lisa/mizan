@@ -209,78 +209,109 @@ async function refreshGovernmentData(
     return { recordsUpdated: 0 };
   }
 
-  const CABINET_URL = "https://cabinet.gov.eg/en/";
+  // cabinet.gov.eg is JS-rendered. Use Ahram Online (gov-affiliated news) as primary source.
+  const AHRAM_URL = "https://english.ahram.org.eg/News/562168.aspx";
+
   let pageText = "";
+
+  // Fetch Ahram Online cabinet lineup article
   try {
-    const response = await fetch(CABINET_URL);
-    if (response.ok) {
-      pageText = await response.text();
-      pageText = pageText.slice(0, 8000);
-    } else {
-      console.warn(
-        `[dataAgent] Cabinet page returned status ${response.status}; using empty context.`
-      );
+    const ahramRes = await fetch(AHRAM_URL, { signal: AbortSignal.timeout(15000) });
+    if (ahramRes.ok) {
+      const html = await ahramRes.text();
+      // Find the article body -- use the title marker, not the ad placeholder
+      const titleMarker = html.indexOf("ContentPlaceHolder1_hd");
+      const bodyStart = titleMarker > 0 ? titleMarker : html.indexOf("ContentPlaceHolder1_bref");
+      const articleHtml = bodyStart > 0 ? html.slice(bodyStart, bodyStart + 15000) : html.slice(Math.floor(html.length / 2), Math.floor(html.length / 2) + 15000);
+      // Strip HTML tags to get clean text
+      pageText = articleHtml.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+      console.log(`[dataAgent] Fetched Ahram cabinet article: ${pageText.length} chars`);
     }
-  } catch (fetchErr) {
-    console.warn(
-      `[dataAgent] Failed to fetch cabinet page: ${String(fetchErr)}; using empty context.`
-    );
+  } catch (err) {
+    console.warn(`[dataAgent] Ahram fetch failed: ${err}`);
   }
+
+  if (pageText.length < 500) {
+    console.warn("[dataAgent] Insufficient page content for government extraction");
+    return { recordsUpdated: 0 };
+  }
+
+  const CABINET_URL = AHRAM_URL;
 
   const systemPrompt = `You are a data extraction assistant for Mizan, Egypt's government transparency platform.
 Extract structured Egyptian government data from official sources.
 Always respond with valid JSON only — no markdown, no prose.`;
 
-  const prompt = `Extract a list of current Egyptian cabinet ministers from the following page content.
-Return a JSON array of objects, each with:
+  const prompt = `Extract the COMPLETE list of current Egyptian cabinet ministers from this page.
+Include the President, Prime Minister, and ALL ministers.
+Return a JSON array. Each entry must have:
 {
-  "nameEn": "<English name>",
-  "titleEn": "<English ministry/title>",
-  "nameAr": "<Arabic name or empty string>",
-  "titleAr": "<Arabic title or empty string>"
+  "nameEn": "Full English name",
+  "titleEn": "Full English title (e.g. Minister of Higher Education and Scientific Research)",
+  "nameAr": "Full Arabic name",
+  "titleAr": "Full Arabic title",
+  "role": "president" | "prime_minister" | "minister"
 }
-Return an empty array [] if no minister data is found.
+
+Be thorough — Egypt's cabinet typically has 30+ ministers. Include deputy ministers if listed.
+Return an empty array [] if no data is found.
 
 Page content:
 ${pageText || "(page content unavailable)"}`;
 
+  console.log(`[dataAgent] Government: sending ${pageText.length} chars to Claude...`);
   const claudeResponse = await callClaude(prompt, systemPrompt);
 
   if (!claudeResponse) {
-    console.warn("[dataAgent] Claude returned no government data.");
+    console.warn("[dataAgent] Claude returned no government data (null response).");
     return { recordsUpdated: 0 };
   }
 
-  let ministers: Array<{
+  console.log(`[dataAgent] Government: Claude returned ${claudeResponse.length} chars`);
+
+  let officials: Array<{
     nameEn: string;
     titleEn: string;
     nameAr: string;
     titleAr: string;
+    role: string;
   }>;
   try {
-    const parsed: unknown = JSON.parse(claudeResponse);
+    let jsonStr = claudeResponse;
+    const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fence) jsonStr = fence[1];
+    const parsed: unknown = JSON.parse(jsonStr.trim());
     if (!Array.isArray(parsed)) {
       console.warn("[dataAgent] Claude government response is not an array.");
       return { recordsUpdated: 0 };
     }
-    ministers = parsed as typeof ministers;
+    officials = parsed as typeof officials;
   } catch {
     console.warn(
-      `[dataAgent] Could not parse Claude government response: ${claudeResponse}`
+      `[dataAgent] Could not parse Claude government response`
     );
     return { recordsUpdated: 0 };
   }
 
-  if (ministers.length === 0) {
-    console.warn("[dataAgent] Claude found no ministers in page content.");
+  console.log(`[dataAgent] Government: parsed ${officials.length} officials from Claude response`);
+  if (officials.length === 0) {
+    console.warn("[dataAgent] Claude found no officials. First 300 chars of response: " + claudeResponse.slice(0, 300));
     return { recordsUpdated: 0 };
   }
 
-  // Flag potential changes for human review via a mutation
+  // Auto-write officials to DB (upsert by name, never delete existing)
   const recordsUpdated: number = await ctx.runMutation(
-    internal.dataRefresh.flagGovernmentChanges,
+    internal.dataRefresh.upsertGovernmentOfficials,
     {
-      detectedMinisters: ministers,
+      officials: officials.map((o) => ({
+        nameEn: o.nameEn,
+        nameAr: o.nameAr || o.nameEn,
+        titleEn: o.titleEn,
+        titleAr: o.titleAr || o.titleEn,
+        role: o.role === "president" ? "president" as const
+          : o.role === "prime_minister" ? "prime_minister" as const
+          : "minister" as const,
+      })),
       sourceUrl: CABINET_URL,
     }
   );
@@ -536,13 +567,26 @@ export const orchestrateRefresh = internalAction({
       "economy",
     ];
 
+    // Check which tables are actually empty (force refresh even if "fresh")
+    const tableEmpty: Record<string, boolean> = await ctx.runQuery(
+      internal.dataRefresh.checkEmptyTables,
+      {}
+    );
+
     for (const category of categories) {
       const lastTime = lastUpdated[category];
-      if (lastTime !== null && now - lastTime < STALE_THRESHOLD_MS) {
+      const isEmpty = tableEmpty[category] ?? false;
+
+      // Skip if fresh AND not empty. Always refresh if table is empty.
+      if (!isEmpty && lastTime !== null && now - lastTime < STALE_THRESHOLD_MS) {
         console.log(
-          `[dataAgent] Category "${category}" is fresh — skipping (last updated ${new Date(lastTime).toISOString()}).`
+          `[dataAgent] Category "${category}" is fresh — skipping.`
         );
         continue;
+      }
+
+      if (isEmpty) {
+        console.log(`[dataAgent] Category "${category}" table is EMPTY — forcing refresh.`);
       }
 
       await refreshCategory(ctx, category);
