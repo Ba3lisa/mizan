@@ -16,6 +16,7 @@ import type * as agents_dataAgent from "../agents/dataAgent.js";
 import type * as agents_githubAgent from "../agents/githubAgent.js";
 import type * as agents_maintenance from "../agents/maintenance.js";
 import type * as agents_parliamentAgent from "../agents/parliamentAgent.js";
+import type * as agents_parliamentScraper from "../agents/parliamentScraper.js";
 import type * as agents_providers_anthropic from "../agents/providers/anthropic.js";
 import type * as agents_providers_registry from "../agents/providers/registry.js";
 import type * as agents_validators from "../agents/validators.js";
@@ -59,6 +60,7 @@ declare const fullApi: ApiFromModules<{
   "agents/githubAgent": typeof agents_githubAgent;
   "agents/maintenance": typeof agents_maintenance;
   "agents/parliamentAgent": typeof agents_parliamentAgent;
+  "agents/parliamentScraper": typeof agents_parliamentScraper;
   "agents/providers/anthropic": typeof agents_providers_anthropic;
   "agents/providers/registry": typeof agents_providers_registry;
   "agents/validators": typeof agents_validators;

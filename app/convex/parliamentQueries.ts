@@ -1,6 +1,7 @@
 import { internalQuery, internalMutation } from "./_generated/server";
 import { v } from "convex/values";
 
+
 export const getMemberCount = internalQuery({
   args: {},
   handler: async (ctx) => {
@@ -109,5 +110,110 @@ export const upsertParliamentComposition = internalMutation({
     }
 
     return totalUpdated;
+  },
+});
+
+/**
+ * Upsert a single parliament member from the parliament.gov.eg scraper.
+ * Matches by Arabic name to avoid duplicates.
+ */
+export const upsertMember = internalMutation({
+  args: {
+    nameAr: v.string(),
+    nameEn: v.string(),
+    partyNameEn: v.string(),
+    governorate: v.string(),
+    constituency: v.string(),
+    membershipType: v.union(
+      v.literal("constituency"),
+      v.literal("party_list"),
+      v.literal("presidential_appointment")
+    ),
+    committee: v.string(),
+    sourceUrl: v.string(),
+    chamber: v.union(v.literal("house"), v.literal("senate")),
+  },
+  handler: async (ctx, args) => {
+    // Find existing official by Arabic name
+    const allOfficials = await ctx.db
+      .query("officials")
+      .withIndex("by_role_and_isCurrent", (q) =>
+        q.eq("role", args.chamber === "house" ? "mp" : "senator").eq("isCurrent", true)
+      )
+      .collect();
+
+    const existing = allOfficials.find(
+      (o) => o.nameAr === args.nameAr || o.nameEn === args.nameEn
+    );
+
+    // Find party by name
+    const allParties = await ctx.db.query("parties").collect();
+    const party = allParties.find(
+      (p) =>
+        p.nameEn.toLowerCase().includes(args.partyNameEn.toLowerCase()) ||
+        p.nameAr.includes(args.partyNameEn)
+    );
+
+    // Find governorate
+    const allGovernorates = await ctx.db.query("governorates").collect();
+    const gov = allGovernorates.find(
+      (g) =>
+        g.nameEn.toLowerCase().includes(args.governorate.toLowerCase()) ||
+        g.nameAr.includes(args.governorate)
+    );
+
+    if (existing) {
+      // Update official with real name if it was a placeholder
+      if (existing.nameEn.includes("Member ")) {
+        await ctx.db.patch(existing._id, {
+          nameAr: args.nameAr,
+          nameEn: args.nameEn,
+          sourceUrl: args.sourceUrl,
+        });
+      }
+
+      // Update the parliament member record
+      const memberRecords = await ctx.db
+        .query("parliamentMembers")
+        .withIndex("by_chamber_and_isCurrent", (q) =>
+          q.eq("chamber", args.chamber).eq("isCurrent", true)
+        )
+        .collect();
+      const memberRecord = memberRecords.find(
+        (m) => m.officialId === existing._id
+      );
+      if (memberRecord) {
+        await ctx.db.patch(memberRecord._id, {
+          partyId: party?._id,
+          governorateId: gov?._id,
+          constituency: args.constituency || undefined,
+          electionMethod: args.membershipType,
+        });
+      }
+      return;
+    }
+
+    // Create new official
+    const officialId = await ctx.db.insert("officials", {
+      nameAr: args.nameAr,
+      nameEn: args.nameEn,
+      titleAr: args.chamber === "house" ? "عضو مجلس النواب" : "عضو مجلس الشيوخ",
+      titleEn: `Member of Parliament (${args.chamber === "house" ? "House" : "Senate"})`,
+      role: args.chamber === "house" ? "mp" as const : "senator" as const,
+      isCurrent: true,
+      sourceUrl: args.sourceUrl,
+    });
+
+    // Create parliament member record
+    await ctx.db.insert("parliamentMembers", {
+      officialId,
+      chamber: args.chamber,
+      partyId: party?._id,
+      governorateId: gov?._id,
+      electionMethod: args.membershipType,
+      constituency: args.constituency || undefined,
+      termStart: "2025-12-01",
+      isCurrent: true,
+    });
   },
 });
