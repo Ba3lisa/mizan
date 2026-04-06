@@ -149,3 +149,57 @@ export const getBudgetSankeyData = query({
     return { fiscalYear, nodes, links };
   },
 });
+
+/**
+ * Get tax brackets for a specific year.
+ * Used by /budget/your-share to calculate personal tax burden.
+ */
+export const getTaxBrackets = query({
+  args: { year: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    const year = args.year ?? "2024";
+    return await ctx.db
+      .query("taxBrackets")
+      .withIndex("by_year_and_sortOrder", (q) => q.eq("year", year))
+      .collect();
+  },
+});
+
+/**
+ * Get expenditure breakdown as percentages for the latest fiscal year.
+ * Used by /budget/your-share to show where tax money goes.
+ */
+export const getExpenditureBreakdown = query({
+  args: {},
+  handler: async (ctx) => {
+    // Get the latest fiscal year
+    const fiscalYears = await ctx.db
+      .query("fiscalYears")
+      .withIndex("by_year")
+      .order("desc")
+      .take(1);
+
+    if (fiscalYears.length === 0) return { fiscalYear: null, items: [] };
+
+    const fy = fiscalYears[0];
+    const items = await ctx.db
+      .query("budgetItems")
+      .withIndex("by_fiscalYearId_and_category", (q) =>
+        q.eq("fiscalYearId", fy._id).eq("category", "expenditure")
+      )
+      .collect();
+
+    // Only top-level items (no parent)
+    const topLevel = items.filter((i) => !i.parentItemId);
+
+    return {
+      fiscalYear: fy,
+      items: topLevel.map((i) => ({
+        sectorAr: i.sectorAr,
+        sectorEn: i.sectorEn,
+        amount: i.amount,
+        percentageOfTotal: i.percentageOfTotal ?? 0,
+      })),
+    };
+  },
+});

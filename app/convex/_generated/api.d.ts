@@ -36,6 +36,7 @@ import type * as parliament from "../parliament.js";
 import type * as referenceData from "../referenceData.js";
 import type * as seedConstitutionMissing from "../seedConstitutionMissing.js";
 import type * as seedData from "../seedData.js";
+import type * as taxData from "../taxData.js";
 import type * as transparency from "../transparency.js";
 
 import type {
@@ -73,6 +74,7 @@ declare const fullApi: ApiFromModules<{
   referenceData: typeof referenceData;
   seedConstitutionMissing: typeof seedConstitutionMissing;
   seedData: typeof seedData;
+  taxData: typeof taxData;
   transparency: typeof transparency;
 }>;
 

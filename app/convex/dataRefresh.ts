@@ -164,21 +164,28 @@ export const upsertDebtRecord = internalMutation({
       return 1;
     }
 
-    // Only patch if any value actually changed
-    const hasChange =
-      args.totalExternalDebt !== existing.totalExternalDebt ||
-      args.totalDomesticDebt !== existing.totalDomesticDebt ||
-      args.debtToGdpRatio !== existing.debtToGdpRatio ||
-      args.foreignReserves !== existing.foreignReserves;
+    // Only patch fields that are explicitly provided (not undefined).
+    // This prevents WB API data (which only has totalExternalDebt) from
+    // overwriting existing domestic debt, GDP ratio, or reserves.
+    const patch: Record<string, unknown> = {};
+    if (args.totalExternalDebt !== undefined && args.totalExternalDebt !== existing.totalExternalDebt) {
+      patch.totalExternalDebt = args.totalExternalDebt;
+    }
+    if (args.totalDomesticDebt !== undefined && args.totalDomesticDebt !== existing.totalDomesticDebt) {
+      patch.totalDomesticDebt = args.totalDomesticDebt;
+    }
+    if (args.debtToGdpRatio !== undefined && args.debtToGdpRatio !== existing.debtToGdpRatio) {
+      patch.debtToGdpRatio = args.debtToGdpRatio;
+    }
+    if (args.foreignReserves !== undefined && args.foreignReserves !== existing.foreignReserves) {
+      patch.foreignReserves = args.foreignReserves;
+    }
+    if (args.sourceUrl !== undefined) {
+      patch.sourceUrl = args.sourceUrl;
+    }
 
-    if (hasChange) {
-      await ctx.db.patch(existing._id, {
-        totalExternalDebt: args.totalExternalDebt,
-        totalDomesticDebt: args.totalDomesticDebt,
-        debtToGdpRatio: args.debtToGdpRatio,
-        foreignReserves: args.foreignReserves,
-        sourceUrl: args.sourceUrl,
-      });
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(existing._id, patch);
       return 1;
     }
 

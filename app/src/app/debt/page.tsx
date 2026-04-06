@@ -57,13 +57,21 @@ function DebtTimeline() {
   const convexTimeline = useQuery(api.debt.getDebtTimeline);
   const isLoading = convexTimeline === undefined;
 
-  const activeTimelineData: TimelineDataPoint[] = !isLoading && convexTimeline.length > 0
-    ? convexTimeline.map((r) => ({
-        year: new Date(r.date).getFullYear(),
-        externalDebt: r.totalExternalDebt ?? 0,
-        debtToGDP: r.debtToGdpRatio ?? 0,
-      }))
-    : [];
+  // Deduplicate by year -- keep the latest record per year (e.g., 2024-12-31 over 2024-06-30)
+  const activeTimelineData: TimelineDataPoint[] = (() => {
+    if (isLoading || convexTimeline.length === 0) return [];
+    const byYear = new Map<number, { date: string; ext: number; ratio: number }>();
+    for (const r of convexTimeline) {
+      const year = new Date(r.date).getFullYear();
+      const prev = byYear.get(year);
+      if (!prev || r.date > prev.date) {
+        byYear.set(year, { date: r.date, ext: r.totalExternalDebt ?? 0, ratio: r.debtToGdpRatio ?? 0 });
+      }
+    }
+    return Array.from(byYear.entries())
+      .map(([year, v]) => ({ year, externalDebt: v.ext, debtToGDP: v.ratio }))
+      .sort((a, b) => a.year - b.year);
+  })();
 
   const svgW = 700;
   const svgH = 300;
@@ -519,9 +527,8 @@ export default function DebtPage() {
               <p className="text-xs text-muted-foreground mb-1">
                 {isAr ? "\u0646\u0633\u0628\u0629 \u0627\u0644\u062f\u064a\u0646 / \u0627\u0644\u0646\u0627\u062a\u062c" : "Debt-to-GDP"}
               </p>
-              <p className="font-mono text-3xl font-bold tabular-nums text-foreground">
-                {latestRecord ? `${latestRecord.debtToGDP}` : "\u2014"}
-                <span className="text-base font-normal text-muted-foreground">%</span>
+              <p className="font-mono text-3xl font-bold tabular-nums text-foreground" dir="ltr">
+                {latestRecord ? `${latestRecord.debtToGDP}%` : "\u2014"}
               </p>
             </CardContent>
           </Card>
@@ -532,9 +539,8 @@ export default function DebtPage() {
                 <p className="text-xs text-muted-foreground mb-1">
                   {isAr ? `\u0627\u0644\u0632\u064a\u0627\u062f\u0629 \u0645\u0646\u0630 ${earliestRecord.year}` : `Rise since ${earliestRecord.year}`}
                 </p>
-                <p className="font-mono text-3xl font-bold tabular-nums text-red-400">
-                  +{increasePercent}
-                  <span className="text-base font-normal text-muted-foreground">%</span>
+                <p className="font-mono text-3xl font-bold tabular-nums text-red-400" dir="ltr">
+                  +{increasePercent}%
                 </p>
               </CardContent>
             </Card>

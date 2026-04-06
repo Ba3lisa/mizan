@@ -278,6 +278,20 @@ export default defineSchema({
     .index("by_governorateId", ["governorateId"])
     .index("by_electionId_and_governorateId", ["electionId", "governorateId"]),
 
+  // TAX BRACKETS (tracked by AI pipeline from Egyptian Tax Authority)
+  taxBrackets: defineTable({
+    year: v.string(),
+    fromAmount: v.number(),
+    toAmount: v.optional(v.number()),
+    rate: v.number(),
+    personalExemption: v.optional(v.number()),
+    lawReference: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    sortOrder: v.number(),
+  })
+    .index("by_year", ["year"])
+    .index("by_year_and_sortOrder", ["year", "sortOrder"]),
+
   // DATA SOURCES
   dataSources: defineTable({
     nameAr: v.string(),

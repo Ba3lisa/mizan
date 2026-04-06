@@ -45,32 +45,41 @@ async function refreshDebtData(
     return { recordsUpdated: 0 };
   }
 
-  // Take the most recent entry
-  const latest = entries[0];
-  const debtValueUsd = latest.value; // already confirmed non-null by parser
+  // Process all entries (not just the most recent)
+  let totalUpdated = 0;
+  for (const entry of entries) {
+    const debtValueUsd = entry.value;
+    if (debtValueUsd === null || debtValueUsd === undefined) continue;
 
-  const record = {
-    totalExternalDebt: debtValueUsd ?? undefined,
-  };
+    // World Bank returns raw USD values. Convert to billions for consistency
+    // with all other debt data in the database (stored as billions USD/EGP).
+    // UI displays with appropriate formatting.
+    const debtInBillions = debtValueUsd / 1e9;
+    const record = { totalExternalDebt: debtInBillions };
 
-  const validation = validateDebtRecord(record);
-  if (!validation.valid) {
-    throw new Error(
-      `Debt record failed validation: ${validation.errors.join("; ")}`
+    const validation = validateDebtRecord(record);
+    if (!validation.valid) {
+      console.warn(
+        `[dataAgent] Debt record for ${entry.date} failed validation: ${validation.errors.join("; ")}`
+      );
+      continue;
+    }
+
+    // Normalize date: World Bank returns "2024", we want "2024-12-31"
+    const date = entry.date.length === 4 ? `${entry.date}-12-31` : entry.date;
+
+    const updated: number = await ctx.runMutation(
+      internal.dataRefresh.upsertDebtRecord,
+      {
+        date,
+        totalExternalDebt: debtInBillions,
+        sourceUrl: SOURCE_URL,
+      }
     );
+    totalUpdated += updated;
   }
 
-  // Upsert the debt record via a mutation
-  const recordsUpdated: number = await ctx.runMutation(
-    internal.dataRefresh.upsertDebtRecord,
-    {
-      date: latest.date,
-      totalExternalDebt: debtValueUsd ?? undefined,
-      sourceUrl: SOURCE_URL,
-    }
-  );
-
-  return { recordsUpdated, sourceUrl: SOURCE_URL };
+  return { recordsUpdated: totalUpdated, sourceUrl: SOURCE_URL };
 }
 
 // ─── BUDGET REFRESH ───────────────────────────────────────────────────────────

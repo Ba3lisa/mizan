@@ -19,6 +19,7 @@ The foundation: a fully functional transparency platform covering all major bran
 - **AI Data Agent** -- Automated data refresh cycle every 6 hours, pulling from World Bank API, Ministry of Finance, Cabinet portal, and other official sources
 - **Transparency Page** -- Full audit trail of every data refresh the agent has performed, including successes, failures, and data change counts
 - **Bilingual Arabic/English Interface** -- Complete right-to-left Arabic support alongside English, switchable from any page
+- **Your Tax Share** -- Personal tax calculator at /budget/your-share showing where your taxes go, powered by live budget data from Convex and official tax brackets (Law 7/2024)
 - **Source Citations** -- Every data point on the platform links to its original source URL; no number exists without a citation
 
 ## v1.1 -- In Progress
@@ -35,7 +36,6 @@ Community verification infrastructure and open source readiness.
 
 Personal relevance and economic context.
 
-- **/budget/your-share** -- Personal tax calculator: enter your annual salary, see exactly where your tax money goes (education, health, debt service, defense), with a personalized breakdown chart
 - **/economy** -- Economic indicators dashboard tracking GDP growth, inflation (CPI), unemployment, EGP exchange rates, foreign reserves, Suez Canal revenue, tourism revenue, and diaspora remittances
 - **Multi-Model LLM Council** -- Expand the council beyond Claude to include OpenAI and Google models for more robust consensus on data verification
 - **UI Contribution Agent** -- Automated feasibility analysis for community-proposed UI changes, generating effort estimates and implementation plans
