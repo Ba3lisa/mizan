@@ -221,9 +221,95 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
     );
   }
 
+  // Mobile: show clean vertical bar breakdown instead of Sankey
+  if (isMobile) {
+    const totalRev = revenueData.reduce((s, r) => s + r.amount, 0);
+    const totalSp = spendingData.reduce((s, r) => s + r.amount, 0);
+    const sortedRev = [...revenueData].sort((a, b) => b.amount - a.amount);
+    const sortedSp = [...spendingData].sort((a, b) => b.amount - a.amount);
+
+    return (
+      <div className="flex flex-col gap-8">
+        {/* Revenue */}
+        <div>
+          <div className="flex items-baseline justify-between mb-3">
+            <h3 className="text-sm font-bold text-foreground">{isAr ? "الإيرادات" : "Revenue"}</h3>
+            <span className="font-mono text-xs text-emerald-500">{fmtAmount(totalRev)}</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {sortedRev.map((r) => {
+              const pct = totalRev > 0 ? (r.amount / totalRev) * 100 : 0;
+              return (
+                <div key={r.nameEn}>
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className="text-xs text-foreground truncate flex-1">{isAr ? r.nameAr : r.nameEn}</span>
+                    <span className="font-mono text-[0.65rem] text-muted-foreground ms-2">{pct.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-6 bg-muted/30 rounded overflow-hidden">
+                    <div
+                      className="h-full rounded flex items-center justify-end px-2"
+                      style={{ width: `${pct}%`, background: REVENUE_COLOR }}
+                    >
+                      {pct > 15 && (
+                        <span className="text-[0.6rem] text-white font-mono">{fmtAmount(r.amount)}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Spending */}
+        <div>
+          <div className="flex items-baseline justify-between mb-3">
+            <h3 className="text-sm font-bold text-foreground">{isAr ? "المصروفات" : "Spending"}</h3>
+            <span className="font-mono text-xs text-red-400">{fmtAmount(totalSp)}</span>
+          </div>
+          <div className="flex flex-col gap-2">
+            {sortedSp.map((s) => {
+              const pct = totalSp > 0 ? (s.amount / totalSp) * 100 : 0;
+              const isDebt = s.nameEn === "Debt Service";
+              return (
+                <div key={s.nameEn}>
+                  <div className="flex items-baseline justify-between mb-1">
+                    <span className={`text-xs truncate flex-1 ${isDebt ? "text-red-400 font-semibold" : "text-foreground"}`}>
+                      {isAr ? s.nameAr : s.nameEn}
+                    </span>
+                    <span className="font-mono text-[0.65rem] text-muted-foreground ms-2">{pct.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-6 bg-muted/30 rounded overflow-hidden">
+                    <div
+                      className="h-full rounded flex items-center justify-end px-2"
+                      style={{ width: `${pct}%`, background: isDebt ? DEBT_SERVICE_COLOR : SPENDING_COLOR }}
+                    >
+                      {pct > 12 && (
+                        <span className="text-[0.6rem] text-white font-mono">{fmtAmount(s.amount)}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Deficit */}
+        {totalSp > totalRev && (
+          <div className="border-t border-border pt-3 flex items-baseline justify-between">
+            <span className="text-xs font-semibold text-amber-400">{isAr ? "العجز" : "Deficit"}</span>
+            <span className="font-mono text-sm font-bold text-amber-400">{fmtAmount(totalSp - totalRev)}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop: full Sankey diagram
   return (
-    <div className={isMobile ? "overflow-x-auto" : ""} dir="ltr">
-      <div className={isMobile ? "min-w-[900px] h-[700px]" : "h-[700px]"}>
+    <div dir="ltr">
+      <div className="h-[700px]">
       <ResponsiveSankey
         data={{ nodes, links: validLinks }}
         margin={isMobile
