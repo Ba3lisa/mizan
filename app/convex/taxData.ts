@@ -39,6 +39,7 @@ export const ensureTaxBrackets = internalMutation({
         lawReference: LAW_REFERENCE,
         sourceUrl: TAX_SOURCE_URL,
         sortOrder: bracket.sortOrder,
+        sanadLevel: 1,
       });
     }
 

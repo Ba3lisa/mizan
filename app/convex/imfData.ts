@@ -56,6 +56,7 @@ export const ensureIMFForecasts = internalMutation({
           unit: f.unit,
           sourceUrl: "https://www.imf.org/external/datamapper/profile/EGY",
           sourceNameEn: f.sourceNameEn,
+          sanadLevel: 2,
         });
         total++;
       }

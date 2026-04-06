@@ -1056,6 +1056,9 @@ ${indicatorSummary}`;
 
 const GOVERNORATES_WIKI_URL = "https://en.wikipedia.org/wiki/Governorates_of_Egypt";
 const GOVERNORATES_HDI_URL = "https://en.wikipedia.org/wiki/List_of_governorates_of_Egypt_by_Human_Development_Index";
+// Wikipedia API endpoints — returns plain text, far more token-efficient than raw HTML
+const GOVERNORATES_WIKI_API = "https://en.wikipedia.org/w/api.php?action=query&titles=Governorates_of_Egypt&prop=extracts&explaintext=true&format=json";
+const GOVERNORATES_HDI_API = "https://en.wikipedia.org/w/api.php?action=query&titles=List_of_governorates_of_Egypt_by_Human_Development_Index&prop=extracts&explaintext=true&format=json";
 
 async function refreshGovernorateStatsData(
   ctx: ActionCtx
@@ -1068,37 +1071,45 @@ async function refreshGovernorateStatsData(
     return { recordsUpdated: 0 };
   }
 
-  // Fetch main governorates page
-  let page1Html = "";
+  // Fetch main governorates page via Wikipedia API (plain text — much more token-efficient)
+  let page1Text = "";
   try {
-    const res = await fetch(GOVERNORATES_WIKI_URL, { signal: AbortSignal.timeout(15000) });
+    const res = await fetch(GOVERNORATES_WIKI_API, { signal: AbortSignal.timeout(15000) });
     if (res.ok) {
-      const html = await res.text();
-      page1Html = html.slice(0, 15000);
-      console.log(`[dataAgent/govStats] Fetched main governorates page: ${page1Html.length} chars`);
+      const data = await res.json() as { query?: { pages?: Record<string, { extract?: string }> } };
+      const pages = data.query?.pages;
+      if (pages) {
+        page1Text = Object.values(pages)[0]?.extract ?? "";
+        page1Text = page1Text.slice(0, 12000); // Plain text is ~5x more efficient than HTML
+      }
+      console.log(`[dataAgent/govStats] Fetched govs plain text: ${page1Text.length} chars`);
     } else {
-      console.warn(`[dataAgent/govStats] Governorates page returned ${res.status}`);
+      console.warn(`[dataAgent/govStats] Governorates API returned ${res.status}`);
     }
   } catch (err) {
     console.warn(`[dataAgent/govStats] Failed to fetch governorates page: ${String(err)}`);
   }
 
-  // Fetch HDI page
-  let page2Html = "";
+  // Fetch HDI page via Wikipedia API
+  let page2Text = "";
   try {
-    const res = await fetch(GOVERNORATES_HDI_URL, { signal: AbortSignal.timeout(15000) });
+    const res = await fetch(GOVERNORATES_HDI_API, { signal: AbortSignal.timeout(15000) });
     if (res.ok) {
-      const html = await res.text();
-      page2Html = html.slice(0, 15000);
-      console.log(`[dataAgent/govStats] Fetched HDI page: ${page2Html.length} chars`);
+      const data = await res.json() as { query?: { pages?: Record<string, { extract?: string }> } };
+      const pages = data.query?.pages;
+      if (pages) {
+        page2Text = Object.values(pages)[0]?.extract ?? "";
+        page2Text = page2Text.slice(0, 8000);
+      }
+      console.log(`[dataAgent/govStats] Fetched HDI plain text: ${page2Text.length} chars`);
     } else {
-      console.warn(`[dataAgent/govStats] HDI page returned ${res.status}`);
+      console.warn(`[dataAgent/govStats] HDI API returned ${res.status}`);
     }
   } catch (err) {
     console.warn(`[dataAgent/govStats] Failed to fetch HDI page: ${String(err)}`);
   }
 
-  if (page1Html.length < 500 && page2Html.length < 500) {
+  if (page1Text.length < 500 && page2Text.length < 500) {
     console.warn("[dataAgent/govStats] Both pages returned insufficient content.");
     return { recordsUpdated: 0 };
   }
@@ -1118,11 +1129,11 @@ Always respond with valid JSON only — no markdown, no prose.`;
 
   const prompt = `Extract governorate statistics from these Wikipedia pages about Egyptian governorates.
 
-PAGE 1 (Governorates of Egypt):
-${page1Html || "(unavailable)"}
+PAGE 1 (Governorates of Egypt — plain text):
+${page1Text || "(unavailable)"}
 
-PAGE 2 (HDI by governorate):
-${page2Html || "(unavailable)"}
+PAGE 2 (HDI by governorate — plain text):
+${page2Text || "(unavailable)"}
 
 Return a JSON array where each element is:
 {
@@ -1153,7 +1164,16 @@ For HDI, some frontier governorates are grouped — skip those that don't have i
     let jsonStr = claudeResponse;
     const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (fence) jsonStr = fence[1];
-    const raw = JSON.parse(jsonStr.trim()) as unknown;
+    let raw = JSON.parse(jsonStr.trim()) as unknown;
+    // Handle cases where Claude wraps array in an object like { governorates: [...] }
+    if (!Array.isArray(raw) && typeof raw === "object" && raw !== null) {
+      const values = Object.values(raw as Record<string, unknown>);
+      const arr = values.find((v) => Array.isArray(v));
+      if (arr) {
+        console.log("[dataAgent/govStats] Extracted array from nested object.");
+        raw = arr;
+      }
+    }
     if (!Array.isArray(raw)) {
       console.warn("[dataAgent/govStats] Claude response is not an array.");
       return { recordsUpdated: 0 };

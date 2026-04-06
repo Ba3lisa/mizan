@@ -28,14 +28,16 @@ export const upsertOfficial = mutation({
     bioAr: v.optional(v.string()),
     bioEn: v.optional(v.string()),
     sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const { officialId, ...fields } = args;
+    const withSanad = { ...fields, sanadLevel: fields.sanadLevel ?? 4 };
     if (officialId) {
-      await ctx.db.patch(officialId, fields);
+      await ctx.db.patch(officialId, withSanad);
       return officialId;
     }
-    return await ctx.db.insert("officials", fields);
+    return await ctx.db.insert("officials", withSanad);
   },
 });
 
@@ -139,9 +141,10 @@ export const addBudgetItem = mutation({
     percentageOfTotal: v.optional(v.number()),
     percentageOfGdp: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("budgetItems", args);
+    return await ctx.db.insert("budgetItems", { ...args, sanadLevel: args.sanadLevel ?? 1 });
   },
 });
 
@@ -153,8 +156,9 @@ export const addDebtRecord = mutation({
     debtToGdpRatio: v.optional(v.number()),
     foreignReserves: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("debtRecords", args);
+    return await ctx.db.insert("debtRecords", { ...args, sanadLevel: args.sanadLevel ?? 2 });
   },
 });

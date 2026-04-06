@@ -43,6 +43,7 @@ export const upsertRating = internalMutation({
         effectiveDate: args.effectiveDate,
         previousRating: args.previousRating,
         sourceUrl: args.sourceUrl,
+        sanadLevel: 2,
       });
       return 1;
     }

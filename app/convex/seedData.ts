@@ -21,6 +21,7 @@ export const seed = internalMutation({
       bioAr:
         "عبد الفتاح السيسي هو الرئيس السادس لجمهورية مصر العربية، وقد شغل سابقاً منصب وزير الدفاع.",
       sourceUrl: "https://www.presidency.eg",
+      sanadLevel: 1,
     });
 
     const _pmId = await ctx.db.insert("officials", {
@@ -36,6 +37,7 @@ export const seed = internalMutation({
       bioAr:
         "مصطفى مدبولي يشغل منصب رئيس مجلس الوزراء منذ يونيو 2018، وقد كان وزيراً للإسكان من قبل.",
       sourceUrl: "https://www.cabinet.gov.eg",
+      sanadLevel: 1,
     });
 
     // Cabinet ministers (2024)
@@ -252,6 +254,7 @@ export const seed = internalMutation({
         role: "minister",
         isCurrent: true,
         appointmentDate: "2024-07-15",
+        sanadLevel: 1,
       });
       ministerIds.push(id);
     }
@@ -1338,6 +1341,7 @@ export const seed = internalMutation({
         role: p.chamber === "house" ? "mp" : "senator",
         isCurrent: true,
         appointmentDate: "2021-01-12",
+        sanadLevel: 1,
       });
 
       const memberId = await ctx.db.insert("parliamentMembers", {
@@ -2431,6 +2435,7 @@ export const seed = internalMutation({
       totalVotesCast: 25607487,
       turnoutPercentage: 47.5,
       sourceUrl: "https://www.elections.eg",
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("electionResults", {
@@ -2440,6 +2445,7 @@ export const seed = internalMutation({
       votes: 23780104,
       percentage: 96.91,
       isWinner: true,
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("electionResults", {
@@ -2449,6 +2455,7 @@ export const seed = internalMutation({
       votes: 757511,
       percentage: 3.09,
       isWinner: false,
+      sanadLevel: 1,
     });
 
     // 2018 Presidential Election
@@ -2460,6 +2467,7 @@ export const seed = internalMutation({
       totalVotesCast: 24253432,
       turnoutPercentage: 41.05,
       sourceUrl: "https://www.elections.eg",
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("electionResults", {
@@ -2469,6 +2477,7 @@ export const seed = internalMutation({
       votes: 21835394,
       percentage: 97.08,
       isWinner: true,
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("electionResults", {
@@ -2478,6 +2487,7 @@ export const seed = internalMutation({
       votes: 656534,
       percentage: 2.92,
       isWinner: false,
+      sanadLevel: 1,
     });
 
     // 2024 Presidential Election (held December 2023)
@@ -2489,6 +2499,7 @@ export const seed = internalMutation({
       totalVotesCast: 44759501,
       turnoutPercentage: 66.8,
       sourceUrl: "https://www.elections.eg",
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("electionResults", {
@@ -2498,6 +2509,7 @@ export const seed = internalMutation({
       votes: 39702845,
       percentage: 89.6,
       isWinner: true,
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("electionResults", {
@@ -2507,6 +2519,7 @@ export const seed = internalMutation({
       votes: 1618561,
       percentage: 3.7,
       isWinner: false,
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("electionResults", {
@@ -2516,6 +2529,7 @@ export const seed = internalMutation({
       votes: 1354948,
       percentage: 3.1,
       isWinner: false,
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("electionResults", {
@@ -2525,6 +2539,7 @@ export const seed = internalMutation({
       votes: 1285647,
       percentage: 2.9,
       isWinner: false,
+      sanadLevel: 1,
     });
 
     // Governorate-level data for the 2024 election
@@ -2588,6 +2603,7 @@ export const seed = internalMutation({
       deficit: -450,
       gdp: 9200,
       sourceUrl: "https://www.mof.gov.eg",
+      sanadLevel: 1,
     });
 
     const fy2324Id = await ctx.db.insert("fiscalYears", {
@@ -2599,6 +2615,7 @@ export const seed = internalMutation({
       deficit: -694,
       gdp: 10300,
       sourceUrl: "https://www.mof.gov.eg",
+      sanadLevel: 1,
     });
 
     const fy2425Id = await ctx.db.insert("fiscalYears", {
@@ -2610,6 +2627,7 @@ export const seed = internalMutation({
       deficit: -820,
       gdp: 12500,
       sourceUrl: "https://www.mof.gov.eg",
+      sanadLevel: 1,
     });
 
     // ─── BUDGET ITEMS ────────────────────────────────────────────────────────────
@@ -2623,6 +2641,7 @@ export const seed = internalMutation({
       amount: 920,
       percentageOfTotal: 67.2,
       percentageOfGdp: 10.0,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2223Id,
@@ -2632,6 +2651,7 @@ export const seed = internalMutation({
       amount: 95,
       percentageOfTotal: 6.9,
       percentageOfGdp: 1.0,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2223Id,
@@ -2641,6 +2661,7 @@ export const seed = internalMutation({
       amount: 180,
       percentageOfTotal: 13.1,
       percentageOfGdp: 2.0,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2223Id,
@@ -2650,6 +2671,7 @@ export const seed = internalMutation({
       amount: 175,
       percentageOfTotal: 12.8,
       percentageOfGdp: 1.9,
+  sanadLevel: 1,
     });
 
     // FY 2022-2023 Expenditure
@@ -2661,6 +2683,7 @@ export const seed = internalMutation({
       amount: 560,
       percentageOfTotal: 30.8,
       percentageOfGdp: 6.1,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2223Id,
@@ -2670,6 +2693,7 @@ export const seed = internalMutation({
       amount: 380,
       percentageOfTotal: 20.9,
       percentageOfGdp: 4.1,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2223Id,
@@ -2679,6 +2703,7 @@ export const seed = internalMutation({
       amount: 280,
       percentageOfTotal: 15.4,
       percentageOfGdp: 3.0,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2223Id,
@@ -2688,6 +2713,7 @@ export const seed = internalMutation({
       amount: 310,
       percentageOfTotal: 17.0,
       percentageOfGdp: 3.4,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2223Id,
@@ -2697,6 +2723,7 @@ export const seed = internalMutation({
       amount: 140,
       percentageOfTotal: 7.7,
       percentageOfGdp: 1.5,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2223Id,
@@ -2706,6 +2733,7 @@ export const seed = internalMutation({
       amount: 100,
       percentageOfTotal: 5.5,
       percentageOfGdp: 1.1,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2223Id,
@@ -2715,6 +2743,7 @@ export const seed = internalMutation({
       amount: 50,
       percentageOfTotal: 2.7,
       percentageOfGdp: 0.5,
+  sanadLevel: 1,
     });
 
     // FY 2023-2024 Revenue
@@ -2726,6 +2755,7 @@ export const seed = internalMutation({
       amount: 1160,
       percentageOfTotal: 68.0,
       percentageOfGdp: 11.3,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2324Id,
@@ -2735,6 +2765,7 @@ export const seed = internalMutation({
       amount: 85,
       percentageOfTotal: 5.0,
       percentageOfGdp: 0.8,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2324Id,
@@ -2744,6 +2775,7 @@ export const seed = internalMutation({
       amount: 200,
       percentageOfTotal: 11.7,
       percentageOfGdp: 1.9,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2324Id,
@@ -2753,6 +2785,7 @@ export const seed = internalMutation({
       amount: 261,
       percentageOfTotal: 15.3,
       percentageOfGdp: 2.5,
+  sanadLevel: 1,
     });
 
     // FY 2023-2024 Expenditure
@@ -2764,6 +2797,7 @@ export const seed = internalMutation({
       amount: 1120,
       percentageOfTotal: 46.7,
       percentageOfGdp: 10.9,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2324Id,
@@ -2773,6 +2807,7 @@ export const seed = internalMutation({
       amount: 420,
       percentageOfTotal: 17.5,
       percentageOfGdp: 4.1,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2324Id,
@@ -2782,6 +2817,7 @@ export const seed = internalMutation({
       amount: 310,
       percentageOfTotal: 12.9,
       percentageOfGdp: 3.0,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2324Id,
@@ -2791,6 +2827,7 @@ export const seed = internalMutation({
       amount: 360,
       percentageOfTotal: 15.0,
       percentageOfGdp: 3.5,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2324Id,
@@ -2800,6 +2837,7 @@ export const seed = internalMutation({
       amount: 115,
       percentageOfTotal: 4.8,
       percentageOfGdp: 1.1,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2324Id,
@@ -2809,6 +2847,7 @@ export const seed = internalMutation({
       amount: 75,
       percentageOfTotal: 3.1,
       percentageOfGdp: 0.7,
+  sanadLevel: 1,
     });
 
     // FY 2024-2025 Revenue
@@ -2820,6 +2859,7 @@ export const seed = internalMutation({
       amount: 1550,
       percentageOfTotal: 67.4,
       percentageOfGdp: 12.4,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2425Id,
@@ -2829,6 +2869,7 @@ export const seed = internalMutation({
       amount: 70,
       percentageOfTotal: 3.0,
       percentageOfGdp: 0.6,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2425Id,
@@ -2838,6 +2879,7 @@ export const seed = internalMutation({
       amount: 350,
       percentageOfTotal: 15.2,
       percentageOfGdp: 2.8,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2425Id,
@@ -2847,6 +2889,7 @@ export const seed = internalMutation({
       amount: 330,
       percentageOfTotal: 14.4,
       percentageOfGdp: 2.6,
+  sanadLevel: 1,
     });
 
     // FY 2024-2025 Expenditure
@@ -2858,6 +2901,7 @@ export const seed = internalMutation({
       amount: 1370,
       percentageOfTotal: 43.9,
       percentageOfGdp: 11.0,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2425Id,
@@ -2867,6 +2911,7 @@ export const seed = internalMutation({
       amount: 520,
       percentageOfTotal: 16.7,
       percentageOfGdp: 4.2,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2425Id,
@@ -2876,6 +2921,7 @@ export const seed = internalMutation({
       amount: 380,
       percentageOfTotal: 12.2,
       percentageOfGdp: 3.0,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2425Id,
@@ -2885,6 +2931,7 @@ export const seed = internalMutation({
       amount: 450,
       percentageOfTotal: 14.4,
       percentageOfGdp: 3.6,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2425Id,
@@ -2894,6 +2941,7 @@ export const seed = internalMutation({
       amount: 200,
       percentageOfTotal: 6.4,
       percentageOfGdp: 1.6,
+  sanadLevel: 1,
     });
     await ctx.db.insert("budgetItems", {
       fiscalYearId: fy2425Id,
@@ -2903,6 +2951,7 @@ export const seed = internalMutation({
       amount: 200,
       percentageOfTotal: 6.4,
       percentageOfGdp: 1.6,
+  sanadLevel: 1,
     });
 
     // ─── DEBT RECORDS ─────────────────────────────────────────────────────────────
@@ -2915,6 +2964,7 @@ export const seed = internalMutation({
       debtToGdpRatio: 87.0,
       foreignReserves: 40.1,
       sourceUrl: "https://www.cbe.org.eg",
+      sanadLevel: 1,
     });
 
     const debt2021Id = await ctx.db.insert("debtRecords", {
@@ -2924,6 +2974,7 @@ export const seed = internalMutation({
       debtToGdpRatio: 88.5,
       foreignReserves: 41.2,
       sourceUrl: "https://www.cbe.org.eg",
+      sanadLevel: 1,
     });
 
     const debt2022Id = await ctx.db.insert("debtRecords", {
@@ -2933,6 +2984,7 @@ export const seed = internalMutation({
       debtToGdpRatio: 92.7,
       foreignReserves: 34.2,
       sourceUrl: "https://www.cbe.org.eg",
+      sanadLevel: 1,
     });
 
     const debt2023Id = await ctx.db.insert("debtRecords", {
@@ -2942,6 +2994,7 @@ export const seed = internalMutation({
       debtToGdpRatio: 95.0,
       foreignReserves: 35.0,
       sourceUrl: "https://www.cbe.org.eg",
+      sanadLevel: 1,
     });
 
     const debt2024Id = await ctx.db.insert("debtRecords", {
@@ -2951,6 +3004,7 @@ export const seed = internalMutation({
       debtToGdpRatio: 89.5,
       foreignReserves: 46.1,
       sourceUrl: "https://www.cbe.org.eg",
+      sanadLevel: 1,
     });
 
     // Creditors for 2020
@@ -3244,6 +3298,7 @@ export const seed = internalMutation({
       type: "official_government",
       lastAccessedDate: "2024-11-01",
       notes: "Primary source for budget and fiscal data",
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("dataSources", {
@@ -3253,6 +3308,7 @@ export const seed = internalMutation({
       type: "official_government",
       lastAccessedDate: "2024-11-01",
       notes: "Primary source for debt and monetary data",
+      sanadLevel: 1,
     });
 
     await ctx.db.insert("dataSources", {
@@ -3262,6 +3318,7 @@ export const seed = internalMutation({
       type: "international_org",
       lastAccessedDate: "2024-10-15",
       notes: "IMF Article IV consultations and debt data",
+      sanadLevel: 2,
     });
 
     await ctx.db.insert("dataSources", {
@@ -3271,6 +3328,7 @@ export const seed = internalMutation({
       type: "international_org",
       lastAccessedDate: "2024-10-15",
       notes: "GDP, development indicators, and external debt data",
+      sanadLevel: 2,
     });
 
     await ctx.db.insert("dataSources", {
@@ -3280,6 +3338,7 @@ export const seed = internalMutation({
       type: "official_government",
       lastAccessedDate: "2024-11-01",
       notes: "Parliamentary membership and committee information",
+      sanadLevel: 1,
     });
 
     // ─── DATA REFRESH LOG (initial seed entries) ─────────────────────────────

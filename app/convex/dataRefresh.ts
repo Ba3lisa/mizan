@@ -183,7 +183,7 @@ export const upsertDebtRecord = internalMutation({
     totalInterestPayments: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
     sourceNameEn: v.optional(v.string()),
-    sanadLevel: v.optional(v.number()),
+    sanadLevel: v.number(),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -260,7 +260,7 @@ export const upsertFiscalYear = internalMutation({
     deficit: v.optional(v.number()),
     gdp: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
-    sanadLevel: v.optional(v.number()),
+    sanadLevel: v.number(),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -325,7 +325,7 @@ export const upsertEconomicIndicator = internalMutation({
     unit: v.string(),
     sourceUrl: v.optional(v.string()),
     sourceNameEn: v.optional(v.string()),
-    sanadLevel: v.optional(v.number()),
+    sanadLevel: v.number(),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -477,7 +477,7 @@ export const upsertGovernmentOfficials = internalMutation({
       })
     ),
     sourceUrl: v.string(),
-    sanadLevel: v.optional(v.number()),
+    sanadLevel: v.number(),
   },
   handler: async (ctx, args) => {
     let updated = 0;
@@ -961,6 +961,58 @@ export const backfillAllSanadLevels = internalMutation({
           level = 4;
         }
         await ctx.db.patch(record._id, { sanadLevel: level });
+        total++;
+      }
+    }
+
+    // Elections → sanadLevel 1 (official results)
+    const elections = await ctx.db.query("elections").collect();
+    for (const record of elections) {
+      if (record.sanadLevel === undefined) {
+        await ctx.db.patch(record._id, { sanadLevel: 1 });
+        total++;
+      }
+    }
+
+    // Election results → sanadLevel 1 (official results)
+    const electionResults = await ctx.db.query("electionResults").collect();
+    for (const record of electionResults) {
+      if (record.sanadLevel === undefined) {
+        await ctx.db.patch(record._id, { sanadLevel: 1 });
+        total++;
+      }
+    }
+
+    // Tax brackets → sanadLevel 1 (Tax Authority)
+    const taxBrackets = await ctx.db.query("taxBrackets").collect();
+    for (const record of taxBrackets) {
+      if (record.sanadLevel === undefined) {
+        await ctx.db.patch(record._id, { sanadLevel: 1 });
+        total++;
+      }
+    }
+
+    // Sovereign ratings → sanadLevel 2 (international rating agencies)
+    const sovereignRatings = await ctx.db.query("sovereignRatings").collect();
+    for (const record of sovereignRatings) {
+      if (record.sanadLevel === undefined) {
+        await ctx.db.patch(record._id, { sanadLevel: 2 });
+        total++;
+      }
+    }
+
+    // Data sources → infer from type field
+    const dataSources = await ctx.db.query("dataSources").collect();
+    for (const record of dataSources) {
+      if (record.sanadLevel === undefined) {
+        const typeMap: Record<string, number> = {
+          official_government: 1,
+          international_org: 2,
+          media: 3,
+          academic: 2,
+          other: 4,
+        };
+        await ctx.db.patch(record._id, { sanadLevel: typeMap[record.type] ?? 4 });
         total++;
       }
     }

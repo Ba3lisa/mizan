@@ -107,6 +107,7 @@ export const upsertParliamentComposition = internalMutation({
             role: partyData.chamber === "house" ? "mp" as const : "senator" as const,
             isCurrent: true,
             sourceUrl: args.sourceUrl,
+            sanadLevel: 1,
           });
 
           await ctx.db.insert("parliamentMembers", {

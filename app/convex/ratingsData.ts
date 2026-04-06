@@ -45,6 +45,7 @@ export const ensureRatings = internalMutation({
         outlook: r.outlook,
         effectiveDate: r.effectiveDate,
         sourceUrl: r.sourceUrl,
+        sanadLevel: 2,
       });
       inserted++;
     }

@@ -71,6 +71,12 @@ async function performUpsert(ctx: MutationCtx, args: UpsertArgs) {
     return existing._id;
   }
 
+  const sanadLevel = args.type === "official_government" ? 1
+    : args.type === "international_org" ? 2
+    : args.type === "academic" ? 2
+    : args.type === "media" ? 3
+    : 4;
+
   return await ctx.db.insert("dataSources", {
     nameEn: args.nameEn,
     nameAr: args.nameAr,
@@ -79,6 +85,7 @@ async function performUpsert(ctx: MutationCtx, args: UpsertArgs) {
     type: args.type,
     notes: args.notes,
     lastAccessedDate: today,
+    sanadLevel,
   });
 }
 
