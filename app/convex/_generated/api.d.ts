@@ -37,6 +37,7 @@ import type * as government from "../government.js";
 import type * as lineage from "../lineage.js";
 import type * as maintenance from "../maintenance.js";
 import type * as parliament from "../parliament.js";
+import type * as parliamentCleanup from "../parliamentCleanup.js";
 import type * as parliamentQueries from "../parliamentQueries.js";
 import type * as referenceData from "../referenceData.js";
 import type * as regionalData from "../regionalData.js";
@@ -81,6 +82,7 @@ declare const fullApi: ApiFromModules<{
   lineage: typeof lineage;
   maintenance: typeof maintenance;
   parliament: typeof parliament;
+  parliamentCleanup: typeof parliamentCleanup;
   parliamentQueries: typeof parliamentQueries;
   referenceData: typeof referenceData;
   regionalData: typeof regionalData;

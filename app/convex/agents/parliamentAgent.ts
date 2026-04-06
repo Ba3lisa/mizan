@@ -1,154 +1,133 @@
 "use node";
 // Parliament data agent.
-// Fetches parliament composition from Wikipedia (structured, accessible)
-// and uses Claude to extract member/party data.
-// parliament.gov.eg is JS-rendered and blocks automated access,
-// so we use Wikipedia as the primary source and IPU Parline as backup.
+// Two responsibilities:
+// 1. Ensure party composition exists (from Wikipedia, only if parties table is empty)
+// 2. Scrape real member names from parliament.gov.eg (replaces placeholders)
+//
+// The composition (party seats) changes only with elections (~every 5 years).
+// Member names are scraped via the separate parliamentScraper.ts using scheduler.
 
-import { internalAction } from "../_generated/server";
+import { internalAction, ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
 import { callClaude } from "./providers/anthropic";
 
-const WIKI_HOUSE_URL =
+const WIKI_URL =
   "https://en.wikipedia.org/wiki/2025_Egyptian_parliamentary_election";
-const _WIKI_SENATE_URL =
-  "https://en.wikipedia.org/wiki/Egyptian_Senate";
 
 export const refreshParliament = internalAction({
   args: { force: v.optional(v.boolean()) },
   handler: async (ctx, args) => {
-    console.log("[parliamentAgent] Starting parliament refresh...");
+    console.log("[parliamentAgent] Starting parliament check...");
 
-    // Check current member count
-    const currentCount: number = await ctx.runQuery(
+    // Step 1: Check if party composition exists
+    const partyCount: number = await ctx.runQuery(
+      internal.parliamentQueries.getPartyCount,
+      {}
+    );
+    const memberCount: number = await ctx.runQuery(
       internal.parliamentQueries.getMemberCount,
       {}
     );
 
-    // Only refresh if we have fewer than expected (596 house + 300 senate)
-    if (currentCount >= 500 && !args.force) {
+    // If we already have parties and 500+ members, skip entirely
+    if (partyCount > 0 && memberCount >= 500 && !args.force) {
       console.log(
-        `[parliamentAgent] Parliament has ${currentCount} members, skipping refresh`
+        `[parliamentAgent] Parliament OK: ${partyCount} parties, ${memberCount} members`
       );
-      return { status: "skipped", members: currentCount };
+      return { status: "skipped", members: memberCount };
     }
 
-    console.log(
-      `[parliamentAgent] Parliament has ${currentCount} members (expected ~896), refreshing...`
+    // Step 2: If no parties, load composition from Wikipedia
+    if (partyCount === 0) {
+      console.log("[parliamentAgent] No parties found, loading 2025 election composition...");
+      await loadCompositionFromWikipedia(ctx);
+    }
+
+    // Step 3: If we have members but names are placeholders, trigger the scraper
+    const placeholderCount: number = await ctx.runQuery(
+      internal.parliamentQueries.getPlaceholderCount,
+      {}
     );
 
-    // Step 1: Fetch Wikipedia article as clean text via MediaWiki API
-    let wikiText = "";
-    try {
-      const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=2025_Egyptian_parliamentary_election&prop=extracts&explaintext=true&format=json`;
-      const response = await fetch(apiUrl);
-      if (response.ok) {
-        const data = await response.json() as { query?: { pages?: Record<string, { extract?: string }> } };
-        const pages = data?.query?.pages;
-        if (pages) {
-          const page = Object.values(pages)[0];
-          wikiText = page?.extract ?? "";
-        }
-        wikiText = wikiText.slice(0, 15000); // Keep manageable for Claude
+    if (placeholderCount > 0) {
+      console.log(
+        `[parliamentAgent] ${placeholderCount} placeholder members found, scheduling name scraper...`
+      );
+      // Schedule the scraper to run in background (chains batches via scheduler)
+      await ctx.scheduler.runAfter(
+        0,
+        internal.agents.parliamentScraper.scrapeAndContinue,
+        { startId: 1, maxId: 600, batchSize: 10, totalSaved: 0 }
+      );
+    }
+
+    const finalCount: number = await ctx.runQuery(
+      internal.parliamentQueries.getMemberCount,
+      {}
+    );
+    return { status: "success", partiesUpdated: finalCount };
+  },
+});
+
+async function loadCompositionFromWikipedia(ctx: ActionCtx) {
+  // Fetch Wikipedia article as clean text
+  let wikiText = "";
+  try {
+    const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=2025_Egyptian_parliamentary_election&prop=extracts&explaintext=true&format=json`;
+    const response = await fetch(apiUrl);
+    if (response.ok) {
+      const data = await response.json() as { query?: { pages?: Record<string, { extract?: string }> } };
+      const pages = data?.query?.pages;
+      if (pages) {
+        const page = Object.values(pages)[0];
+        wikiText = page?.extract ?? "";
       }
-    } catch (err) {
-      console.warn(`[parliamentAgent] Failed to fetch Wikipedia API: ${err}`);
+      wikiText = wikiText.slice(0, 15000);
     }
+  } catch (err) {
+    console.warn(`[parliamentAgent] Failed to fetch Wikipedia: ${err}`);
+    return;
+  }
 
-    if (!wikiText) {
-      console.warn("[parliamentAgent] No Wikipedia content, cannot refresh");
-      return { status: "failed", error: "Wikipedia fetch failed" };
-    }
+  if (!wikiText) return;
 
-    // Step 2: Use Claude to extract party composition
-    const systemPrompt = `You are a data extraction assistant for the Egyptian Parliament.
-Extract structured party composition data from Wikipedia.
-Respond with valid JSON only.`;
+  const response = await callClaude(
+    `Extract the 2025 Egyptian House of Representatives election results.
+Return JSON: {"parties": [{"nameEn": "...", "nameAr": "...", "seats": N, "color": "#hex"}]}
+Include ALL parties and independents. Total should be 596 seats.
 
-    const prompt = `Extract the 2025 Egyptian House of Representatives election results from this Wikipedia page.
-Return a JSON object with:
-{
-  "houseParties": [
-    {"nameEn": "Party Name", "nameAr": "Arabic Name", "seats": 123, "color": "#hexcolor"}
-  ],
-  "totalHouseSeats": 596,
-  "senateParties": [],
-  "totalSenateSeats": 300
-}
+Text: ${wikiText}`,
+    "Extract Egyptian parliament election data. JSON only, no markdown."
+  );
 
-Include ALL parties including independents. Use appropriate colors for each party.
-For Arabic names, use the official Arabic party names.
+  if (!response) return;
 
-Wikipedia content:
-${wikiText}`;
-
-    const claudeResponse = await callClaude(prompt, systemPrompt);
-    if (!claudeResponse) {
-      return { status: "failed", error: "Claude parsing failed" };
-    }
-
-    let parsed: {
-      houseParties?: Array<{ nameEn: string; nameAr: string; seats: number; color: string }>;
-      totalHouseSeats?: number;
+  try {
+    let jsonStr = response;
+    const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) jsonStr = fenceMatch[1];
+    const parsed = JSON.parse(jsonStr.trim()) as {
+      parties?: Array<{ nameEn: string; nameAr: string; seats: number; color: string }>;
     };
 
-    try {
-      // Strip markdown code fences if Claude wrapped the response
-      let jsonStr = claudeResponse;
-      const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-      if (fenceMatch) jsonStr = fenceMatch[1];
-      jsonStr = jsonStr.trim();
-      parsed = JSON.parse(jsonStr) as typeof parsed;
-    } catch {
-      console.error("[parliamentAgent] Failed to parse Claude response:", claudeResponse.slice(0, 500));
-      return { status: "failed", error: "JSON parse failed" };
-    }
-
-    if (!parsed.houseParties || parsed.houseParties.length === 0) {
-      return { status: "failed", error: "No parties extracted" };
-    }
-
-    // Step 3: Upsert parties and create member records
-    const logId = await ctx.runMutation(
-      internal.dataRefresh.logRefreshStart,
-      { category: "parliament" }
-    );
-
-    let totalInserted = 0;
-    try {
-      totalInserted = await ctx.runMutation(
+    if (parsed.parties && parsed.parties.length > 0) {
+      await ctx.runMutation(
         internal.parliamentQueries.upsertParliamentComposition,
         {
-          parties: parsed.houseParties.map((p) => ({
+          parties: parsed.parties.map((p) => ({
             nameEn: p.nameEn,
             nameAr: p.nameAr || p.nameEn,
             seats: p.seats,
             color: p.color || "#7F8C8D",
             chamber: "house" as const,
           })),
-          sourceUrl: WIKI_HOUSE_URL,
+          sourceUrl: WIKI_URL,
         }
       );
-
-      await ctx.runMutation(internal.dataRefresh.logRefreshComplete, {
-        logId,
-        recordsUpdated: totalInserted,
-        sourceUrl: WIKI_HOUSE_URL,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      await ctx.runMutation(internal.dataRefresh.logRefreshFailed, {
-        logId,
-        errorMessage: message,
-      });
-      return { status: "failed", error: message };
+      console.log(`[parliamentAgent] Loaded ${parsed.parties.length} parties from Wikipedia`);
     }
-
-    console.log(
-      `[parliamentAgent] Parliament refresh complete: ${totalInserted} party/member records updated`
-    );
-
-    return { status: "success", partiesUpdated: totalInserted };
-  },
-});
+  } catch {
+    console.error("[parliamentAgent] Failed to parse Wikipedia data");
+  }
+}

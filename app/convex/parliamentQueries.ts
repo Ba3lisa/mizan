@@ -10,6 +10,27 @@ export const getMemberCount = internalQuery({
   },
 });
 
+export const getPartyCount = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const parties = await ctx.db.query("parties").collect();
+    return parties.length;
+  },
+});
+
+export const getPlaceholderCount = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const officials = await ctx.db
+      .query("officials")
+      .withIndex("by_role_and_isCurrent", (q) =>
+        q.eq("role", "mp").eq("isCurrent", true)
+      )
+      .collect();
+    return officials.filter((o) => o.nameEn.includes("Member ")).length;
+  },
+});
+
 /**
  * Upserts parliament party composition.
  * For each party: creates/updates the party record, then ensures

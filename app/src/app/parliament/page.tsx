@@ -210,7 +210,7 @@ function PartyDistribution({ chamber, parties, onPartyFilter }: { chamber: "hous
       {/* Stacked bar */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          {isAr ? "\u0627\u0644\u062a\u0648\u0632\u064a\u0639 \u0627\u0644\u062d\u0632\u0628\u064a" : "Party Distribution"} \u2014 <span className="font-mono">{total}</span> {isAr ? "\u0645\u0642\u0639\u062f" : "seats"}
+          {isAr ? "\u0627\u0644\u062a\u0648\u0632\u064a\u0639 \u0627\u0644\u062d\u0632\u0628\u064a" : "Party Distribution"} -- <span className="font-mono">{total}</span> {isAr ? "\u0645\u0642\u0639\u062f" : "seats"}
         </p>
         <div className="w-full h-10 rounded-lg overflow-hidden flex">
           {parties.map((p) => {
@@ -500,19 +500,19 @@ export default function ParliamentPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-t border-b border-border mb-6">
             <div>
               <p className="text-xs text-muted-foreground mb-1">{t.totalSeats}</p>
-              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{activeSeats > 0 ? activeSeats : "\u2014"}</p>
+              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{activeSeats > 0 ? activeSeats : "--"}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">{t.numberOfParties}</p>
-              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{houseParties > 0 ? houseParties : "\u2014"}</p>
+              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{houseParties > 0 ? houseParties : "--"}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">{t.committees}</p>
-              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{houseCommitteeCount > 0 ? houseCommitteeCount : "\u2014"}</p>
+              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{houseCommitteeCount > 0 ? houseCommitteeCount : "--"}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">{isAr ? "\u0627\u0644\u0623\u062d\u0632\u0627\u0628" : "Parties"}</p>
-              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{parties.length > 0 ? parties.length : "\u2014"}</p>
+              <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{parties.length > 0 ? parties.length : "--"}</p>
             </div>
           </div>
           </Skeleton>
@@ -532,7 +532,7 @@ export default function ParliamentPage() {
               <TabsContent value="hemicycle">
                 <div className="max-w-3xl">
                   <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                    {chamber === "house" ? (isAr ? "\u0645\u062c\u0644\u0633 \u0627\u0644\u0646\u0648\u0627\u0628" : "House of Representatives") : (isAr ? "\u0645\u062c\u0644\u0633 \u0627\u0644\u0634\u064a\u0648\u062e" : "Senate")} \u2014{" "}
+                    {chamber === "house" ? (isAr ? "\u0645\u062c\u0644\u0633 \u0627\u0644\u0646\u0648\u0627\u0628" : "House of Representatives") : (isAr ? "\u0645\u062c\u0644\u0633 \u0627\u0644\u0634\u064a\u0648\u062e" : "Senate")} --{" "}
                     <span className="font-mono">{activeSeats}</span>{" "}
                     {isAr ? "\u0645\u0642\u0639\u062f" : "seats"}
                   </p>
