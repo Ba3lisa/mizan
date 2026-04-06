@@ -2,25 +2,6 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc, Id } from "./_generated/dataModel";
 
-export const getDataSourceInfo = query({
-  args: {},
-  handler: async (_ctx) => {
-    return {
-      sources: [
-        {
-          nameEn: "Egyptian Parliament",
-          nameAr: "البرلمان المصري",
-          url: "https://www.parliament.gov.eg/en/MPs",
-        },
-        {
-          nameEn: "Egyptian Senate",
-          nameAr: "مجلس الشيوخ المصري",
-          url: "https://www.senategov.eg/en/Members",
-        },
-      ],
-    };
-  },
-});
 
 const chamberValidator = v.union(v.literal("house"), v.literal("senate"));
 

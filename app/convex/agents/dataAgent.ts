@@ -569,6 +569,37 @@ async function refreshCategory(
 
     const { recordsUpdated, sourceUrl } = result;
 
+    // Update the central source registry so pages always read live references.
+    const sourceRegistryMap: Record<RefreshCategory, { nameEn: string; nameAr: string; type: "official_government" | "international_org" | "academic" | "media" | "other" }> = {
+      government: { nameEn: "Wikipedia — Madbouly Cabinet", nameAr: "ويكيبيديا — حكومة مدبولي", type: "media" },
+      parliament: { nameEn: "Wikipedia — 2025 Egyptian Parliamentary Election", nameAr: "ويكيبيديا — انتخابات البرلمان المصري 2025", type: "media" },
+      budget: { nameEn: "Ministry of Finance", nameAr: "وزارة المالية", type: "official_government" },
+      debt: { nameEn: "World Bank — Egypt External Debt", nameAr: "البنك الدولي — الدين الخارجي لمصر", type: "international_org" },
+      economy: { nameEn: "World Bank — Egypt Economic Indicators", nameAr: "البنك الدولي — المؤشرات الاقتصادية لمصر", type: "international_org" },
+    };
+    const categorySourceUrlMap: Record<RefreshCategory, string> = {
+      government: "https://en.wikipedia.org/wiki/Madbouly_Cabinet",
+      parliament: "https://en.wikipedia.org/wiki/2025_Egyptian_parliamentary_election",
+      budget: "https://www.mof.gov.eg",
+      debt: "https://data.worldbank.org",
+      economy: "https://data.worldbank.org",
+    };
+    const registryMeta = sourceRegistryMap[category];
+    const registryUrl = sourceUrl ?? categorySourceUrlMap[category];
+    if (registryUrl) {
+      try {
+        await ctx.runMutation(internal.sources.upsertSourceInternal, {
+          nameEn: registryMeta.nameEn,
+          nameAr: registryMeta.nameAr,
+          url: registryUrl,
+          category,
+          type: registryMeta.type,
+        });
+      } catch (srcErr) {
+        console.warn(`[dataAgent] Failed to update source registry for ${category}: ${srcErr}`);
+      }
+    }
+
     // Only log detailed change entries when something actually changed.
     // The dataRefreshLog already records that a refresh ran — the change log
     // should only track meaningful changes to keep storage lean.

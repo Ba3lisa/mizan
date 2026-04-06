@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { TrendingUp, TrendingDown, Users, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, Users, ChevronDown, ChevronRight } from "lucide-react";
+import { DataSourceFooter } from "@/components/data-source";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
@@ -782,14 +783,7 @@ export default function BudgetPage() {
               ? `خدمة الدين تمثل ${debtServicePct}% من إجمالي الإنفاق — وهي أكبر بند في الميزانية، وتتجاوز الإنفاق على التعليم والصحة والدفاع مجتمعة.`
               : `Debt service represents ${debtServicePct}% of total expenditure — the single largest budget item, exceeding education, health, and defence combined.`}
           </p>
-          <a
-            href="https://mof.gov.eg"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-primary hover:underline mt-1 inline-flex items-center gap-1"
-          >
-            mof.gov.eg <ExternalLink size={10} />
-          </a>
+          <DataSourceFooter category="budget" />
         </div>
 
         {/* ── CanadaSpends Visualization ── */}
@@ -865,27 +859,7 @@ export default function BudgetPage() {
           <PerCapitaSection year={selectedYearStr as FiscalYear} spendingData={activeSpending} revenueData={activeRevenue} populationOverride={population} />
         </div>
 
-        {/* ── Sources ── */}
-        <div className="border-t border-border pt-5 flex flex-wrap gap-4 items-center">
-          <span className="text-xs text-muted-foreground">
-            {isAr ? "المصادر:" : "Sources:"}
-          </span>
-          {[
-            { href: "https://mof.gov.eg", label: "mof.gov.eg" },
-            { href: "https://capmas.gov.eg", label: "capmas.gov.eg" },
-            { href: "https://worldbank.org", label: "worldbank.org" },
-          ].map(({ href, label }) => (
-            <a
-              key={label}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-            >
-              {label} <ExternalLink size={10} />
-            </a>
-          ))}
-        </div>
+        <DataSourceFooter category="budget" />
 
       </div>
     </div>

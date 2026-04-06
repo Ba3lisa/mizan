@@ -315,8 +315,20 @@ export default defineSchema({
     ),
     lastAccessedDate: v.string(),
     notes: v.optional(v.string()),
+    category: v.optional(v.union(
+      v.literal("government"),
+      v.literal("parliament"),
+      v.literal("constitution"),
+      v.literal("budget"),
+      v.literal("debt"),
+      v.literal("elections"),
+      v.literal("economy"),
+      v.literal("general")
+    )),
   })
-    .index("by_type", ["type"]),
+    .index("by_type", ["type"])
+    .index("by_category", ["category"])
+    .index("by_url", ["url"]),
 
   // ECONOMIC INDICATORS (fetched from World Bank and CBE every 6 hours)
   economicIndicators: defineTable({

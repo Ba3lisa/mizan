@@ -2,25 +2,6 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 
-export const getDataSourceInfo = query({
-  args: {},
-  handler: async (_ctx) => {
-    return {
-      sources: [
-        {
-          nameEn: "Cabinet of Egypt",
-          nameAr: "مجلس الوزراء",
-          url: "https://www.cabinet.gov.eg/English/TheMinistry/Pages/default.aspx",
-        },
-        {
-          nameEn: "State Information Service",
-          nameAr: "الهيئة العامة للاستعلامات",
-          url: "https://www.sis.gov.eg/section/352/7510?lang=en",
-        },
-      ],
-    };
-  },
-});
 
 export const listMinistriesSorted = query({
   args: {},

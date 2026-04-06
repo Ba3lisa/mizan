@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Search, Users, Building2, MapPin, ExternalLink } from "lucide-react";
+import { Search, Users, Building2, MapPin } from "lucide-react";
+import { DataSourceFooter } from "@/components/data-source";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
@@ -294,11 +295,7 @@ export default function GovernmentPage() {
                 <p className="text-center text-muted-foreground py-20">{isAr ? "\u0644\u0627 \u062a\u0648\u062c\u062f \u0628\u064a\u0627\u0646\u0627\u062a \u0645\u062a\u0627\u062d\u0629" : "No data available"}</p>
               )}
 
-              <p className="text-xs text-muted-foreground mt-8">
-                <a href="https://en.wikipedia.org/wiki/Madbouly_Cabinet" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline inline-flex items-center gap-1">
-                  <ExternalLink size={10} /> wikipedia.org
-                </a>
-              </p>
+              <DataSourceFooter category="government" />
             </div>
             </Skeleton>
           </TabsContent>
@@ -350,8 +347,8 @@ export default function GovernmentPage() {
             {filteredMinistries.length === 0 && ministries.length > 0 && <p className="text-sm text-muted-foreground py-12 text-center">{isAr ? "\u0644\u0627 \u062a\u0648\u062c\u062f \u0646\u062a\u0627\u0626\u062c" : "No results"}</p>}
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground">{filteredMinistries.length} {isAr ? "\u0648\u0632\u0627\u0631\u0629" : "ministries"}</p>
-              <a href="https://en.wikipedia.org/wiki/Madbouly_Cabinet" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1"><ExternalLink size={10} /> wikipedia.org</a>
             </div>
+            <DataSourceFooter category="government" />
             </>
             </Skeleton>
           </TabsContent>
@@ -401,8 +398,8 @@ export default function GovernmentPage() {
 
             <div className="flex items-center justify-between pt-4 border-t border-border">
               <p className="text-xs text-muted-foreground">{filteredGovernorates.length} {isAr ? "\u0645\u062d\u0627\u0641\u0638\u0629" : "governorates"}</p>
-              <a href="https://capmas.gov.eg" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1"><ExternalLink size={10} /> capmas.gov.eg</a>
             </div>
+            <DataSourceFooter category="government" />
             </>
             </Skeleton>
           </TabsContent>

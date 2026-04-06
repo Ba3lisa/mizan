@@ -44,6 +44,7 @@ import type * as referenceData from "../referenceData.js";
 import type * as regionalData from "../regionalData.js";
 import type * as seedConstitutionMissing from "../seedConstitutionMissing.js";
 import type * as seedData from "../seedData.js";
+import type * as sources from "../sources.js";
 import type * as taxData from "../taxData.js";
 import type * as transparency from "../transparency.js";
 
@@ -90,6 +91,7 @@ declare const fullApi: ApiFromModules<{
   regionalData: typeof regionalData;
   seedConstitutionMissing: typeof seedConstitutionMissing;
   seedData: typeof seedData;
+  sources: typeof sources;
   taxData: typeof taxData;
   transparency: typeof transparency;
 }>;

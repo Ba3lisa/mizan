@@ -1,20 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 
-export const getDataSourceInfo = query({
-  args: {},
-  handler: async (_ctx) => {
-    return {
-      sources: [
-        {
-          nameEn: "State Information Service",
-          nameAr: "الهيئة العامة للاستعلامات",
-          url: "https://www.sis.gov.eg/section/10/7527?lang=en",
-        },
-      ],
-    };
-  },
-});
 
 export const listParts = query({
   args: {},

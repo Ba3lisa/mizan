@@ -1,20 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 
-export const getDataSourceInfo = query({
-  args: {},
-  handler: async (_ctx) => {
-    return {
-      sources: [
-        {
-          nameEn: "Ministry of Finance",
-          nameAr: "وزارة المالية",
-          url: "https://www.mof.gov.eg/en/posts/statementsAndReports/5",
-        },
-      ],
-    };
-  },
-});
 
 const categoryValidator = v.union(
   v.literal("revenue"),

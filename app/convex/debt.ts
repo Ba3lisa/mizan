@@ -1,30 +1,6 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
 
-export const getDataSourceInfo = query({
-  args: {},
-  handler: async (_ctx) => {
-    return {
-      sources: [
-        {
-          nameEn: "Central Bank of Egypt",
-          nameAr: "البنك المركزي المصري",
-          url: "https://www.cbe.org.eg/en/economic-research/statistics",
-        },
-        {
-          nameEn: "World Bank",
-          nameAr: "البنك الدولي",
-          url: "https://data.worldbank.org/indicator/DT.DOD.DECT.CD?locations=EG",
-        },
-        {
-          nameEn: "IMF",
-          nameAr: "صندوق النقد الدولي",
-          url: "https://www.imf.org/en/Countries/EGY",
-        },
-      ],
-    };
-  },
-});
 
 export const listDebtRecords = query({
   args: {},
