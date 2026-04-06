@@ -18,7 +18,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "ميزان",
-    description: "Egypt's government, made visible.",
+    description: "Egypt, visualized.",
     locale: "ar_EG",
     alternateLocale: "en_US",
     type: "website",
