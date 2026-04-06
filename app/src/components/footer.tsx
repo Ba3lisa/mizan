@@ -61,7 +61,17 @@ export function Footer() {
           {isAr ? "بناء" : "Built by"}{" "}
           <a href="https://egouda.xyz/" target="_blank" rel="noopener noreferrer" className="text-primary no-underline hover:underline">Essam Gouda</a>
         </p>
-        <p className="text-xs text-muted-foreground font-mono">© {new Date().getFullYear()}</p>
+        <div className="flex items-center gap-3">
+          <a
+            href={`https://github.com/Ba3lisa/mizan/releases/tag/${process.env.NEXT_PUBLIC_APP_VERSION || "v1.0.2"}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[0.625rem] text-muted-foreground/60 no-underline hover:text-primary font-mono transition-colors"
+          >
+            {process.env.NEXT_PUBLIC_APP_VERSION || "v1.0.2"}
+          </a>
+          <p className="text-xs text-muted-foreground font-mono">© {new Date().getFullYear()}</p>
+        </div>
       </div>
     </footer>
   );

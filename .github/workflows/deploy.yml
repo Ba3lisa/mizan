@@ -48,6 +48,7 @@ jobs:
         env:
           CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
           NEXT_PUBLIC_CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+          NEXT_PUBLIC_APP_VERSION: ${{ github.event.release.tag_name || github.sha }}
 
   deploy-app:
     needs: deploy-convex
