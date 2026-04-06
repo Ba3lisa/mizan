@@ -291,14 +291,26 @@ ${pageText || "(page content unavailable)"}`;
 // ─── PARLIAMENT REFRESH ───────────────────────────────────────────────────────
 
 async function refreshParliamentData(
-  _ctx: ActionCtx
+  ctx: ActionCtx
 ): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
-  // Parliament data changes rarely; log a no-op for now and return 0.
-  // When a data source becomes available, implement fetch + Claude parse here.
-  console.log(
-    "[dataAgent] Parliament refresh: no automated source configured yet."
-  );
-  return { recordsUpdated: 0 };
+  // Delegate to the parliament agent which fetches composition from Wikipedia
+  // and uses Claude to extract party/seat data
+  try {
+    const result: { status: string; partiesUpdated?: number } =
+      await ctx.runAction(
+        internal.agents.parliamentAgent.refreshParliament,
+        {}
+      );
+    return {
+      recordsUpdated: result.partiesUpdated ?? 0,
+      sourceUrl: "https://en.wikipedia.org/wiki/2025_Egyptian_parliamentary_election",
+    };
+  } catch (err) {
+    console.warn(
+      `[dataAgent] Parliament refresh failed: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return { recordsUpdated: 0 };
+  }
 }
 
 // ─── ECONOMY REFRESH ──────────────────────────────────────────────────────────
