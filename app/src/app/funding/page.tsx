@@ -294,9 +294,9 @@ interface AllocationSectionProps {
 function AllocationSection({ breakdown, isAr, fmtUsd }: AllocationSectionProps) {
   const isLoading = breakdown === undefined;
 
-  const isEmpty = !isLoading && Object.keys(breakdown).length === 0;
+  const isEmpty = !isLoading && Object.keys(breakdown ?? {}).length === 0;
 
-  const grandTotal = !isLoading
+  const grandTotal = breakdown
     ? Object.values(breakdown).reduce((s, v) => s + v.totalUsd, 0)
     : 0;
 
@@ -309,7 +309,7 @@ function AllocationSection({ breakdown, isAr, fmtUsd }: AllocationSectionProps) 
       ) : (
         <div className="space-y-6">
           {CATEGORY_CONFIG.map((cfg) => {
-            const entry = breakdown![cfg.key];
+            const entry = breakdown?.[cfg.key];
             if (!entry || entry.totalUsd === 0) return null;
             return (
               <AllocationBar
@@ -386,7 +386,7 @@ function DonationsSection({ donations, isAr, fmtUsd }: DonationsSectionProps) {
         </div>
       ) : (
         <div className="divide-y divide-border/40">
-          {donations!.map((d) => (
+          {(donations ?? []).map((d) => (
             <div key={d._id} className="py-4 flex items-start justify-between gap-4">
               <div className="flex items-start gap-3 min-w-0">
                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
