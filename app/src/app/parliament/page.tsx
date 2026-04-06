@@ -284,50 +284,118 @@ function MemberDirectory({
   const { lang, t } = useLanguage();
   const isAr = lang === "ar";
   const [globalFilter, setGlobalFilter] = useState("");
+  const [page, setPage] = useState(0);
+  const pageSize = 50;
 
-  // No Convex members query yet — show empty state with search UI stub
-  const isAr2 = isAr;
-  void chamber; void parties; void globalFilter; void isAr2;
+  const members = useQuery(api.parliament.listMembers, { chamber, isCurrent: true });
+  const isLoading = members === undefined;
+
+  // Filter by search
+  const filtered = members
+    ? members.filter((m) => {
+        if (!globalFilter) return true;
+        const q = globalFilter.toLowerCase();
+        const name = isAr
+          ? m.official?.nameAr ?? ""
+          : m.official?.nameEn ?? "";
+        const partyName = isAr
+          ? m.party?.nameAr ?? ""
+          : m.party?.nameEn ?? "";
+        const govName = isAr
+          ? m.governorate?.nameAr ?? ""
+          : m.governorate?.nameEn ?? "";
+        return (
+          name.toLowerCase().includes(q) ||
+          partyName.toLowerCase().includes(q) ||
+          govName.toLowerCase().includes(q)
+        );
+      })
+    : [];
+
+  // Filter out placeholder names for display
+  const realMembers = filtered.filter(
+    (m) => m.official && !m.official.nameEn.includes("Member ")
+  );
+  const paginated = realMembers.slice(page * pageSize, (page + 1) * pageSize);
+  const totalPages = Math.ceil(realMembers.length / pageSize);
+
+  // Build party color map
+  const partyColorMap: Record<string, string> = {};
+  for (const p of parties) {
+    partyColorMap[p.id] = p.color;
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Search bar stub */}
+      {/* Search */}
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
           <Input
             value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
+            onChange={(e) => { setGlobalFilter(e.target.value); setPage(0); }}
             placeholder={`${t.search}...`}
             className="ps-9 pe-8 text-sm"
           />
           {globalFilter && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setGlobalFilter("")}
-              className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7"
-            >
+            <Button variant="ghost" size="icon" onClick={() => setGlobalFilter("")} className="absolute end-1 top-1/2 -translate-y-1/2 h-7 w-7">
               <X size={14} />
             </Button>
           )}
         </div>
       </div>
 
-      <p className="text-center text-muted-foreground py-12">
-        {isAr ? "\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0623\u0639\u0636\u0627\u0621 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d\u0629 \u0628\u0639\u062f" : "Member data not yet available"}
-      </p>
+      <Skeleton name="parliament-directory" loading={isLoading}>
+      {realMembers.length === 0 ? (
+        <p className="text-center text-muted-foreground py-12">
+          {isAr ? "جاري تحميل بيانات الأعضاء..." : "Loading member data..."}
+        </p>
+      ) : (
+        <>
+          {/* Member grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {paginated.map((m) => {
+              const name = isAr ? m.official?.nameAr : m.official?.nameEn;
+              const partyName = isAr ? m.party?.nameAr : m.party?.nameEn;
+              const govName = isAr ? m.governorate?.nameAr : m.governorate?.nameEn;
+              const partyColor = m.partyId ? partyColorMap[m.partyId] : "#95A5A6";
+              return (
+                <div key={m._id} className="rounded-lg border border-border bg-card p-3 flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: partyColor }} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">{name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{partyName ?? (isAr ? "مستقل" : "Independent")}</p>
+                    {govName && <p className="text-[0.625rem] text-muted-foreground/70">{govName}</p>}
+                    {m.constituency && <p className="text-[0.625rem] text-muted-foreground/50">{m.constituency}</p>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center gap-2 mt-2">
+              <Button variant="outline" size="sm" onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}>
+                {isAr ? "السابق" : "Prev"}
+              </Button>
+              <span className="text-xs text-muted-foreground">
+                {page + 1} / {totalPages}
+              </span>
+              <Button variant="outline" size="sm" onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}>
+                {isAr ? "التالي" : "Next"}
+              </Button>
+            </div>
+          )}
+        </>
+      )}
+      </Skeleton>
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {isAr ? "\u0639\u0631\u0636 0 \u0639\u0636\u0648" : "Showing 0 members"}
+          {isAr ? `عرض ${realMembers.length} عضو` : `Showing ${realMembers.length} members`}
         </p>
-        <a
-          href="https://parliament.gov.eg"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-xs text-primary hover:underline"
-        >
+        <a href="https://parliament.gov.eg" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
           parliament.gov.eg
         </a>
       </div>
