@@ -6,23 +6,76 @@ import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://mizanmasr.com"),
   title: {
-    default: "ميزان",
+    default: "ميزان — Egypt, visualized.",
     template: "%s | ميزان",
   },
   description:
-    "منصة شفافية مدنية تتيح الوصول إلى بيانات الحكومة المصرية — الوزارات، البرلمان، الدستور، الميزانية، والديون.",
-  keywords: ["مصر", "حكومة", "شفافية", "برلمان", "ميزانية", "Egypt", "government", "transparency"],
+    "منصة شفافية مدنية تتيح الوصول إلى بيانات الحكومة المصرية — الوزارات، البرلمان، الدستور، الميزانية، والديون. Civic transparency platform for Egyptian government data.",
+  keywords: [
+    "مصر", "حكومة", "شفافية", "برلمان", "ميزانية", "دستور", "ديون", "انتخابات",
+    "Egypt", "government", "transparency", "parliament", "budget", "constitution", "debt", "elections",
+    "Egyptian government data", "open data Egypt", "ميزان",
+  ],
   icons: {
-    icon: '/icon.svg',
+    icon: "/icon.svg",
+  },
+  alternates: {
+    canonical: "https://mizanmasr.com",
+    languages: {
+      "ar-EG": "https://mizanmasr.com",
+      "en": "https://mizanmasr.com",
+    },
   },
   openGraph: {
-    title: "ميزان",
+    title: "ميزان — Egypt, visualized.",
     description: "Egypt, visualized.",
+    url: "https://mizanmasr.com",
+    siteName: "Mizan - ميزان",
     locale: "ar_EG",
     alternateLocale: "en_US",
     type: "website",
   },
+  twitter: {
+    card: "summary_large_image",
+    title: "ميزان — Egypt, visualized.",
+    description: "Civic transparency platform for Egyptian government data.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      name: "Mizan",
+      alternateName: "ميزان",
+      url: "https://mizanmasr.com",
+      inLanguage: ["ar", "en"],
+      description: "Civic transparency platform for Egyptian government data.",
+      publisher: { "@id": "https://mizanmasr.com/#org" },
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://mizanmasr.com/#org",
+      name: "Mizan",
+      alternateName: "ميزان",
+      url: "https://mizanmasr.com",
+      sameAs: ["https://github.com/Ba3lisa/mizan"],
+    },
+  ],
 };
 
 export default function RootLayout({
@@ -33,6 +86,10 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+        />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             try {
