@@ -82,7 +82,7 @@ export default function HomePage() {
               {isAr ? "ميزان" : "Mizan"}
             </h1>
             <p className="text-base md:text-lg text-muted-foreground mb-2">
-              {isAr ? "الحكومة المصرية، مرئية للجميع." : "Egypt's government, made visible."}
+              {isAr ? "مصر، بالأرقام." : "Egypt, visualized."}
             </p>
             <p className="text-sm text-muted-foreground/60 mx-auto mb-6 max-w-sm leading-relaxed">
               {isAr
