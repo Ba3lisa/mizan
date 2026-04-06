@@ -136,6 +136,7 @@ export const getCategoryHealth = query({
       "constitution",
       "budget",
       "debt",
+      "elections",
     ] as const;
 
     const result = await Promise.all(
