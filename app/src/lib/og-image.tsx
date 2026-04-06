@@ -90,7 +90,7 @@ export async function generateOgImage({
           {title}
         </div>
 
-        {/* Arabic title */}
+        {/* Arabic title — wrap in RLI/PDI Unicode isolates for Satori */}
         <div
           style={{
             fontSize: 32,
@@ -98,10 +98,9 @@ export async function generateOgImage({
             marginTop: 8,
             textAlign: "center",
             fontFamily: "Cairo",
-            direction: "rtl",
           }}
         >
-          {titleAr}
+          {"\u2067"}{titleAr}{"\u2069"}
         </div>
 
         {/* Description */}

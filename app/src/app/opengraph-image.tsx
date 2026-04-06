@@ -80,10 +80,9 @@ export default async function OgImage() {
             color: GOLD,
             marginTop: 4,
             fontFamily: "Cairo",
-            direction: "rtl",
           }}
         >
-          ميزان
+          {"\u2067"}ميزان{"\u2069"}
         </div>
 
         {/* Tagline */}
