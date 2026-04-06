@@ -84,6 +84,8 @@ export function validateDebtRecord(record: DebtRecord): {
     errors.push("totalDomesticDebt must be non-negative");
   }
 
+  // If debt-to-GDP > 200%, the AI must be hallucinating... right? RIGHT?!
+  // (We allow up to 500% anyway because reality has no upper bound on bad news)
   if (record.debtToGdpRatio !== undefined) {
     if (record.debtToGdpRatio < 0 || record.debtToGdpRatio > 500) {
       errors.push("debtToGdpRatio must be between 0 and 500");
