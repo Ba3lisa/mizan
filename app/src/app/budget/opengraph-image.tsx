@@ -5,7 +5,7 @@ export const alt = "National Budget | Mizan";
 export const size = ogSize;
 export const contentType = ogContentType;
 
-export default function OgImage() {
+export default async function OgImage() {
   return generateOgImage({
     title: "National Budget",
     titleAr: "الموازنة العامة",

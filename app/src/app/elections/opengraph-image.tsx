@@ -5,7 +5,7 @@ export const alt = "Elections | Mizan";
 export const size = ogSize;
 export const contentType = ogContentType;
 
-export default function OgImage() {
+export default async function OgImage() {
   return generateOgImage({
     title: "Elections",
     titleAr: "الانتخابات",

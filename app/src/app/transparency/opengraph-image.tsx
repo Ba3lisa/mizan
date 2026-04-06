@@ -5,7 +5,7 @@ export const alt = "Transparency | Mizan";
 export const size = ogSize;
 export const contentType = ogContentType;
 
-export default function OgImage() {
+export default async function OgImage() {
   return generateOgImage({
     title: "Transparency",
     titleAr: "الشفافية",

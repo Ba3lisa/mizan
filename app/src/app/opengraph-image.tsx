@@ -10,7 +10,12 @@ const DARK = "#0F1117";
 const SURFACE = "#181C25";
 const MUTED = "#7A8299";
 
-export default function OgImage() {
+const ARABIC_FONT_URL =
+  "https://fonts.gstatic.com/s/cairo/v31/SLXgc1nY6HkvangtZmpQdkhzfH5lkSs2SgRjCAGMQ1z0hAc5W1Q.ttf";
+
+export default async function OgImage() {
+  const arabicFont = await fetch(ARABIC_FONT_URL).then((r) => r.arrayBuffer());
+
   return new ImageResponse(
     (
       <div
@@ -74,6 +79,8 @@ export default function OgImage() {
             fontSize: 36,
             color: GOLD,
             marginTop: 4,
+            fontFamily: "Cairo",
+            direction: "rtl",
           }}
         >
           ميزان
@@ -99,7 +106,7 @@ export default function OgImage() {
             padding: "16px 32px",
             background: SURFACE,
             borderRadius: 12,
-            border: `1px solid #252A36`,
+            border: "1px solid #252A36",
           }}
         >
           {[
@@ -146,6 +153,16 @@ export default function OgImage() {
         </div>
       </div>
     ),
-    { ...size }
+    {
+      ...size,
+      fonts: [
+        {
+          name: "Cairo",
+          data: arabicFont,
+          style: "normal",
+          weight: 700,
+        },
+      ],
+    }
   );
 }

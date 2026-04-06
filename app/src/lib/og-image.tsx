@@ -7,7 +7,11 @@ const MUTED = "#7A8299";
 export const ogSize = { width: 1200, height: 630 };
 export const ogContentType = "image/png";
 
-export function generateOgImage({
+// Cairo font works with Satori (Noto Kufi Arabic has unsupported OpenType features)
+const ARABIC_FONT_URL =
+  "https://fonts.gstatic.com/s/cairo/v31/SLXgc1nY6HkvangtZmpQdkhzfH5lkSs2SgRjCAGMQ1z0hAc5W1Q.ttf";
+
+export async function generateOgImage({
   title,
   titleAr,
   description,
@@ -16,6 +20,8 @@ export function generateOgImage({
   titleAr: string;
   description: string;
 }) {
+  const arabicFont = await fetch(ARABIC_FONT_URL).then((r) => r.arrayBuffer());
+
   return new ImageResponse(
     (
       <div
@@ -91,6 +97,8 @@ export function generateOgImage({
             color: GOLD,
             marginTop: 8,
             textAlign: "center",
+            fontFamily: "Cairo",
+            direction: "rtl",
           }}
         >
           {titleAr}
@@ -122,6 +130,16 @@ export function generateOgImage({
         </div>
       </div>
     ),
-    { ...ogSize }
+    {
+      ...ogSize,
+      fonts: [
+        {
+          name: "Cairo",
+          data: arabicFont,
+          style: "normal" as const,
+          weight: 700 as const,
+        },
+      ],
+    }
   );
 }
