@@ -571,13 +571,93 @@ type IMFResponse = {
   values?: Record<string, Record<string, Record<string, number>>>;
 };
 
-async function refreshIMFData(
+// IMF direct API function -- kept for when IMF unblocks cloud IPs
+async function _refreshIMFData(
   ctx: ActionCtx
 ): Promise<{ recordsUpdated: number }> {
   let totalUpdated = 0;
   const BASE_URL = "https://www.imf.org/external/datamapper/api/v1";
 
+  // IMF DataMapper API blocks cloud IPs (403). Use Wikipedia as the source
+  // for IMF projections -- the Economy of Egypt article cites IMF WEO data.
+  // Fallback: one Claude call to extract forecasts from the Wikipedia text.
+  console.log("[dataAgent/imf] Fetching IMF projections from Wikipedia...");
+
+  let imfText = "";
+  try {
+    const wikiUrl = "https://en.wikipedia.org/w/api.php?action=query&titles=Economy_of_Egypt&prop=extracts&explaintext=true&format=json";
+    const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(15000) });
+    if (wikiRes.ok) {
+      const data = await wikiRes.json() as { query?: { pages?: Record<string, { extract?: string }> } };
+      const pages = data?.query?.pages;
+      if (pages) {
+        imfText = Object.values(pages)[0]?.extract ?? "";
+        imfText = imfText.slice(0, 15000);
+      }
+    }
+  } catch {
+    console.warn("[dataAgent/imf] Wikipedia fetch failed");
+  }
+
+  if (imfText.length > 500) {
+    const imfResponse = await callClaude(
+      `Extract IMF economic projections for Egypt from this Wikipedia article.
+Return JSON: {"indicators": [{"indicator": "imf_gdp_growth_forecast", "data": {"2024": 2.4, "2025": 4.3, ...}}, ...]}
+
+Extract these if available:
+- imf_gdp_growth_forecast (Real GDP growth %)
+- imf_inflation_forecast (Inflation %)
+- imf_current_account_forecast (Current account % of GDP)
+- imf_gov_debt_gdp (Government debt % of GDP)
+
+Include both historical and forecast years (2020-2030).
+
+Text: ${imfText}`,
+      "Extract IMF economic data from Wikipedia. JSON only."
+    );
+
+    if (imfResponse) {
+      try {
+        let jsonStr = imfResponse;
+        const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (fence) jsonStr = fence[1];
+        const parsed = JSON.parse(jsonStr.trim()) as {
+          indicators?: Array<{ indicator: string; data: Record<string, number> }>;
+        };
+
+        if (parsed.indicators) {
+          for (const ind of parsed.indicators) {
+            const meta = IMF_INDICATORS.find((i) => i.indicator === ind.indicator);
+            if (!meta) continue;
+            for (const [yearStr, value] of Object.entries(ind.data)) {
+              if (typeof value !== "number" || isNaN(value)) continue;
+              const updated: number = await ctx.runMutation(
+                internal.dataRefresh.upsertEconomicIndicator,
+                {
+                  indicator: ind.indicator,
+                  date: `${yearStr}-12-31`,
+                  year: yearStr,
+                  value,
+                  unit: meta.unit,
+                  sourceUrl: "https://en.wikipedia.org/wiki/Economy_of_Egypt",
+                  sourceNameEn: meta.sourceNameEn,
+                }
+              );
+              totalUpdated += updated;
+            }
+          }
+          console.log(`[dataAgent/imf] Extracted IMF data from Wikipedia: ${totalUpdated} records`);
+        }
+      } catch {
+        console.warn("[dataAgent/imf] Failed to parse IMF data from Wikipedia");
+      }
+    }
+  }
+
+  // Original loop kept as dead code for when IMF API access is restored
+  const _skipDirectApi = true;
   for (const imf of IMF_INDICATORS) {
+    if (_skipDirectApi) break;
     const url = `${BASE_URL}/${imf.code}/EGY`;
     let raw: unknown;
 
@@ -723,9 +803,20 @@ async function refreshEconomyData(
   const stockResult = await refreshStockMarket(ctx);
   totalUpdated += stockResult.recordsUpdated;
 
-  // Fetch IMF DataMapper indicators (includes forecasts through 2030)
-  const imfResult = await refreshIMFData(ctx);
-  totalUpdated += imfResult.recordsUpdated;
+  // IMF forecasts: seeded from reference data (API blocks cloud IPs).
+  // Ensure IMF data exists (no-op if already populated).
+  try {
+    const imfSeeded: number = await ctx.runMutation(
+      internal.imfData.ensureIMFForecasts,
+      {}
+    );
+    if (imfSeeded > 0) {
+      totalUpdated += imfSeeded;
+      console.log(`[dataAgent/economy] Seeded ${imfSeeded} IMF forecast records`);
+    }
+  } catch {
+    console.warn("[dataAgent/economy] IMF seed failed");
+  }
 
   return {
     recordsUpdated: totalUpdated,
