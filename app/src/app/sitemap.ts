@@ -13,7 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/economy", priority: 0.8, changeFrequency: "weekly" as const },
     { path: "/elections", priority: 0.8, changeFrequency: "monthly" as const },
     { path: "/governorate", priority: 0.7, changeFrequency: "monthly" as const },
-    { path: "/promises", priority: 0.7, changeFrequency: "monthly" as const },
+    { path: "/funding", priority: 0.6, changeFrequency: "monthly" as const },
     { path: "/transparency", priority: 0.6, changeFrequency: "daily" as const },
     { path: "/methodology", priority: 0.5, changeFrequency: "monthly" as const },
   ];

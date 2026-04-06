@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   Building2, Users, BookOpen, BarChart3, TrendingDown, Landmark,
   ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
-  LineChart, CheckSquare, MapPin, Calculator, Bot, BookMarked,
+  LineChart, Heart, MapPin, Calculator, Bot, BookMarked,
 } from "lucide-react";
 import { useLanguage } from "@/components/providers";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ const features = [
   { icon: TrendingDown, href: "/debt", ar: "الدين العام", en: "Debt", descAr: "١٥٥ مليار$ ديون خارجية", descEn: "$155B External Debt" },
   { icon: Landmark, href: "/elections", ar: "الانتخابات", en: "Elections", descAr: "نتائج الانتخابات الرئاسية والبرلمانية", descEn: "Presidential & parliamentary election results" },
   { icon: LineChart, href: "/economy", ar: "الاقتصاد", en: "Economy", descAr: "مؤشرات اقتصادية · التضخم · الاحتياطي", descEn: "GDP · Inflation · Reserves · Exchange Rate" },
-  { icon: CheckSquare, href: "/promises", ar: "الوعود", en: "Promises", descAr: "الوعود الحكومية · المشاريع العملاقة", descEn: "Government commitments · Megaprojects" },
+  { icon: Heart, href: "/funding", ar: "التمويل", en: "Funding", descAr: "التمويل الشفاف · أين تذهب التبرعات", descEn: "Transparent funding · Where donations go" },
   { icon: MapPin, href: "/governorate", ar: "محافظتك", en: "Your Governorate", descAr: "بيانات محافظتك · المحافظ · النواب", descEn: "Governor · MPs · Local stats" },
   { icon: Calculator, href: "/budget/your-share", ar: "حاسبة الضريبة", en: "Tax Calculator", descAr: "أين تذهب ضرائبك؟ — حاسبة تفاعلية", descEn: "Where do your taxes go? — Interactive calculator" },
   { icon: Bot, href: "/transparency", ar: "الشفافية", en: "Transparency", descAr: "سجل تحديث البيانات · تقارير الذكاء الاصطناعي", descEn: "AI audit log · Data refresh reports" },
