@@ -51,6 +51,7 @@ import type * as seedConstitutionMissing from "../seedConstitutionMissing.js";
 import type * as seedData from "../seedData.js";
 import type * as sources from "../sources.js";
 import type * as taxData from "../taxData.js";
+import type * as testFetch from "../testFetch.js";
 import type * as transparency from "../transparency.js";
 
 import type {
@@ -103,6 +104,7 @@ declare const fullApi: ApiFromModules<{
   seedData: typeof seedData;
   sources: typeof sources;
   taxData: typeof taxData;
+  testFetch: typeof testFetch;
   transparency: typeof transparency;
 }>;
 

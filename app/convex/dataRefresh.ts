@@ -519,8 +519,14 @@ export const upsertGovernmentOfficials = internalMutation({
     }
 
     // Mark officials NOT in the new list as no longer current
+    // ONLY mark officials whose role matches the roles in the new list
+    // (prevents governor upsert from deactivating ministers and vice versa)
+    const rolesInNewList = new Set(args.officials.map((o) => o.role));
     for (const existing of govOfficials) {
-      if (!newNames.has(existing.nameEn.toLowerCase())) {
+      if (
+        rolesInNewList.has(existing.role as "president" | "prime_minister" | "minister" | "governor") &&
+        !newNames.has(existing.nameEn.toLowerCase())
+      ) {
         await ctx.db.patch(existing._id, {
           isCurrent: false,
           endDate: new Date().toISOString().slice(0, 10),

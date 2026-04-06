@@ -17,6 +17,10 @@ const TRUSTED_DOMAINS: Array<RegExp> = [
   /^github\.com$/,
   /\.un\.org$/,
   /\.transparency\.org$/,
+  /^open\.er-api\.com$/,
+  /^countryeconomy\.com$/,
+  /\.exchangerate-api\.com$/,
+  /\.tradingeconomics\.com$/,
 ];
 
 /**

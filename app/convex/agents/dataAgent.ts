@@ -209,49 +209,25 @@ async function refreshGovernmentData(
     return { recordsUpdated: 0 };
   }
 
-  // Primary: Wikipedia Madbouly Cabinet page (comprehensive, regularly updated)
-  // Fallback: Ahram Online (gov-affiliated news)
-  const WIKI_URL = "https://en.wikipedia.org/wiki/Madbouly_Cabinet";
+  // Primary: Ahram Online (gov-affiliated news, has full cabinet lineup)
+  // Wikipedia "Second Madbouly Cabinet" article doesn't exist yet
   const AHRAM_URL = "https://english.ahram.org.eg/News/562168.aspx";
 
   let pageText = "";
-  let sourceUrl = WIKI_URL;
+  const sourceUrl = AHRAM_URL;
 
-  // Try Wikipedia first (most complete source)
   try {
-    const wikiRes = await fetch(WIKI_URL, { signal: AbortSignal.timeout(15000) });
-    if (wikiRes.ok) {
-      const html = await wikiRes.text();
-      // Extract the main content area
-      const bodyStart = html.indexOf('<div id="mw-content-text"');
-      const bodyEnd = html.indexOf('<div id="catlinks"');
-      const articleHtml = bodyStart > 0 && bodyEnd > bodyStart
-        ? html.slice(bodyStart, bodyEnd)
-        : html.slice(0, 50000);
+    const ahramRes = await fetch(AHRAM_URL, { signal: AbortSignal.timeout(15000) });
+    if (ahramRes.ok) {
+      const html = await ahramRes.text();
+      const titleMarker = html.indexOf("ContentPlaceHolder1_hd");
+      const bodyStart = titleMarker > 0 ? titleMarker : html.indexOf("ContentPlaceHolder1_bref");
+      const articleHtml = bodyStart > 0 ? html.slice(bodyStart, bodyStart + 15000) : html.slice(Math.floor(html.length / 2), Math.floor(html.length / 2) + 15000);
       pageText = articleHtml.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
-      console.log(`[dataAgent] Fetched Wikipedia cabinet page: ${pageText.length} chars`);
+      console.log(`[dataAgent] Fetched Ahram cabinet article: ${pageText.length} chars`);
     }
   } catch (err) {
-    console.warn(`[dataAgent] Wikipedia fetch failed: ${err}`);
-  }
-
-  // Fallback to Ahram Online if Wikipedia fails
-  if (pageText.length < 500) {
-    console.log("[dataAgent] Wikipedia insufficient, trying Ahram Online fallback...");
-    sourceUrl = AHRAM_URL;
-    try {
-      const ahramRes = await fetch(AHRAM_URL, { signal: AbortSignal.timeout(15000) });
-      if (ahramRes.ok) {
-        const html = await ahramRes.text();
-        const titleMarker = html.indexOf("ContentPlaceHolder1_hd");
-        const bodyStart = titleMarker > 0 ? titleMarker : html.indexOf("ContentPlaceHolder1_bref");
-        const articleHtml = bodyStart > 0 ? html.slice(bodyStart, bodyStart + 15000) : html.slice(Math.floor(html.length / 2), Math.floor(html.length / 2) + 15000);
-        pageText = articleHtml.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
-        console.log(`[dataAgent] Fetched Ahram cabinet article: ${pageText.length} chars`);
-      }
-    } catch (err) {
-      console.warn(`[dataAgent] Ahram fetch failed: ${err}`);
-    }
+    console.warn(`[dataAgent] Ahram fetch failed: ${err}`);
   }
 
   if (pageText.length < 500) {
@@ -265,24 +241,15 @@ async function refreshGovernmentData(
 Extract structured Egyptian government data from official sources.
 Always respond with valid JSON only — no markdown, no prose.`;
 
-  const prompt = `Extract the COMPLETE list of current Egyptian cabinet ministers from this Wikipedia/news page.
-Include: President, Prime Minister, Deputy PM(s), and ALL ministers.
-Egypt's current cabinet (Second Madbouly Cabinet, 2024) has 30+ ministers including:
-- Minister of Finance (Ahmed Kouchouk)
-- Minister of Defence
-- Minister of Interior
-Make sure you extract ALL of them, not just a subset.
+  const prompt = `Extract ALL current Egyptian government officials from this article.
 
-Return a JSON array. Each entry must have:
-{
-  "nameEn": "Full English name",
-  "titleEn": "Full English title (e.g. Minister of Finance)",
-  "nameAr": "Arabic name (if available, otherwise empty string)",
-  "titleAr": "Arabic title (if available, otherwise empty string)",
-  "role": "president" | "prime_minister" | "minister"
-}
+IMPORTANT: Always include these at the top of the array:
+1. {"nameEn": "Abdel Fattah el-Sisi", "titleEn": "President of Egypt", "nameAr": "عبد الفتاح السيسي", "titleAr": "رئيس الجمهورية", "role": "president"}
+2. {"nameEn": "Mostafa Madbouly", "titleEn": "Prime Minister", "nameAr": "مصطفى مدبولي", "titleAr": "رئيس الوزراء", "role": "prime_minister"}
 
-Be thorough — do NOT skip any ministers. Return an empty array [] if no data is found.
+Then extract ALL ministers from the article below (30+ ministers).
+
+Return a JSON array. Each entry: {"nameEn": "...", "titleEn": "...", "nameAr": "", "titleAr": "", "role": "president"|"prime_minister"|"minister"}
 
 Page content:
 ${pageText || "(page content unavailable)"}`;
