@@ -78,12 +78,14 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
   - Financial monthly: `https://www.mof.gov.eg/en/posts/statementsAndReports/6`
 
 ### Government/Cabinet Data
-- **Primary**: Ahram Online (english.ahram.org.eg) -- English-language coverage of cabinet reshuffles and minister appointments. Used because cabinet.gov.eg is a JS-rendered SPA inaccessible to server-side fetch.
-- **Parsing**: Claude Haiku 4.5 extracts minister names and portfolios from the Ahram Online HTML
-- **Auto-write**: Unlike other categories, the government refresh auto-writes via `upsertOfficialAndMinistry` mutation when Claude detects minister changes
+- **Primary**: Wikipedia Madbouly Cabinet page -- comprehensive, regularly updated list of all cabinet ministers. Used because cabinet.gov.eg is a JS-rendered SPA inaccessible to server-side fetch.
+- **Fallback**: Ahram Online (english.ahram.org.eg) -- English-language coverage of cabinet reshuffles
+- **Parsing**: Claude Haiku 4.5 extracts minister names and portfolios from the Wikipedia/Ahram HTML
+- **Auto-write**: The government refresh auto-writes via `upsertOfficialAndMinistry` mutation when Claude detects minister changes
 - **Validation**: Cross-referenced with State Information Service (sis.gov.eg)
 - **Specific URLs**:
-  - Ahram Online (cabinet reshuffle): `https://english.ahram.org.eg/News/562168.aspx`
+  - Wikipedia (primary): `https://en.wikipedia.org/wiki/Madbouly_Cabinet`
+  - Ahram Online (fallback): `https://english.ahram.org.eg/News/562168.aspx`
   - SIS: `https://www.sis.gov.eg/section/352/7510?lang=en`
 
 ### Parliament Data

@@ -209,26 +209,49 @@ async function refreshGovernmentData(
     return { recordsUpdated: 0 };
   }
 
-  // cabinet.gov.eg is JS-rendered. Use Ahram Online (gov-affiliated news) as primary source.
+  // Primary: Wikipedia Madbouly Cabinet page (comprehensive, regularly updated)
+  // Fallback: Ahram Online (gov-affiliated news)
+  const WIKI_URL = "https://en.wikipedia.org/wiki/Madbouly_Cabinet";
   const AHRAM_URL = "https://english.ahram.org.eg/News/562168.aspx";
 
   let pageText = "";
+  let sourceUrl = WIKI_URL;
 
-  // Fetch Ahram Online cabinet lineup article
+  // Try Wikipedia first (most complete source)
   try {
-    const ahramRes = await fetch(AHRAM_URL, { signal: AbortSignal.timeout(15000) });
-    if (ahramRes.ok) {
-      const html = await ahramRes.text();
-      // Find the article body -- use the title marker, not the ad placeholder
-      const titleMarker = html.indexOf("ContentPlaceHolder1_hd");
-      const bodyStart = titleMarker > 0 ? titleMarker : html.indexOf("ContentPlaceHolder1_bref");
-      const articleHtml = bodyStart > 0 ? html.slice(bodyStart, bodyStart + 15000) : html.slice(Math.floor(html.length / 2), Math.floor(html.length / 2) + 15000);
-      // Strip HTML tags to get clean text
+    const wikiRes = await fetch(WIKI_URL, { signal: AbortSignal.timeout(15000) });
+    if (wikiRes.ok) {
+      const html = await wikiRes.text();
+      // Extract the main content area
+      const bodyStart = html.indexOf('<div id="mw-content-text"');
+      const bodyEnd = html.indexOf('<div id="catlinks"');
+      const articleHtml = bodyStart > 0 && bodyEnd > bodyStart
+        ? html.slice(bodyStart, bodyEnd)
+        : html.slice(0, 50000);
       pageText = articleHtml.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
-      console.log(`[dataAgent] Fetched Ahram cabinet article: ${pageText.length} chars`);
+      console.log(`[dataAgent] Fetched Wikipedia cabinet page: ${pageText.length} chars`);
     }
   } catch (err) {
-    console.warn(`[dataAgent] Ahram fetch failed: ${err}`);
+    console.warn(`[dataAgent] Wikipedia fetch failed: ${err}`);
+  }
+
+  // Fallback to Ahram Online if Wikipedia fails
+  if (pageText.length < 500) {
+    console.log("[dataAgent] Wikipedia insufficient, trying Ahram Online fallback...");
+    sourceUrl = AHRAM_URL;
+    try {
+      const ahramRes = await fetch(AHRAM_URL, { signal: AbortSignal.timeout(15000) });
+      if (ahramRes.ok) {
+        const html = await ahramRes.text();
+        const titleMarker = html.indexOf("ContentPlaceHolder1_hd");
+        const bodyStart = titleMarker > 0 ? titleMarker : html.indexOf("ContentPlaceHolder1_bref");
+        const articleHtml = bodyStart > 0 ? html.slice(bodyStart, bodyStart + 15000) : html.slice(Math.floor(html.length / 2), Math.floor(html.length / 2) + 15000);
+        pageText = articleHtml.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+        console.log(`[dataAgent] Fetched Ahram cabinet article: ${pageText.length} chars`);
+      }
+    } catch (err) {
+      console.warn(`[dataAgent] Ahram fetch failed: ${err}`);
+    }
   }
 
   if (pageText.length < 500) {
@@ -236,30 +259,67 @@ async function refreshGovernmentData(
     return { recordsUpdated: 0 };
   }
 
-  const CABINET_URL = AHRAM_URL;
+  const CABINET_URL = sourceUrl;
 
   const systemPrompt = `You are a data extraction assistant for Mizan, Egypt's government transparency platform.
 Extract structured Egyptian government data from official sources.
 Always respond with valid JSON only — no markdown, no prose.`;
 
-  const prompt = `Extract the COMPLETE list of current Egyptian cabinet ministers from this page.
-Include the President, Prime Minister, and ALL ministers.
+  const prompt = `Extract the COMPLETE list of current Egyptian cabinet ministers from this Wikipedia/news page.
+Include: President, Prime Minister, Deputy PM(s), and ALL ministers.
+Egypt's current cabinet (Second Madbouly Cabinet, 2024) has 30+ ministers including:
+- Minister of Finance (Ahmed Kouchouk)
+- Minister of Defence
+- Minister of Interior
+Make sure you extract ALL of them, not just a subset.
+
 Return a JSON array. Each entry must have:
 {
   "nameEn": "Full English name",
-  "titleEn": "Full English title (e.g. Minister of Higher Education and Scientific Research)",
-  "nameAr": "Full Arabic name",
-  "titleAr": "Full Arabic title",
+  "titleEn": "Full English title (e.g. Minister of Finance)",
+  "nameAr": "Arabic name (if available, otherwise empty string)",
+  "titleAr": "Arabic title (if available, otherwise empty string)",
   "role": "president" | "prime_minister" | "minister"
 }
 
-Be thorough — Egypt's cabinet typically has 30+ ministers. Include deputy ministers if listed.
-Return an empty array [] if no data is found.
+Be thorough — do NOT skip any ministers. Return an empty array [] if no data is found.
 
 Page content:
 ${pageText || "(page content unavailable)"}`;
 
-  console.log(`[dataAgent] Government: sending ${pageText.length} chars to Claude...`);
+  // Also fetch governor data from Wikipedia
+  let governorText = "";
+  try {
+    const govWikiUrl = "https://en.wikipedia.org/w/api.php?action=query&titles=Subdivisions_of_Egypt&prop=extracts&explaintext=true&format=json";
+    const govRes = await fetch(govWikiUrl, { signal: AbortSignal.timeout(10000) });
+    if (govRes.ok) {
+      const data = await govRes.json() as { query?: { pages?: Record<string, { extract?: string }> } };
+      const pages = data?.query?.pages;
+      if (pages) {
+        governorText = Object.values(pages)[0]?.extract ?? "";
+        governorText = governorText.slice(0, 10000);
+      }
+    }
+  } catch {
+    console.warn("[dataAgent] Wikipedia governor fetch failed");
+  }
+
+  // Fetch Ahram governor article too
+  if (governorText.length < 500) {
+    try {
+      const govAhramRes = await fetch("https://english.ahram.org.eg/News/526575.aspx", { signal: AbortSignal.timeout(10000) });
+      if (govAhramRes.ok) {
+        const html = await govAhramRes.text();
+        const titleMarker = html.indexOf("ContentPlaceHolder1_hd");
+        const bodyStart = titleMarker > 0 ? titleMarker : 0;
+        governorText = html.slice(bodyStart, bodyStart + 10000).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+      }
+    } catch {
+      console.warn("[dataAgent] Ahram governor article fetch failed");
+    }
+  }
+
+  console.log(`[dataAgent] Government: sending ${pageText.length} chars to Claude for ministers...`);
   const claudeResponse = await callClaude(prompt, systemPrompt);
 
   if (!claudeResponse) {
@@ -300,7 +360,7 @@ ${pageText || "(page content unavailable)"}`;
   }
 
   // Auto-write officials to DB (upsert by name, never delete existing)
-  const recordsUpdated: number = await ctx.runMutation(
+  let recordsUpdated: number = await ctx.runMutation(
     internal.dataRefresh.upsertGovernmentOfficials,
     {
       officials: officials.map((o) => ({
@@ -315,6 +375,50 @@ ${pageText || "(page content unavailable)"}`;
       sourceUrl: CABINET_URL,
     }
   );
+
+  // Step 2: Extract governors separately (different source)
+  if (governorText.length > 200) {
+    console.log(`[dataAgent] Government: extracting governors from ${governorText.length} chars...`);
+    const govResponse = await callClaude(
+      `Extract ALL 27 Egyptian governors from this text.
+Return a JSON array: [{"nameEn": "...", "titleEn": "Governor of [Governorate]", "nameAr": "", "titleAr": "", "role": "governor"}]
+Egypt has 27 governorates. Extract every governor mentioned.
+
+Text:
+${governorText.slice(0, 8000)}`,
+      systemPrompt
+    );
+
+    if (govResponse) {
+      try {
+        let jsonStr = govResponse;
+        const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (fence) jsonStr = fence[1];
+        const govParsed = JSON.parse(jsonStr.trim()) as Array<{
+          nameEn: string; titleEn: string; nameAr: string; titleAr: string; role: string;
+        }>;
+        if (Array.isArray(govParsed) && govParsed.length > 0) {
+          const govUpdated: number = await ctx.runMutation(
+            internal.dataRefresh.upsertGovernmentOfficials,
+            {
+              officials: govParsed.map((o) => ({
+                nameEn: o.nameEn,
+                nameAr: o.nameAr || "",
+                titleEn: o.titleEn,
+                titleAr: o.titleAr || "",
+                role: "governor" as const,
+              })),
+              sourceUrl: "https://english.ahram.org.eg/News/526575.aspx",
+            }
+          );
+          recordsUpdated += govUpdated;
+          console.log(`[dataAgent] Government: ${govParsed.length} governors extracted`);
+        }
+      } catch {
+        console.warn("[dataAgent] Failed to parse governor response");
+      }
+    }
+  }
 
   return { recordsUpdated, sourceUrl: CABINET_URL };
 }

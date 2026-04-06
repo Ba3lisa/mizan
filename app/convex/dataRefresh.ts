@@ -412,7 +412,8 @@ export const upsertGovernmentOfficials = internalMutation({
         role: v.union(
           v.literal("president"),
           v.literal("prime_minister"),
-          v.literal("minister")
+          v.literal("minister"),
+          v.literal("governor")
         ),
       })
     ),
@@ -429,7 +430,7 @@ export const upsertGovernmentOfficials = internalMutation({
 
     // Filter to only government roles (not MPs/senators)
     const govOfficials = currentOfficials.filter(
-      (o) => o.role === "president" || o.role === "prime_minister" || o.role === "minister" || o.role === "deputy_minister"
+      (o) => o.role === "president" || o.role === "prime_minister" || o.role === "minister" || o.role === "deputy_minister" || o.role === "governor"
     );
 
     const existingByName = new Map(
@@ -473,6 +474,22 @@ export const upsertGovernmentOfficials = internalMutation({
           sourceUrl: args.sourceUrl,
         }) as string;
         updated++;
+      }
+
+      // Link governors to their governorate
+      if (official.role === "governor") {
+        const govName = official.titleEn.replace(/^Governor of /, "").trim();
+        const allGovernorates = await ctx.db.query("governorates").collect();
+        const gov = allGovernorates.find(
+          (g) => g.nameEn.toLowerCase() === govName.toLowerCase() ||
+                 g.nameEn.toLowerCase().includes(govName.toLowerCase()) ||
+                 govName.toLowerCase().includes(g.nameEn.toLowerCase())
+        );
+        if (gov) {
+          await ctx.db.patch(gov._id, {
+            currentGovernorId: officialId as unknown as typeof gov["currentGovernorId"],
+          });
+        }
       }
 
       // Create/update ministry for ministers (not president/PM)
