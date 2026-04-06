@@ -110,9 +110,9 @@ export default function HomePage() {
       </section>
 
       {/* ════════ STATS ════════ */}
-      <section className="border-y border-border bg-card/50">
-        <div className="container-page">
-          <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-border rtl:divide-x-reverse">
+      <section className="container-page">
+        <div className="border border-border rounded-xl bg-card/50">
+          <div className="grid grid-cols-2 md:grid-cols-4 [&>*:not(:first-child)]:border-s [&>*:not(:first-child)]:border-border">
             {stats.map((s) => (
               <Stat key={s.source} value={s.value}
                 label={isAr ? s.ar : s.en} source={s.source} sourceUrl={s.url}

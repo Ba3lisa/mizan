@@ -21,6 +21,7 @@ import { cn } from "@/lib/utils";
 interface TimelineDataPoint {
   year: number;
   externalDebt: number;
+  domesticDebt: number;
   debtToGDP: number;
   event?: string;
   eventAr?: string;
@@ -49,10 +50,15 @@ const regionalData: RegionalCountry[] = [
 
 function DebtTimeline() {
   const { lang } = useLanguage();
-  const { symbol, fromEGP, fmt } = useCurrency();
+  const { symbol, fromUSD, fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
-  const fmtB = (v: number) => `${fmt(fromEGP(v * 1e9), { compact: true })} ${symbol}`;
+
+  // External debt in USD billions, domestic in EGP billions — both converted to user's currency
+  const fmtExtB = (v: number) => `${fmt(fromUSD(v), { compact: true })}B ${symbol}`;
+  const fmtDomB = (v: number) => `${fmt(fromEGP(v), { compact: true })}B ${symbol}`;
+  const fmtTotalB = (ext: number, dom: number) =>
+    `${fmt(fromUSD(ext) + fromEGP(dom), { compact: true })}B ${symbol}`;
 
   const convexTimeline = useQuery(api.debt.getDebtTimeline);
   const isLoading = convexTimeline === undefined;
@@ -60,47 +66,93 @@ function DebtTimeline() {
   // Deduplicate by year -- keep the latest record per year (e.g., 2024-12-31 over 2024-06-30)
   const activeTimelineData: TimelineDataPoint[] = (() => {
     if (isLoading || convexTimeline.length === 0) return [];
-    const byYear = new Map<number, { date: string; ext: number; ratio: number }>();
+    const byYear = new Map<number, { date: string; ext: number; dom: number; ratio: number }>();
     for (const r of convexTimeline) {
       const year = new Date(r.date).getFullYear();
       const prev = byYear.get(year);
       if (!prev || r.date > prev.date) {
-        byYear.set(year, { date: r.date, ext: r.totalExternalDebt ?? 0, ratio: r.debtToGdpRatio ?? 0 });
+        byYear.set(year, {
+          date: r.date,
+          ext: r.totalExternalDebt ?? 0,
+          dom: r.totalDomesticDebt ?? 0,
+          ratio: r.debtToGdpRatio ?? 0,
+        });
       }
     }
     return Array.from(byYear.entries())
-      .map(([year, v]) => ({ year, externalDebt: v.ext, debtToGDP: v.ratio }))
+      .map(([year, v]) => ({ year, externalDebt: v.ext, domesticDebt: v.dom, debtToGDP: v.ratio }))
       .sort((a, b) => a.year - b.year);
   })();
 
   const svgW = 700;
   const svgH = 300;
-  const padL = 55;
+  const padL = 60;
   const padR = 30;
   const padT = 30;
   const padB = 40;
   const innerW = svgW - padL - padR;
   const innerH = svgH - padT - padB;
 
-  const maxDebt = activeTimelineData.length > 0
-    ? Math.max(...activeTimelineData.map((d) => d.externalDebt)) * 1.1
-    : 200;
+  // Convert both series to user's selected currency for comparable stacking
+  const convertedData = activeTimelineData.map((d) => ({
+    ...d,
+    extConverted: fromUSD(d.externalDebt),
+    domConverted: fromEGP(d.domesticDebt),
+    totalConverted: fromUSD(d.externalDebt) + fromEGP(d.domesticDebt),
+  }));
+
+  const maxTotal =
+    convertedData.length > 0
+      ? Math.max(...convertedData.map((d) => d.totalConverted)) * 1.15
+      : 200;
+
   const minYear = activeTimelineData[0]?.year ?? 2015;
   const maxYear = activeTimelineData[activeTimelineData.length - 1]?.year ?? 2024;
   const yearRange = maxYear - minYear || 1;
 
   const xScale = (year: number) => padL + ((year - minYear) / yearRange) * innerW;
-  const yScale = (val: number) => padT + (1 - val / maxDebt) * innerH;
+  // yScale operates on already-converted values
+  const yScale = (val: number) => padT + (1 - val / maxTotal) * innerH;
+  const baseline = padT + innerH;
 
-  const linePath = activeTimelineData
-    .map((d, i) => `${i === 0 ? "M" : "L"} ${xScale(d.year)} ${yScale(d.externalDebt)}`)
-    .join(" ");
+  // Stacked area: external (bottom layer) from 0 → extConverted
+  const extAreaPath =
+    convertedData.length > 0
+      ? [
+          ...convertedData.map((d, i) => `${i === 0 ? "M" : "L"} ${xScale(d.year)} ${yScale(d.extConverted)}`),
+          `L ${xScale(maxYear)} ${baseline}`,
+          `L ${xScale(minYear)} ${baseline}`,
+          "Z",
+        ].join(" ")
+      : "";
 
-  const areaPath = activeTimelineData.length > 0
-    ? `${linePath} L ${xScale(maxYear)} ${padT + innerH} L ${xScale(minYear)} ${padT + innerH} Z`
-    : "";
+  // Domestic (top layer) from extConverted → totalConverted
+  const domAreaPath =
+    convertedData.length > 0
+      ? [
+          ...convertedData.map((d, i) => `${i === 0 ? "M" : "L"} ${xScale(d.year)} ${yScale(d.totalConverted)}`),
+          // trace back along the top of the external area
+          ...[...convertedData].reverse().map((d) => `L ${xScale(d.year)} ${yScale(d.extConverted)}`),
+          "Z",
+        ].join(" ")
+      : "";
 
-  const hovered = hoveredYear ? activeTimelineData.find((d) => d.year === hoveredYear) : null;
+  // Total line path
+  const totalLinePath =
+    convertedData.length > 0
+      ? convertedData.map((d, i) => `${i === 0 ? "M" : "L"} ${xScale(d.year)} ${yScale(d.totalConverted)}`).join(" ")
+      : "";
+
+  // External boundary line
+  const extLinePath =
+    convertedData.length > 0
+      ? convertedData.map((d, i) => `${i === 0 ? "M" : "L"} ${xScale(d.year)} ${yScale(d.extConverted)}`).join(" ")
+      : "";
+
+  const hovered = hoveredYear != null ? convertedData.find((d) => d.year === hoveredYear) : null;
+
+  // Y-axis labels using converted max
+  const fmtAxisVal = (v: number) => fmt(v, { compact: true });
 
   return (
     <Skeleton name="debt-timeline" loading={isLoading}>
@@ -119,60 +171,77 @@ function DebtTimeline() {
             {/* Grid */}
             {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
               const y = padT + (1 - frac) * innerH;
-              const val = Math.round((maxDebt * frac) / 10) * 10;
+              const val = maxTotal * frac;
               return (
                 <g key={frac}>
                   <line x1={padL} y1={y} x2={svgW - padR} y2={y} stroke="#252A36" strokeWidth={0.5} />
-                  <text x={padL - 8} y={y} textAnchor="end" dominantBaseline="middle" fill="#7A8299" fontSize={9} fontFamily="var(--font-mono)">
-                    {fmtB(val)}
+                  <text x={padL - 6} y={y} textAnchor="end" dominantBaseline="middle" fill="#7A8299" fontSize={9} fontFamily="var(--font-mono)">
+                    {fmtAxisVal(val)}
                   </text>
                 </g>
               );
             })}
 
-            {/* Area fill */}
-            {areaPath && <path d={areaPath} fill="#C9A84C" opacity={0.05} />}
+            {/* Stacked area — external (gold, bottom) */}
+            {extAreaPath && <path d={extAreaPath} fill="#C9A84C" opacity={0.35} />}
 
-            {/* Line */}
-            {linePath && <path d={linePath} fill="none" stroke="#C9A84C" strokeWidth={2} />}
+            {/* Stacked area — domestic (blue, top) */}
+            {domAreaPath && <path d={domAreaPath} fill="#6C8EEF" opacity={0.35} />}
 
-            {/* Event vertical lines */}
-            {activeTimelineData
-              .filter((d) => d.event)
-              .map((d) => (
-                <line
-                  key={d.year}
-                  x1={xScale(d.year)}
-                  y1={yScale(d.externalDebt) - 8}
-                  x2={xScale(d.year)}
-                  y2={padT + 4}
-                  stroke="#E76F51"
-                  strokeWidth={0.8}
-                  strokeDasharray="3 3"
-                  opacity={0.6}
-                />
-              ))}
+            {/* External boundary line */}
+            {extLinePath && <path d={extLinePath} fill="none" stroke="#C9A84C" strokeWidth={1.5} strokeDasharray="4 3" opacity={0.7} />}
 
-            {/* Data points */}
-            {activeTimelineData.map((d) => {
+            {/* Total line */}
+            {totalLinePath && <path d={totalLinePath} fill="none" stroke="#E8ECF4" strokeWidth={2} opacity={0.9} />}
+
+            {/* Hover hit-area circles (invisible, full height for easy hover) */}
+            {convertedData.map((d) => (
+              <rect
+                key={d.year}
+                x={xScale(d.year) - (innerW / (2 * (convertedData.length || 1)))}
+                y={padT}
+                width={innerW / (convertedData.length || 1)}
+                height={innerH}
+                fill="transparent"
+                className="cursor-pointer"
+                onMouseEnter={() => setHoveredYear(d.year)}
+              />
+            ))}
+
+            {/* Data point dots on total line */}
+            {convertedData.map((d) => {
               const isHov = hoveredYear === d.year;
               return (
                 <circle
                   key={d.year}
                   cx={xScale(d.year)}
-                  cy={yScale(d.externalDebt)}
-                  r={isHov ? 5 : d.event ? 4 : 3}
-                  fill={d.event ? "#E76F51" : "#C9A84C"}
+                  cy={yScale(d.totalConverted)}
+                  r={isHov ? 5 : 3}
+                  fill="#E8ECF4"
                   stroke="#0F1117"
                   strokeWidth={1.5}
-                  className="cursor-pointer transition-all duration-100"
-                  onMouseEnter={() => setHoveredYear(d.year)}
+                  style={{ pointerEvents: "none" }}
                 />
               );
             })}
 
+            {/* Hovered year vertical line */}
+            {hovered && (
+              <line
+                x1={xScale(hovered.year)}
+                y1={padT}
+                x2={xScale(hovered.year)}
+                y2={baseline}
+                stroke="#7A8299"
+                strokeWidth={0.8}
+                strokeDasharray="3 3"
+                opacity={0.5}
+                style={{ pointerEvents: "none" }}
+              />
+            )}
+
             {/* Year labels */}
-            {activeTimelineData.filter((_, i) => i % 2 === 0 || activeTimelineData[i].event).map((d) => (
+            {convertedData.filter((_, i) => i % 2 === 0).map((d) => (
               <text
                 key={d.year}
                 x={xScale(d.year)}
@@ -189,25 +258,43 @@ function DebtTimeline() {
             {/* Tooltip */}
             {hovered && (() => {
               const hx = xScale(hovered.year);
-              const hy = yScale(hovered.externalDebt);
-              const boxW = 160;
-              const boxH = hovered.event ? 62 : 46;
+              const hy = yScale(hovered.totalConverted);
+              const boxW = isAr ? 220 : 190;
+              const boxH = 78;
               const tx = Math.min(Math.max(hx - boxW / 2, 4), svgW - boxW - 4);
               const ty = Math.max(hy - boxH - 14, 4);
               return (
                 <g style={{ pointerEvents: "none" }}>
-                  <rect x={tx} y={ty} width={boxW} height={boxH} rx={6} fill="#1E2330" fillOpacity={0.92} stroke="#333A4A" strokeWidth={0.5} />
-                  <text x={tx + 8} y={ty + 14} fill="#C9A84C" fontSize={10} fontFamily="var(--font-mono)" fontWeight="600">
+                  <rect x={tx} y={ty} width={boxW} height={boxH} rx={6} fill="#1E2330" fillOpacity={0.96} stroke="#333A4A" strokeWidth={0.5} />
+                  <text x={tx + 10} y={ty + 16} fill="#E8ECF4" fontSize={11} fontFamily="var(--font-mono)" fontWeight="700">
                     {hovered.year}
+                    {"  "}
+                    <tspan fill="#7A8299" fontSize={9} fontWeight="400">{hovered.debtToGDP}% GDP</tspan>
                   </text>
-                  <text x={tx + 8} y={ty + 27} fill="#E8ECF4" fontSize={9} fontFamily="var(--font-mono)">
-                    {fmtB(hovered.externalDebt)} \u00b7 {hovered.debtToGDP}% GDP
+                  {/* External row */}
+                  <rect x={tx + 10} y={ty + 26} width={6} height={6} rx={1} fill="#C9A84C" />
+                  <text x={tx + 20} y={ty + 32} fill="#C9A84C" fontSize={9} fontFamily={isAr ? "var(--font-sans)" : "var(--font-mono)"}>
+                    {isAr ? "\u062e\u0627\u0631\u062c\u064a" : "External"}
                   </text>
-                  {hovered.event && (
-                    <text x={tx + 8} y={ty + 40} fill="#E76F51" fontSize={7} fontFamily="var(--font-sans)">
-                      {isAr ? hovered.eventAr : hovered.event}
-                    </text>
-                  )}
+                  <text x={tx + boxW - 10} y={ty + 32} fill="#C9A84C" fontSize={9} fontFamily="var(--font-mono)" textAnchor="end">
+                    {fmtExtB(hovered.externalDebt)}
+                  </text>
+                  {/* Domestic row */}
+                  <rect x={tx + 10} y={ty + 42} width={6} height={6} rx={1} fill="#6C8EEF" />
+                  <text x={tx + 20} y={ty + 48} fill="#6C8EEF" fontSize={9} fontFamily={isAr ? "var(--font-sans)" : "var(--font-mono)"}>
+                    {isAr ? "\u0645\u062d\u0644\u064a" : "Domestic"}
+                  </text>
+                  <text x={tx + boxW - 10} y={ty + 48} fill="#6C8EEF" fontSize={9} fontFamily="var(--font-mono)" textAnchor="end">
+                    {fmtDomB(hovered.domesticDebt)}
+                  </text>
+                  {/* Total row */}
+                  <line x1={tx + 10} y1={ty + 56} x2={tx + boxW - 10} y2={ty + 56} stroke="#333A4A" strokeWidth={0.5} />
+                  <text x={tx + 10} y={ty + 68} fill="#E8ECF4" fontSize={9} fontFamily={isAr ? "var(--font-sans)" : "var(--font-mono)"} fontWeight="600">
+                    {isAr ? "\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a" : "Total"}
+                  </text>
+                  <text x={tx + boxW - 10} y={ty + 68} fill="#E8ECF4" fontSize={9} fontFamily="var(--font-mono)" fontWeight="600" textAnchor="end">
+                    {fmtTotalB(hovered.externalDebt, hovered.domesticDebt)}
+                  </text>
                 </g>
               );
             })()}
@@ -215,14 +302,18 @@ function DebtTimeline() {
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+        <div className="flex flex-wrap gap-5 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
-            <span className="w-4 h-0.5 rounded bg-amber-400 inline-block" />
-            {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u062e\u0627\u0631\u062c\u064a (\u0645\u0644\u064a\u0627\u0631 \u062f\u0648\u0644\u0627\u0631)" : `External Debt (${symbol} B)`}
+            <span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#C9A84C", opacity: 0.85 }} />
+            {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u062e\u0627\u0631\u062c\u064a (\u0628\u0627\u0644\u062f\u0648\u0644\u0627\u0631)" : `External Debt (USD)`}
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-full bg-orange-500 inline-block" />
-            {isAr ? "\u062d\u062f\u062b \u0631\u0626\u064a\u0633\u064a" : "Key event"}
+            <span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#6C8EEF", opacity: 0.85 }} />
+            {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u0645\u062d\u0644\u064a (\u0628\u0627\u0644\u062c\u0646\u064a\u0647)" : `Domestic Debt (EGP)`}
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-6 h-0.5 rounded inline-block" style={{ background: "#E8ECF4" }} />
+            {isAr ? "\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a" : `Total (${symbol})`}
           </span>
         </div>
         </>
@@ -240,7 +331,7 @@ function DebtTimeline() {
 
 function CreditorBreakdown() {
   const { lang } = useLanguage();
-  const { symbol, fromEGP, fmt } = useCurrency();
+  const { symbol, fromUSD, fmt } = useCurrency();
   const isAr = lang === "ar";
   const [sortBy, setSortBy] = useState<"amount">("amount");
 
@@ -248,19 +339,22 @@ function CreditorBreakdown() {
   const isCreditorLoading = convexLatest === undefined;
   const CREDITOR_COLORS = ["#6C8EEF", "#2EC4B6", "#C9A84C", "#E76F51", "#9B72CF", "#E5484D", "#525C72"];
 
-  const fmtB = (v: number) => `${fmt(fromEGP(v * 1e6), { compact: true })} ${symbol}`;
+  // Creditor amounts are in billions USD (same unit as debt records)
+  const fmtCreditor = (v: number) => `${fmt(fromUSD(v ?? 0), { decimals: 1 })}B ${symbol}`;
 
   // Map creditors from Convex latest record
-  interface ConvexCreditor {
-    creditorName: string;
-    creditorNameAr?: string;
-    amountMillions: number;
-  }
-  const rawCreditors: ConvexCreditor[] = (convexLatest?.creditors as unknown as ConvexCreditor[] | undefined) ?? [];
+  const rawCreditors = convexLatest?.creditors ?? [];
   const sorted = [...rawCreditors]
-    .map((c, i) => ({ ...c, color: CREDITOR_COLORS[i % CREDITOR_COLORS.length] }))
-    .sort((a, b) => b.amountMillions - a.amountMillions);
-  const totalOwed = sorted.reduce((s, c) => s + c.amountMillions, 0);
+    .map((c, i) => ({
+      creditorName: c.creditorEn,
+      creditorNameAr: c.creditorAr,
+      amount: c.amount ?? 0,
+      creditorType: c.creditorType,
+      percentageOfTotal: c.percentageOfTotal,
+      color: CREDITOR_COLORS[i % CREDITOR_COLORS.length],
+    }))
+    .sort((a, b) => b.amount - a.amount);
+  const totalOwed = sorted.reduce((s, c) => s + c.amount, 0);
 
   return (
     <Skeleton name="debt-creditors" loading={isCreditorLoading}>
@@ -299,7 +393,7 @@ function CreditorBreakdown() {
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-mono text-lg font-bold tabular-nums" style={{ color: creditor.color }}>
-                    {fmtB(creditor.amountMillions)}
+                    {fmtCreditor(creditor.amount)}
                   </p>
                 </div>
               </div>
@@ -307,7 +401,7 @@ function CreditorBreakdown() {
               <div className="h-2 bg-muted/50 rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-700"
-                  style={{ width: totalOwed > 0 ? `${(creditor.amountMillions / totalOwed) * 100}%` : "0%", background: creditor.color }}
+                  style={{ width: totalOwed > 0 ? `${(creditor.amount / totalOwed) * 100}%` : "0%", background: creditor.color }}
                 />
               </div>
             </div>
@@ -332,7 +426,7 @@ function CreditorBreakdown() {
             </TableHeader>
             <TableBody>
               {sorted.map((creditor) => {
-                const pct = totalOwed > 0 ? ((creditor.amountMillions / totalOwed) * 100).toFixed(1) : "0.0";
+                const pct = totalOwed > 0 ? ((creditor.amount / totalOwed) * 100).toFixed(1) : "0.0";
                 return (
                   <TableRow key={creditor.creditorName} className="hover:bg-muted/30 transition-colors">
                     <TableCell>
@@ -345,7 +439,7 @@ function CreditorBreakdown() {
                     </TableCell>
                     <TableCell className="text-right">
                       <span className="font-mono tabular-nums text-sm text-foreground">
-                        {fmtB(creditor.amountMillions)}
+                        {fmtCreditor(creditor.amount)}
                       </span>
                     </TableCell>
                     <TableCell className="text-right hidden md:table-cell">
@@ -360,7 +454,7 @@ function CreditorBreakdown() {
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="font-mono font-semibold tabular-nums text-sm text-foreground">
-                    {fmtB(totalOwed)}
+                    {fmtCreditor(totalOwed)}
                   </span>
                 </TableCell>
                 <TableCell className="hidden md:table-cell" />
@@ -450,7 +544,7 @@ function RegionalComparison() {
 
 export default function DebtPage() {
   const { t, lang, dir } = useLanguage();
-  const { symbol, fromEGP, fmt } = useCurrency();
+  const { symbol, fromUSD, fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
   const [activeTab, setActiveTab] = useState<"timeline" | "creditors" | "regional">("timeline");
 
@@ -460,28 +554,29 @@ export default function DebtPage() {
 
   const isPageLoading = convexTimeline === undefined || convexLatest === undefined;
 
-  const latestRecord = convexLatest
-    ? {
-        externalDebt: convexLatest.totalExternalDebt ?? 0,
-        debtToGDP: convexLatest.debtToGdpRatio ?? 0,
-        year: new Date(convexLatest.date).getFullYear(),
-      }
-    : null;
+  // Build stat card data from the best available across recent records.
+  // The WB API record (2024-12-31) only has external debt.
+  // The CBE record (2024-06-30) has domestic debt + GDP ratio.
+  // Use the most recent non-null value for each field.
+  const latestRecord = (() => {
+    if (!convexTimeline || convexTimeline.length === 0) return null;
+    const sorted = [...convexTimeline].sort((a, b) => b.date.localeCompare(a.date));
+    const extRecord = sorted.find((r) => r.totalExternalDebt != null && r.totalExternalDebt > 0);
+    const domRecord = sorted.find((r) => r.totalDomesticDebt != null && r.totalDomesticDebt > 0);
+    const gdpRecord = sorted.find((r) => r.debtToGdpRatio != null && r.debtToGdpRatio > 0);
+    return {
+      externalDebt: extRecord?.totalExternalDebt ?? 0,
+      domesticDebt: domRecord?.totalDomesticDebt ?? 0,
+      debtToGDP: gdpRecord?.debtToGdpRatio ?? 0,
+      year: new Date(sorted[0].date).getFullYear(),
+    };
+  })();
 
-  const earliestRecord =
-    !isPageLoading && convexTimeline.length > 0
-      ? {
-          externalDebt: convexTimeline[0].totalExternalDebt ?? 0,
-          year: new Date(convexTimeline[0].date).getFullYear(),
-        }
-      : null;
-
-  const increasePercent =
-    latestRecord && earliestRecord && earliestRecord.externalDebt > 0
-      ? Math.round(((latestRecord.externalDebt - earliestRecord.externalDebt) / earliestRecord.externalDebt) * 100)
-      : null;
-
-  const fmtDebt = (v: number) => `${fmt(fromEGP(v * 1e9), { compact: true })} ${symbol}`;
+  // Values in DB are in billions (ext in USD B, dom in EGP B)
+  const fmtExtDebt = (v: number) => `${fmt(fromUSD(v), { decimals: 1 })}B ${symbol}`;
+  const fmtDomDebt = (v: number) => `${fmt(fromEGP(v), { compact: true })}B ${symbol}`;
+  const fmtTotalDebt = (ext: number, dom: number) =>
+    `${fmt(fromUSD(ext) + fromEGP(dom), { compact: true })}B ${symbol}`;
 
   const tabs = [
     { id: "timeline" as const, labelAr: "\u0645\u0633\u0627\u0631 \u0627\u0644\u062f\u064a\u0646", labelEn: "Timeline" },
@@ -506,15 +601,34 @@ export default function DebtPage() {
 
         {/* Key Metrics */}
         <Skeleton name="debt-key-metrics" loading={isPageLoading}>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          <Card className="bg-card border-border">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Total debt */}
+          <Card className="bg-card border-border md:col-span-1">
             <CardContent className="pt-5 pb-5">
               <p className="text-xs text-muted-foreground mb-1">
-                {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u062e\u0627\u0631\u062c\u064a" : "External Debt"}
+                {isAr ? "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u062f\u064a\u0646" : "Total Debt"}
                 {latestRecord && ` ${latestRecord.year}`}
               </p>
-              <p className="font-mono text-3xl font-bold tabular-nums text-amber-400">
-                {latestRecord ? fmtDebt(latestRecord.externalDebt) : "\u2014"}
+              <p className="font-mono text-2xl font-bold tabular-nums text-foreground">
+                {latestRecord
+                  ? fmtTotalDebt(latestRecord.externalDebt, latestRecord.domesticDebt)
+                  : "\u2014"}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {isAr ? "\u062e\u0627\u0631\u062c\u064a + \u0645\u062d\u0644\u064a" : "External + Domestic"}
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* External debt */}
+          <Card className="bg-card border-border">
+            <CardContent className="pt-5 pb-5">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#C9A84C" }} />
+                {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u062e\u0627\u0631\u062c\u064a" : "External Debt"}
+              </p>
+              <p className="font-mono text-2xl font-bold tabular-nums text-amber-400">
+                {latestRecord ? fmtExtDebt(latestRecord.externalDebt) : "\u2014"}
               </p>
               <a href="https://cbe.org.eg" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
                 cbe.org.eg
@@ -522,29 +636,36 @@ export default function DebtPage() {
             </CardContent>
           </Card>
 
+          {/* Domestic debt */}
+          <Card className="bg-card border-border">
+            <CardContent className="pt-5 pb-5">
+              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#6C8EEF" }} />
+                {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u0645\u062d\u0644\u064a" : "Domestic Debt"}
+              </p>
+              <p className="font-mono text-2xl font-bold tabular-nums" style={{ color: "#6C8EEF" }}>
+                {latestRecord ? fmtDomDebt(latestRecord.domesticDebt) : "\u2014"}
+              </p>
+              <a href="https://mof.gov.eg" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
+                mof.gov.eg
+              </a>
+            </CardContent>
+          </Card>
+
+          {/* Debt-to-GDP */}
           <Card className="bg-card border-border">
             <CardContent className="pt-5 pb-5">
               <p className="text-xs text-muted-foreground mb-1">
                 {isAr ? "\u0646\u0633\u0628\u0629 \u0627\u0644\u062f\u064a\u0646 / \u0627\u0644\u0646\u0627\u062a\u062c" : "Debt-to-GDP"}
               </p>
-              <p className="font-mono text-3xl font-bold tabular-nums text-foreground" dir="ltr">
+              <p className="font-mono text-2xl font-bold tabular-nums text-foreground" dir="ltr">
                 {latestRecord ? `${latestRecord.debtToGDP}%` : "\u2014"}
               </p>
+              <a href="https://worldbank.org" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
+                worldbank.org
+              </a>
             </CardContent>
           </Card>
-
-          {increasePercent !== null && earliestRecord && (
-            <Card className="bg-card border-red-900/30 border">
-              <CardContent className="pt-5 pb-5">
-                <p className="text-xs text-muted-foreground mb-1">
-                  {isAr ? `\u0627\u0644\u0632\u064a\u0627\u062f\u0629 \u0645\u0646\u0630 ${earliestRecord.year}` : `Rise since ${earliestRecord.year}`}
-                </p>
-                <p className="font-mono text-3xl font-bold tabular-nums text-red-400" dir="ltr">
-                  +{increasePercent}%
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </div>
         </Skeleton>
 

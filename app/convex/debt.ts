@@ -76,22 +76,46 @@ export const getDebtTimeline = query({
 export const getLatestDebtRecord = query({
   args: {},
   handler: async (ctx) => {
-    const record = await ctx.db
+    // Get the latest record by date
+    const latestRecord = await ctx.db
       .query("debtRecords")
       .withIndex("by_date")
       .order("desc")
       .first();
 
-    if (!record) return null;
+    if (!latestRecord) return null;
 
-    const creditors = await ctx.db
+    // Try to find creditors for the latest record
+    let creditors = await ctx.db
       .query("debtByCreditor")
       .withIndex("by_debtRecordId", (q) =>
-        q.eq("debtRecordId", record._id)
+        q.eq("debtRecordId", latestRecord._id)
       )
       .collect();
 
-    return { ...record, creditors };
+    // If latest record has no creditors, find the most recent record that does
+    if (creditors.length === 0) {
+      const allRecords = await ctx.db
+        .query("debtRecords")
+        .withIndex("by_date")
+        .order("desc")
+        .take(10);
+
+      for (const record of allRecords) {
+        const c = await ctx.db
+          .query("debtByCreditor")
+          .withIndex("by_debtRecordId", (q) =>
+            q.eq("debtRecordId", record._id)
+          )
+          .collect();
+        if (c.length > 0) {
+          creditors = c;
+          break;
+        }
+      }
+    }
+
+    return { ...latestRecord, creditors };
   },
 });
 

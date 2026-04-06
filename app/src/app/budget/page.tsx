@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Users, ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
@@ -215,11 +215,23 @@ function BudgetSankey() {
 
   const fmtAmount = (v: number) => `${fmt(fromEGP(v * 1e9), { compact: true })} ${symbol}`;
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+
   return (
-    <div className="h-[700px]" dir="ltr">
+    <div className={isMobile ? "overflow-x-auto" : ""} dir="ltr">
+      <div className={isMobile ? "min-w-[900px] h-[700px]" : "h-[700px]"}>
       <ResponsiveSankey
         data={{ nodes, links: validLinks }}
-        margin={{ top: 20, right: 240, bottom: 20, left: 240 }}
+        margin={isMobile
+          ? { top: 20, right: 160, bottom: 20, left: 160 }
+          : { top: 20, right: 240, bottom: 20, left: 240 }
+        }
         align="justify"
         sort="descending"
         label={(node) => {
@@ -228,8 +240,8 @@ function BudgetSankey() {
         }}
         nodeOpacity={1}
         nodeHoverOthersOpacity={0.25}
-        nodeThickness={24}
-        nodeSpacing={4}
+        nodeThickness={isMobile ? 18 : 24}
+        nodeSpacing={isMobile ? 2 : 4}
         nodeBorderWidth={0}
         nodeBorderColor={{ from: "color", modifiers: [["darker", 0.5]] }}
         nodeBorderRadius={3}
@@ -241,7 +253,7 @@ function BudgetSankey() {
         enableLinkGradient
         labelPosition="outside"
         labelOrientation="horizontal"
-        labelPadding={12}
+        labelPadding={isMobile ? 6 : 12}
         labelTextColor={{ from: "color", modifiers: [["brighter", 1]] }}
         nodeTooltip={({ node }) => (
           <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg text-sm">
@@ -261,6 +273,7 @@ function BudgetSankey() {
           tooltip: { container: { background: "var(--card)", color: "var(--foreground)", borderRadius: "8px", border: "1px solid var(--border)" } },
         }}
       />
+      </div>
     </div>
   );
 }

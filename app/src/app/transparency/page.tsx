@@ -210,6 +210,7 @@ interface ConvexCategoryHealth {
   lastRefreshTime: number | null;
   lastAttemptTime: number | null;
   lastStatus: string | null;
+  recordCount: number;
   recordsUpdated: number | null;
   sourceUrl: string | null;
 }
@@ -285,7 +286,7 @@ export default function TransparencyPage() {
           lastRefresh: formatRelativeTime(ch.lastRefreshTime),
           lastRefreshAr: formatRelativeTime(ch.lastRefreshTime),
           status: mapConvexStatus(ch.lastStatus),
-          records: ch.recordsUpdated ?? 0,
+          records: ch.recordCount ?? ch.recordsUpdated ?? 0,
           source: ch.sourceUrl ?? "",
         };
       });

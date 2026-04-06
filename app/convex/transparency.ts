@@ -109,6 +109,27 @@ export const getRefreshTimeline = query({
 export const getCategoryHealth = query({
   args: {},
   handler: async (ctx) => {
+    // Count actual records in each table (not just refresh log counts)
+    const officials = await ctx.db.query("officials").collect();
+    const ministries = await ctx.db.query("ministries").collect();
+    const governorates = await ctx.db.query("governorates").collect();
+    const parliamentMembers = await ctx.db.query("parliamentMembers").collect();
+    const parties = await ctx.db.query("parties").collect();
+    const constitutionArticles = await ctx.db.query("constitutionArticles").collect();
+    const fiscalYears = await ctx.db.query("fiscalYears").collect();
+    const budgetItems = await ctx.db.query("budgetItems").collect();
+    const debtRecords = await ctx.db.query("debtRecords").collect();
+    const elections = await ctx.db.query("elections").collect();
+
+    const tableCounts: Record<string, number> = {
+      government: officials.length + ministries.length + governorates.length,
+      parliament: parliamentMembers.length + parties.length,
+      constitution: constitutionArticles.length,
+      budget: fiscalYears.length + budgetItems.length,
+      debt: debtRecords.length,
+      elections: elections.length,
+    };
+
     const categories = [
       "government",
       "parliament",
@@ -142,6 +163,7 @@ export const getCategoryHealth = query({
             : null,
           lastAttemptTime: lastAttempt ? lastAttempt.startedAt : null,
           lastStatus: lastAttempt ? lastAttempt.status : null,
+          recordCount: tableCounts[category] ?? 0,
           recordsUpdated: lastSuccessful?.recordsUpdated ?? null,
           sourceUrl: lastSuccessful?.sourceUrl ?? null,
         };
