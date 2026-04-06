@@ -833,7 +833,7 @@ export default function BudgetPage() {
 
   // ─── Convex queries ───────────────────────────────────────────────────────
   const convexFiscalYears = useQuery(api.budget.listFiscalYears);
-  const populationData = useQuery(api.economy.getIndicator, { indicator: "population" });
+  const populationTimeline = useQuery(api.economy.getIndicatorTimeline, { indicator: "population" });
   const _isLoading = convexFiscalYears === undefined;
 
   // Sort newest first for dropdown
@@ -864,10 +864,14 @@ export default function BudgetPage() {
   const totalSpending = selectedFY?.totalExpenditure ?? 0;
   const deficit = selectedFY?.deficit ?? (totalSpending - totalRevenue);
   const gdp = selectedFY?.gdp ?? 0;
-  // Population from Convex (World Bank, stored in millions) — latest value
-  const latestPop = populationData && populationData.length > 0
-    ? populationData[populationData.length - 1].value * 1_000_000
-    : 0;
+  // Population from Convex (World Bank, stored in millions) — match fiscal year
+  const fiscalStartYear = effectiveYear.split(/[-/]/)[0]; // "2024-2025" → "2024"
+  const matchedPop = populationTimeline?.find((p) => p.year === fiscalStartYear);
+  const latestPop = matchedPop
+    ? matchedPop.value * 1_000_000
+    : populationTimeline && populationTimeline.length > 0
+      ? populationTimeline[populationTimeline.length - 1].value * 1_000_000
+      : 0;
   const population = latestPop > 0 ? Math.round(latestPop) : 0;
 
   const _isBudgetLoading = convexBreakdown === undefined || convexRevenue === undefined;
