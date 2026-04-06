@@ -38,16 +38,22 @@ export const refreshParliament = internalAction({
       `[parliamentAgent] Parliament has ${currentCount} members (expected ~896), refreshing...`
     );
 
-    // Step 1: Fetch Wikipedia page for 2025 election results
+    // Step 1: Fetch Wikipedia article as clean text via MediaWiki API
     let wikiText = "";
     try {
-      const response = await fetch(WIKI_HOUSE_URL);
+      const apiUrl = `https://en.wikipedia.org/w/api.php?action=query&titles=2025_Egyptian_parliamentary_election&prop=extracts&explaintext=true&format=json`;
+      const response = await fetch(apiUrl);
       if (response.ok) {
-        wikiText = await response.text();
-        wikiText = wikiText.slice(0, 30000); // Keep manageable for Claude
+        const data = await response.json() as { query?: { pages?: Record<string, { extract?: string }> } };
+        const pages = data?.query?.pages;
+        if (pages) {
+          const page = Object.values(pages)[0];
+          wikiText = page?.extract ?? "";
+        }
+        wikiText = wikiText.slice(0, 15000); // Keep manageable for Claude
       }
     } catch (err) {
-      console.warn(`[parliamentAgent] Failed to fetch Wikipedia: ${err}`);
+      console.warn(`[parliamentAgent] Failed to fetch Wikipedia API: ${err}`);
     }
 
     if (!wikiText) {
@@ -88,9 +94,14 @@ ${wikiText}`;
     };
 
     try {
-      parsed = JSON.parse(claudeResponse) as typeof parsed;
+      // Strip markdown code fences if Claude wrapped the response
+      let jsonStr = claudeResponse;
+      const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+      if (fenceMatch) jsonStr = fenceMatch[1];
+      jsonStr = jsonStr.trim();
+      parsed = JSON.parse(jsonStr) as typeof parsed;
     } catch {
-      console.error("[parliamentAgent] Failed to parse Claude response");
+      console.error("[parliamentAgent] Failed to parse Claude response:", claudeResponse.slice(0, 500));
       return { status: "failed", error: "JSON parse failed" };
     }
 
