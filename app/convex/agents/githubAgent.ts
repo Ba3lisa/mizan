@@ -1,10 +1,21 @@
 "use node";
+// GitHub Issues agent for Mizan.
+// Processes data-correction and stale-data issues in batches,
+// integrates with the LLM Council for verification, and handles
+// spam prevention + deduplication.
+
 import { internalAction, ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 
+import { callClaude } from "./providers/anthropic";
+import { classifySource } from "./council";
+
 const GITHUB_REPO = "Ba3lisa/mizan";
 const GITHUB_API = "https://api.github.com";
+const BATCH_LIMIT = 10;
+const SPAM_AUTHOR_THRESHOLD = 3;
+const MIN_ACCOUNT_AGE_DAYS = 7;
 
 // ─── GITHUB API HELPER ───────────────────────────────────────────────────────
 
@@ -42,55 +53,127 @@ async function githubFetch(
 export const processGitHubIssues = internalAction({
   args: {},
   handler: async (ctx) => {
-    console.log("[githubAgent] Starting GitHub Issues processing...");
+    console.log("[githubAgent] Starting batch GitHub Issues processing...");
+    const batchId = `batch_${Date.now()}`;
 
-    // Fetch open issues with data-correction or stale-data labels
-    const issues = await githubFetch(
+    // Fetch open data issues
+    const dataIssues = await githubFetch(
       `/repos/${GITHUB_REPO}/issues?state=open&labels=data-correction,stale-data&per_page=20`
     );
 
-    if (!issues || !Array.isArray(issues)) {
-      console.log("[githubAgent] No issues found or API unavailable");
+    // Fetch open UI issues
+    const uiIssues = await githubFetch(
+      `/repos/${GITHUB_REPO}/issues?state=open&labels=ui-issue&per_page=10`
+    );
+
+    const allIssues: Array<GitHubIssue> = [];
+    if (Array.isArray(dataIssues)) allIssues.push(...(dataIssues as Array<GitHubIssue>));
+    if (Array.isArray(uiIssues)) allIssues.push(...(uiIssues as Array<GitHubIssue>));
+
+    if (allIssues.length === 0) {
+      console.log("[githubAgent] No open issues found");
       return null;
     }
 
-    console.log(`[githubAgent] Found ${issues.length} open data issues`);
+    console.log(`[githubAgent] Found ${allIssues.length} open issues (batch: ${batchId})`);
 
-    for (const issue of issues) {
-      await processIssue(
-        ctx,
-        issue as {
-          number: number;
-          title: string;
-          body: string;
-          labels: Array<{ name: string }>;
-          created_at: string;
-        }
-      );
+    let processed = 0;
+    for (const issue of allIssues) {
+      if (processed >= BATCH_LIMIT) {
+        console.log(`[githubAgent] Batch limit (${BATCH_LIMIT}) reached, remaining issues queued for next run`);
+        break;
+      }
+
+      // Check if already processed (dedup)
+      const existing: Array<{ _id: Id<"githubIssueProcessing">; status: string }> =
+        await ctx.runQuery(internal.githubIssueQueries.getByIssueNumber, {
+          issueNumber: issue.number,
+        });
+
+      if (existing.length > 0) {
+        console.log(`[githubAgent] Issue #${issue.number} already tracked (status: ${existing[0].status}), skipping`);
+        continue;
+      }
+
+      const isUI = issue.labels.some((l) => l.name === "ui-issue");
+
+      if (isUI) {
+        await processUIIssue(ctx, issue, batchId);
+      } else {
+        await processDataIssue(ctx, issue, batchId);
+      }
+      processed++;
     }
 
-    console.log("[githubAgent] GitHub Issues processing complete");
+    console.log(`[githubAgent] Batch complete: ${processed} issues processed`);
     return null;
   },
 });
 
-// ─── PROCESS SINGLE ISSUE ────────────────────────────────────────────────────
+// ─── UI ISSUE HANDLER ───────────────────────────────────────────────────────
 
-async function processIssue(
+async function processUIIssue(
   ctx: ActionCtx,
-  issue: {
-    number: number;
-    title: string;
-    body: string;
-    labels: Array<{ name: string }>;
-    created_at: string;
-  }
+  issue: GitHubIssue,
+  batchId: string
 ): Promise<void> {
-  console.log(
-    `[githubAgent] Processing issue #${issue.number}: ${issue.title}`
-  );
+  console.log(`[githubAgent] Recording UI issue #${issue.number}`);
 
-  // Use Claude to parse the issue body and extract the data correction
+  await ctx.runMutation(internal.githubIssueQueries.recordIssue, {
+    issueNumber: issue.number,
+    issueType: "ui" as const,
+    status: "queued" as const,
+    authorUsername: issue.user?.login ?? "unknown",
+    batchId,
+  });
+
+  await addComment(
+    issue.number,
+    `**Mizan AI Agent**: Thank you for the UI suggestion! UI issues are reviewed by maintainers during sprint planning. See [CONTRIBUTING.md](https://github.com/${GITHUB_REPO}/blob/main/CONTRIBUTING.md) for the UI contribution path.\n\n_This is an automated response._`
+  );
+}
+
+// ─── DATA ISSUE HANDLER ─────────────────────────────────────────────────────
+
+async function processDataIssue(
+  ctx: ActionCtx,
+  issue: GitHubIssue,
+  batchId: string
+): Promise<void> {
+  console.log(`[githubAgent] Processing data issue #${issue.number}: ${issue.title}`);
+  const authorUsername = issue.user?.login ?? "unknown";
+
+  // Spam check: rate limit per author
+  const authorIssues: Array<{ _id: Id<"githubIssueProcessing"> }> =
+    await ctx.runQuery(internal.githubIssueQueries.getByAuthor, {
+      authorUsername,
+    });
+  if (authorIssues.length >= SPAM_AUTHOR_THRESHOLD) {
+    console.warn(`[githubAgent] Author ${authorUsername} has ${authorIssues.length} open issues, deprioritizing`);
+    await ctx.runMutation(internal.githubIssueQueries.recordIssue, {
+      issueNumber: issue.number,
+      issueType: "data" as const,
+      status: "queued" as const,
+      authorUsername,
+      batchId,
+    });
+    return;
+  }
+
+  // Account age check
+  const accountAge = await getAccountAgeDays(authorUsername);
+
+  // Record the issue as processing
+  await ctx.runMutation(internal.githubIssueQueries.recordIssue, {
+    issueNumber: issue.number,
+    issueType: "data" as const,
+    status: "processing" as const,
+    authorUsername,
+    authorAccountAge: accountAge ?? undefined,
+    batchId,
+  });
+
+  // Parse issue with Claude
   const claudeResponse = await callClaude(
     `You are a data verification assistant for an Egyptian government transparency platform called Mizan.
 
@@ -123,143 +206,191 @@ Issue body: ${issue.body}`
   try {
     parsed = JSON.parse(claudeResponse) as Record<string, unknown>;
   } catch {
-    console.error(
-      `[githubAgent] Failed to parse Claude response for issue #${issue.number}`
-    );
+    console.error(`[githubAgent] Failed to parse Claude response for issue #${issue.number}`);
     return;
   }
 
+  // Spam detection
   if (parsed.valid === false) {
+    await ctx.runMutation(internal.githubIssueQueries.updateIssueStatus, {
+      issueNumber: issue.number,
+      status: "spam" as const,
+    });
     await addComment(
       issue.number,
       `**Mizan AI Agent**: This issue doesn't appear to be a data correction.\n\nReason: ${String(parsed.reason ?? "unknown")}\n\nIf this is incorrect, please update the issue with more details about which data point needs correction and provide a source URL.\n\n_This is an automated response._`
+    );
+    await githubFetch(
+      `/repos/${GITHUB_REPO}/issues/${issue.number}/labels`,
+      { method: "POST", body: JSON.stringify({ labels: ["spam"] }) }
     );
     return;
   }
 
   const page = typeof parsed.page === "string" ? parsed.page : "government";
-  const dataPoint =
-    typeof parsed.dataPoint === "string" ? parsed.dataPoint : "";
-  const currentValue =
-    typeof parsed.currentValue === "string" ? parsed.currentValue : undefined;
-  const correctValue =
-    typeof parsed.correctValue === "string" ? parsed.correctValue : undefined;
-  const sourceUrl =
-    typeof parsed.sourceUrl === "string" ? parsed.sourceUrl : undefined;
-  const confidence =
-    parsed.confidence === "high" ||
-    parsed.confidence === "medium" ||
-    parsed.confidence === "low"
-      ? parsed.confidence
-      : "low";
+  const dataPoint = typeof parsed.dataPoint === "string" ? parsed.dataPoint : "";
+  const correctValue = typeof parsed.correctValue === "string" ? parsed.correctValue : undefined;
+  const currentValue = typeof parsed.currentValue === "string" ? parsed.currentValue : undefined;
+  const sourceUrl = typeof parsed.sourceUrl === "string" ? parsed.sourceUrl : undefined;
 
-  if (confidence === "high" && sourceUrl) {
-    // Try to verify the source URL
-    const verified = await verifySource(sourceUrl);
+  // Update processing record with parsed data
+  await ctx.runMutation(internal.githubIssueQueries.updateIssueParsedData, {
+    issueNumber: issue.number,
+    parsedCategory: page,
+    parsedDataPoint: dataPoint,
+    parsedSourceUrl: sourceUrl,
+  });
 
-    if (verified) {
-      // Start a refresh log entry for audit trail
+  // Account too new — flag for human review regardless
+  if (accountAge !== null && accountAge < MIN_ACCOUNT_AGE_DAYS) {
+    console.warn(`[githubAgent] Account ${authorUsername} is ${accountAge} days old, flagging for human review`);
+    await ctx.runMutation(internal.githubIssueQueries.updateIssueStatus, {
+      issueNumber: issue.number,
+      status: "council_review" as const,
+    });
+    await addComment(
+      issue.number,
+      `**Mizan AI Agent**: Thank you for the report. This issue has been flagged for manual review by a maintainer.\n\n_This is an automated response._`
+    );
+    await githubFetch(
+      `/repos/${GITHUB_REPO}/issues/${issue.number}/labels`,
+      { method: "POST", body: JSON.stringify({ labels: ["needs-human-review"] }) }
+    );
+    return;
+  }
+
+  // Create council session
+  const sourceType = sourceUrl ? classifySource(sourceUrl) : ("other" as const);
+  const category = mapPageToChangeCategory(page);
+
+  const sessionId: Id<"councilSessions"> = await ctx.runMutation(
+    internal.council.createCouncilSession,
+    {
+      triggerType: "github_issue" as const,
+      triggerRef: `issue#${issue.number}`,
+      category,
+      tableName: page,
+      fieldName: dataPoint || undefined,
+      proposedValue: correctValue,
+      currentValue,
+      sourceUrl,
+      sourceType,
+    }
+  );
+
+  // Link council session to issue processing
+  await ctx.runMutation(internal.githubIssueQueries.linkCouncilSession, {
+    issueNumber: issue.number,
+    councilSessionId: sessionId,
+  });
+
+  // Run council review
+  const resolution: { status: string; finalConfidence: string } | null =
+    await ctx.runAction(internal.agents.council.runCouncilReview, {
+      sessionId,
+      category,
+      tableName: page,
+      fieldName: dataPoint || undefined,
+      currentValue,
+      proposedValue: correctValue,
+      sourceUrl,
+      issueBody: issue.body,
+    });
+
+  // Post result to GitHub
+  if (resolution) {
+    const statusEmoji =
+      resolution.status === "approved" ? "✅" :
+      resolution.status === "rejected" ? "❌" : "⚠️";
+
+    const statusLabel =
+      resolution.status === "approved" ? "council-approved" :
+      resolution.status === "rejected" ? "council-rejected" : "needs-human-review";
+
+    const confidenceNote =
+      resolution.finalConfidence === "low"
+        ? "\n\n> Note: This data point will be marked as **estimated** on the site since it comes from a non-governmental source."
+        : "";
+
+    await ctx.runMutation(internal.githubIssueQueries.updateIssueStatus, {
+      issueNumber: issue.number,
+      status: resolution.status === "approved" ? "approved" as const : resolution.status === "rejected" ? "rejected" as const : "council_review" as const,
+    });
+
+    await addComment(
+      issue.number,
+      `**Mizan LLM Council** ${statusEmoji}\n\n**Decision**: ${resolution.status}\n**Confidence**: ${resolution.finalConfidence}\n**Data point**: ${dataPoint}\n**Proposed value**: ${correctValue ?? "(not specified)"}\n**Source**: ${sourceUrl ?? "none provided"}\n**Source type**: ${sourceType}${confidenceNote}\n\n${
+        resolution.status === "approved"
+          ? "This correction will be applied in the next data refresh cycle."
+          : resolution.status === "rejected"
+          ? "This correction was not accepted. Please provide a more authoritative source (preferably .gov.eg) if you believe this is incorrect."
+          : "This correction requires manual review by a maintainer."
+      }\n\n_This decision was made by the Mizan LLM Council. See [/transparency](https://mizanmasr.com/transparency) for the full audit trail._`
+    );
+
+    await githubFetch(
+      `/repos/${GITHUB_REPO}/issues/${issue.number}/labels`,
+      { method: "POST", body: JSON.stringify({ labels: [statusLabel] }) }
+    );
+
+    // If approved and from a .gov source, also log to the data refresh audit trail
+    if (resolution.status === "approved") {
       const logCategory = mapPageToRefreshCategory(page);
-      const refreshLogId = (await ctx.runMutation(
+      const refreshLogId: Id<"dataRefreshLog"> = await ctx.runMutation(
         internal.dataRefresh.logRefreshStart,
         { category: logCategory }
-      )) as Id<"dataRefreshLog">;
+      );
 
-      // Log the correction for human review
       await ctx.runMutation(internal.dataRefresh.logChange, {
         refreshLogId,
-        category: mapPageToChangeCategory(page),
+        category,
         action: "flagged" as const,
         tableName: page,
-        descriptionAr: `تصحيح بيانات من مجتمع GitHub — القضية #${issue.number}: ${dataPoint}`,
-        descriptionEn: `Community data correction from GitHub Issue #${issue.number}: ${dataPoint}`,
+        descriptionAr: `تصحيح بيانات معتمد من مجلس الذكاء الاصطناعي — القضية #${issue.number}: ${dataPoint}`,
+        descriptionEn: `Council-approved data correction from GitHub Issue #${issue.number}: ${dataPoint}`,
         previousValue: currentValue,
         newValue: correctValue,
         sourceUrl,
       });
 
-      // Mark the refresh log as complete (community flag, not a data write)
       await ctx.runMutation(internal.dataRefresh.logRefreshComplete, {
         logId: refreshLogId,
         recordsUpdated: 0,
         sourceUrl,
       });
-
-      await addComment(
-        issue.number,
-        `**Mizan AI Agent**: Thank you for the data correction!\n\n**Verification result:**\n- Data point: ${dataPoint}\n- Suggested value: ${correctValue ?? "(not specified)"}\n- Source: ${sourceUrl}\n- Source accessible: Yes\n\nThis correction has been logged and will be reviewed before the next data refresh cycle.\n\n_This is an automated response. A maintainer has been notified._`
-      );
-
-      // Add "verified" label
-      await githubFetch(
-        `/repos/${GITHUB_REPO}/issues/${issue.number}/labels`,
-        {
-          method: "POST",
-          body: JSON.stringify({ labels: ["verified"] }),
-        }
-      );
-    } else {
-      await addComment(
-        issue.number,
-        `**Mizan AI Agent**: I checked the source URL but couldn't verify the data.\n\n- Source URL: ${sourceUrl}\n- Status: Unable to access or verify\n\nPlease ensure the URL is correct and publicly accessible. A maintainer will review this issue.\n\n_This is an automated response._`
-      );
     }
-  } else if (confidence === "medium") {
-    await addComment(
-      issue.number,
-      `**Mizan AI Agent**: Thank you for the report. I found the following:\n\n- Data point: ${dataPoint}\n- Suggested value: ${correctValue ?? "(not specified)"}\n- Confidence: Medium (no direct source URL provided)\n\nCould you provide a direct URL to the official source where this number can be verified? This helps us maintain data accuracy.\n\n_This is an automated response._`
-    );
-  } else {
-    await addComment(
-      issue.number,
-      `**Mizan AI Agent**: Thank you for the report, but I need more information to verify this correction.\n\nPlease provide:\n1. The exact number that needs correction\n2. The correct value\n3. A URL to an official source proving the correct value\n\n_This is an automated response._`
-    );
   }
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-async function callClaude(prompt: string): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) return null;
-
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "claude-3-5-haiku-20241022",
-        max_tokens: 500,
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
-
-    if (!res.ok) return null;
-    const data = (await res.json()) as {
-      content?: Array<{ type: string; text: string }>;
-    };
-    const content = data?.content?.[0];
-    return content?.type === "text" ? content.text : null;
-  } catch {
-    return null;
-  }
+interface GitHubIssue {
+  number: number;
+  title: string;
+  body: string;
+  labels: Array<{ name: string }>;
+  created_at: string;
+  user?: { login: string; created_at?: string };
 }
 
 async function addComment(issueNumber: number, body: string): Promise<void> {
   await githubFetch(
     `/repos/${GITHUB_REPO}/issues/${issueNumber}/comments`,
-    {
-      method: "POST",
-      body: JSON.stringify({ body }),
-    }
+    { method: "POST", body: JSON.stringify({ body }) }
   );
 }
 
-async function verifySource(url: string): Promise<boolean> {
+async function getAccountAgeDays(username: string): Promise<number | null> {
+  const user = (await githubFetch(`/users/${username}`)) as {
+    created_at?: string;
+  } | null;
+  if (!user?.created_at) return null;
+  const created = new Date(user.created_at);
+  const now = new Date();
+  return Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+async function _verifySource(url: string): Promise<boolean> {
   try {
     const res = await fetch(url, {
       method: "HEAD",
@@ -271,21 +402,12 @@ async function verifySource(url: string): Promise<boolean> {
   }
 }
 
-/**
- * Maps a page name from a GitHub issue to a valid dataRefreshLog category.
- * dataRefreshLog accepts: "government" | "parliament" | "constitution" | "budget" | "debt" | "all"
- */
 function mapPageToRefreshCategory(
   page: string
 ): "government" | "parliament" | "constitution" | "budget" | "debt" | "all" {
   const map: Record<
     string,
-    | "government"
-    | "parliament"
-    | "constitution"
-    | "budget"
-    | "debt"
-    | "all"
+    "government" | "parliament" | "constitution" | "budget" | "debt" | "all"
   > = {
     government: "government",
     parliament: "parliament",
@@ -298,21 +420,12 @@ function mapPageToRefreshCategory(
   return map[page] ?? "government";
 }
 
-/**
- * Maps a page name from a GitHub issue to a valid dataChangeLog category.
- * dataChangeLog accepts: "government" | "parliament" | "constitution" | "budget" | "debt" | "elections"
- */
 function mapPageToChangeCategory(
   page: string
 ): "government" | "parliament" | "constitution" | "budget" | "debt" | "elections" {
   const map: Record<
     string,
-    | "government"
-    | "parliament"
-    | "constitution"
-    | "budget"
-    | "debt"
-    | "elections"
+    "government" | "parliament" | "constitution" | "budget" | "debt" | "elections"
   > = {
     government: "government",
     parliament: "parliament",

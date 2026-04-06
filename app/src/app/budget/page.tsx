@@ -42,6 +42,9 @@ interface BudgetCategory {
 }
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
+// TODO: Replace revenue/spending/HISTORICAL_DATA arrays with Convex queries once
+// getBudgetBreakdown (requires fiscalYearId) and getBudgetSankeyData are wired up.
+// The flat budgetItems schema needs restructuring to match BudgetCategory with subItems.
 
 const revenue: BudgetCategory[] = [
   {

@@ -118,3 +118,10 @@ resource "github_issue_label" "spam" {
   color       = "6E7781"
   description = "Issue identified as spam by the AI agent"
 }
+
+resource "github_issue_label" "pipeline_health" {
+  repository  = "mizan"
+  name        = "pipeline-health"
+  color       = "D93F0B"
+  description = "Automated alert from pipeline health monitoring"
+}

@@ -1,5 +1,6 @@
 import { mutation } from "./_generated/server";
 
+
 // Seeds the two missing constitution articles: 137 and 138.
 // These fall in Part 5 (System of Government), within the presidential section.
 // Source: Egyptian Constitution 2014 (with 2019 amendments)

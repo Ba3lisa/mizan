@@ -9,67 +9,18 @@
 import { internalAction, ActionCtx } from "../_generated/server";
 import { internal, api } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
+
 import {
   parseWorldBankResponse,
   validateDebtRecord,
-  extractClaudeText,
 } from "./validators";
+import { callClaude } from "./providers/anthropic";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
 type RefreshCategory = "government" | "parliament" | "budget" | "debt";
 
-// ─── CLAUDE API HELPER ────────────────────────────────────────────────────────
-
-const CLAUDE_MODEL = "claude-3-5-haiku-20241022";
 const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
-
-/**
- * Calls the Claude API using raw fetch.
- * Returns the assistant's text response, or null if the API key is absent or
- * the request fails.
- */
-async function callClaude(
-  prompt: string,
-  systemPrompt?: string
-): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.warn(
-      "[dataAgent] ANTHROPIC_API_KEY is not set — skipping Claude-powered checks."
-    );
-    return null;
-  }
-
-  const body: Record<string, unknown> = {
-    model: CLAUDE_MODEL,
-    max_tokens: 1024,
-    messages: [{ role: "user", content: prompt }],
-  };
-  if (systemPrompt) {
-    body.system = systemPrompt;
-  }
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Claude API request failed (${response.status}): ${errorText}`
-    );
-  }
-
-  const json: unknown = await response.json();
-  return extractClaudeText(json);
-}
 
 // ─── DEBT REFRESH ─────────────────────────────────────────────────────────────
 
@@ -356,36 +307,39 @@ async function refreshCategory(
 
     const { recordsUpdated, sourceUrl } = result;
 
-    // Log a detailed change entry describing what the agent did
-    const action = recordsUpdated > 0 ? "updated" : "no_change";
-    const descriptionEnMap: Record<RefreshCategory, string> = {
-      debt: `Updated ${recordsUpdated} debt record(s) from World Bank API`,
-      budget: `Updated ${recordsUpdated} budget record(s) from Ministry of Finance`,
-      government: `Flagged ${recordsUpdated} potential government change(s) for human review`,
-      parliament: `Parliament refresh complete — ${recordsUpdated} record(s) updated`,
-    };
-    const descriptionArMap: Record<RefreshCategory, string> = {
-      debt: `تم تحديث ${recordsUpdated} سجل ديون من بيانات البنك الدولي`,
-      budget: `تم تحديث ${recordsUpdated} سجل ميزانية من وزارة المالية`,
-      government: `تم الإشارة إلى ${recordsUpdated} تغيير محتمل في الحكومة للمراجعة البشرية`,
-      parliament: `اكتمل تحديث البرلمان — ${recordsUpdated} سجل محدث`,
-    };
-    const tableNameMap: Record<RefreshCategory, string> = {
-      debt: "debtRecords",
-      budget: "fiscalYears",
-      government: "officials",
-      parliament: "parliamentMembers",
-    };
+    // Only log detailed change entries when something actually changed.
+    // The dataRefreshLog already records that a refresh ran — the change log
+    // should only track meaningful changes to keep storage lean.
+    if (recordsUpdated > 0) {
+      const descriptionEnMap: Record<RefreshCategory, string> = {
+        debt: `Updated ${recordsUpdated} debt record(s) from World Bank API`,
+        budget: `Updated ${recordsUpdated} budget record(s) from Ministry of Finance`,
+        government: `Flagged ${recordsUpdated} potential government change(s) for human review`,
+        parliament: `Parliament refresh complete — ${recordsUpdated} record(s) updated`,
+      };
+      const descriptionArMap: Record<RefreshCategory, string> = {
+        debt: `تم تحديث ${recordsUpdated} سجل ديون من بيانات البنك الدولي`,
+        budget: `تم تحديث ${recordsUpdated} سجل ميزانية من وزارة المالية`,
+        government: `تم الإشارة إلى ${recordsUpdated} تغيير محتمل في الحكومة للمراجعة البشرية`,
+        parliament: `اكتمل تحديث البرلمان — ${recordsUpdated} سجل محدث`,
+      };
+      const tableNameMap: Record<RefreshCategory, string> = {
+        debt: "debtRecords",
+        budget: "fiscalYears",
+        government: "officials",
+        parliament: "parliamentMembers",
+      };
 
-    await ctx.runMutation(internal.dataRefresh.logChange, {
-      refreshLogId: logId,
-      category,
-      action,
-      tableName: tableNameMap[category],
-      descriptionEn: descriptionEnMap[category],
-      descriptionAr: descriptionArMap[category],
-      sourceUrl,
-    });
+      await ctx.runMutation(internal.dataRefresh.logChange, {
+        refreshLogId: logId,
+        category,
+        action: "updated" as const,
+        tableName: tableNameMap[category],
+        descriptionEn: descriptionEnMap[category],
+        descriptionAr: descriptionArMap[category],
+        sourceUrl,
+      });
+    }
 
     await ctx.runMutation(internal.dataRefresh.logRefreshComplete, {
       logId,
@@ -419,6 +373,10 @@ export const orchestrateRefresh = internalAction({
   handler: async (ctx) => {
     console.log("[dataAgent] orchestrateRefresh started.");
 
+    // Ensure reference data is loaded before running the AI refresh.
+    // This is a no-op if all tables are already populated (zero writes).
+    await ctx.runMutation(internal.referenceData.ensureAllReferenceData, {});
+
     // Fetch last-updated timestamps for all categories
     const lastUpdated = await ctx.runQuery(api.dataRefresh.getAllLastUpdated, {});
 
@@ -440,6 +398,21 @@ export const orchestrateRefresh = internalAction({
       }
 
       await refreshCategory(ctx, category);
+    }
+
+    // Ensure reference data exists (zero cost if tables already populated)
+    await ctx.runMutation(internal.referenceData.ensureAllReferenceData, {});
+
+    // Ensure constitution is complete (only runs if < 247 articles)
+    try {
+      await ctx.runAction(
+        internal.agents.constitutionAgent.refreshConstitution,
+        {}
+      );
+    } catch (err) {
+      console.warn(
+        `[dataAgent] Constitution refresh failed: ${err instanceof Error ? err.message : String(err)}`
+      );
     }
 
     console.log("[dataAgent] orchestrateRefresh completed.");

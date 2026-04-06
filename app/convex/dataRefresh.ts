@@ -410,3 +410,64 @@ export const refreshAllData = internalAction({
     await ctx.runAction(internal.agents.dataAgent.orchestrateRefresh, {});
   },
 });
+
+/**
+ * Manually trigger a full pipeline refresh, bypassing staleness checks.
+ * Use via: npx convex run dataRefresh:manualRefresh
+ * Or trigger from the Convex dashboard.
+ */
+export const manualRefresh = internalAction({
+  args: {
+    category: v.optional(
+      v.union(
+        v.literal("government"),
+        v.literal("parliament"),
+        v.literal("constitution"),
+        v.literal("budget"),
+        v.literal("debt"),
+        v.literal("all")
+      )
+    ),
+  },
+  handler: async (ctx, args) => {
+    const category = args.category ?? "all";
+    console.log(`[manualRefresh] Manually triggering refresh for: ${category}`);
+
+    if (category === "all") {
+      // Run the full orchestrator (includes reference data + constitution + all categories)
+      await ctx.runAction(internal.agents.dataAgent.orchestrateRefresh, {});
+    } else if (category === "constitution") {
+      // Force constitution refresh from PDF
+      await ctx.runAction(
+        internal.agents.constitutionAgent.refreshConstitution,
+        { force: true }
+      );
+    } else {
+      // Run a single category (debt, budget, government, parliament)
+      // Log start
+      const logId = await ctx.runMutation(
+        internal.dataRefresh.logRefreshStart,
+        { category }
+      );
+      try {
+        // The orchestrateRefresh handles individual categories internally.
+        // For manual single-category, just run the full orchestrator.
+        await ctx.runAction(internal.agents.dataAgent.orchestrateRefresh, {});
+        await ctx.runMutation(internal.dataRefresh.logRefreshComplete, {
+          logId,
+          recordsUpdated: 0,
+          sourceUrl: undefined,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await ctx.runMutation(internal.dataRefresh.logRefreshFailed, {
+          logId,
+          errorMessage: message,
+        });
+      }
+    }
+
+    console.log(`[manualRefresh] Refresh complete for: ${category}`);
+    return null;
+  },
+});

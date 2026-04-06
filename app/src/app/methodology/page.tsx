@@ -69,8 +69,8 @@ const dataSources: DataSource[] = [
     provides: "Budget, revenue, expenditure",
     method: "AI-parsed from website",
     methodAr: "تحليل ذكاء اصطناعي من الموقع",
-    frequency: "Quarterly",
-    frequencyAr: "ربع سنوي",
+    frequency: "Every 6 hours",
+    frequencyAr: "كل ٦ ساعات",
     url: "https://www.mof.gov.eg/en/posts/statementsAndReports/5",
   },
   {
@@ -79,8 +79,8 @@ const dataSources: DataSource[] = [
     provides: "Ministers, government structure",
     method: "AI-parsed + AI verified",
     methodAr: "تحليل وتحقق بالذكاء الاصطناعي",
-    frequency: "On cabinet changes",
-    frequencyAr: "عند التغييرات الوزارية",
+    frequency: "Every 6 hours",
+    frequencyAr: "كل ٦ ساعات",
     url: "https://www.cabinet.gov.eg/English/TheMinistry/Pages/default.aspx",
   },
   {
@@ -89,8 +89,8 @@ const dataSources: DataSource[] = [
     provides: "MPs, committees, parties",
     method: "AI-parsed from website",
     methodAr: "تحليل ذكاء اصطناعي من الموقع",
-    frequency: "On election cycles",
-    frequencyAr: "كل دورة انتخابية",
+    frequency: "Every 6 hours",
+    frequencyAr: "كل ٦ ساعات",
     url: "https://www.parliament.gov.eg/en/MPs",
   },
   {
@@ -98,9 +98,9 @@ const dataSources: DataSource[] = [
     nameEn: "CAPMAS",
     provides: "Population, economic statistics",
     method: "API + AI parsing",
-    methodAr: "يدوي + API",
-    frequency: "Annually",
-    frequencyAr: "سنوياً",
+    methodAr: "API + تحليل ذكاء اصطناعي",
+    frequency: "Every 6 hours",
+    frequencyAr: "كل ٦ ساعات",
     url: "https://www.capmas.gov.eg",
   },
   {
@@ -109,8 +109,8 @@ const dataSources: DataSource[] = [
     provides: "Election results, turnout",
     method: "AI-parsed from website",
     methodAr: "تحليل ذكاء اصطناعي من الموقع",
-    frequency: "Per election",
-    frequencyAr: "لكل انتخابات",
+    frequency: "Every 6 hours",
+    frequencyAr: "كل ٦ ساعات",
     url: "https://www.elections.eg",
   },
   {
@@ -119,9 +119,19 @@ const dataSources: DataSource[] = [
     provides: "Country reports, fiscal analysis",
     method: "API + AI verification",
     methodAr: "API + تحقق بالذكاء الاصطناعي",
-    frequency: "Per report",
-    frequencyAr: "لكل تقرير",
+    frequency: "Every 6 hours",
+    frequencyAr: "كل ٦ ساعات",
     url: "https://www.imf.org/en/Countries/EGY",
+  },
+  {
+    nameAr: "مشروع الدساتير",
+    nameEn: "Constitute Project",
+    provides: "Constitution full text, amendments",
+    method: "PDF extraction + AI parsing",
+    methodAr: "استخراج PDF + تحليل ذكاء اصطناعي",
+    frequency: "Every 6 hours",
+    frequencyAr: "كل ٦ ساعات",
+    url: "https://www.constituteproject.org/constitution/Egypt_2019",
   },
 ];
 
@@ -502,108 +512,23 @@ export default function MethodologyPage() {
             {isAr ? "وجدت خطأ؟ ساعدنا في تصحيحه." : "Found an error? Help us fix it."}
           </p>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Steps */}
-            <Card className="border-border/60">
-              <CardContent className="p-6">
-                <h3 className="text-sm font-bold mb-4">
-                  {isAr ? "كيفية الإبلاغ عن خطأ" : "How to Report an Error"}
-                </h3>
-                <ol className="space-y-4">
-                  {[
-                    {
-                      numAr: "١",
-                      numEn: "1",
-                      titleAr: "افتح صفحة GitHub Issues",
-                      titleEn: "Open GitHub Issues",
-                      descAr: "توجه إلى صفحة Issues في مستودع المشروع.",
-                      descEn: "Navigate to the project repository's Issues page.",
-                    },
-                    {
-                      numAr: "٢",
-                      numEn: "2",
-                      titleAr: "أنشئ issue جديدة بتصنيف data-correction",
-                      titleEn: "Create a new issue with label 'data-correction'",
-                      descAr: "استخدم تصنيف data-correction حتى تصل إلى الشخص المناسب.",
-                      descEn: "Use the data-correction label so it reaches the right person.",
-                    },
-                    {
-                      numAr: "٣",
-                      numEn: "3",
-                      titleAr: "أدرج: الرقم الخاطئ، الصحيح، والمصدر",
-                      titleEn: "Include: wrong number, correct value, and source URL",
-                      descAr: "نحتاج إلى دليل من مصدر رسمي لإجراء أي تعديل.",
-                      descEn: "We need evidence from an official source to make any change.",
-                    },
-                    {
-                      numAr: "٤",
-                      numEn: "4",
-                      titleAr: "سيتم التحقق والتحديث خلال ٤٨ ساعة",
-                      titleEn: "We verify and update within 48 hours",
-                      descAr: "فريقنا يراجع كل تقرير يصل ويرد عليه.",
-                      descEn: "Our team reviews and responds to every report received.",
-                    },
-                  ].map((step, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                        {isAr ? step.numAr : step.numEn}
-                      </span>
-                      <div>
-                        <p className="text-sm font-semibold">{isAr ? step.titleAr : step.titleEn}</p>
-                        <p className="text-xs text-muted-foreground mt-0.5">{isAr ? step.descAr : step.descEn}</p>
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-
-                <div className="mt-6">
-                  <Button asChild className="w-full gap-2">
-                    <a
-                      href="https://github.com/Ba3lisa/mizan/issues/new?template=data-correction.md&labels=data-correction"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <GitBranch size={14} />
-                      {isAr ? "الإبلاغ عن خطأ في البيانات" : "Report a Data Error"}
-                      <ExternalLink size={12} />
-                    </a>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Template */}
-            <Card className="border-border/60">
-              <CardContent className="p-6">
-                <h3 className="text-sm font-bold mb-4">
-                  {isAr ? "نموذج تقرير التصحيح" : "Data Correction Issue Template"}
-                </h3>
-                <div className="bg-muted/40 rounded-lg p-4 font-mono text-xs leading-relaxed text-muted-foreground overflow-x-auto whitespace-pre">
-{`**Data Correction Report**
-
-**Page / Section:**
-e.g. /debt — External Debt section
-
-**Current value shown:**
-e.g. $152.8 billion
-
-**Correct value:**
-e.g. $155.2 billion
-
-**Source URL:**
-e.g. https://api.worldbank.org/v2/...
-
-**Additional context:**
-(optional — any extra detail
- that helps verification)`}
-                </div>
-                <p className="text-xs text-muted-foreground mt-3">
-                  {isAr
-                    ? "كلما أدرجت تفاصيل أكثر وروابط مصادر أوضح، كلما تسرّعنا في التحقق والتصحيح."
-                    : "The more detail and source links you include, the faster we can verify and correct."}
-                </p>
-              </CardContent>
-            </Card>
+          <div className="flex flex-col gap-4">
+            <Button asChild className="w-fit gap-2">
+              <a
+                href="https://github.com/Ba3lisa/mizan/issues/new?template=data-correction.md&labels=data-correction"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <GitBranch size={14} />
+                {isAr ? "الإبلاغ عن خطأ في البيانات" : "Report a Data Error on GitHub"}
+                <ExternalLink size={12} />
+              </a>
+            </Button>
+            <p className="text-xs text-muted-foreground max-w-lg">
+              {isAr
+                ? "سيتم مراجعة التقرير تلقائياً من قبل مجلس الذكاء الاصطناعي (LLM Council) الخاص بميزان. المصادر الحكومية (.gov.eg) لها الأولوية القصوى."
+                : "Your report will be automatically reviewed by the Mizan LLM Council. Government sources (.gov.eg) have the highest priority."}
+            </p>
           </div>
         </section>
 

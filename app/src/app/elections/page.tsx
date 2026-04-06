@@ -41,43 +41,8 @@ interface GovernorateResult {
 
 // ─── Demo Data ────────────────────────────────────────────────────────────────
 
-const presidentialElections: PresidentialElection[] = [
-  {
-    year: 2024,
-    dateAr: "10–12 ديسمبر 2023",
-    dateEn: "Dec 10–12, 2023",
-    turnout: 66.8,
-    totalVotes: 44860728,
-    candidates: [
-      { nameAr: "عبد الفتاح السيسي", nameEn: "Abdel Fattah el-Sisi", votes: 39760000, pct: 89.6, winner: true },
-      { nameAr: "حازم عمر", nameEn: "Hazem Omar", votes: 2390000, pct: 4.5 },
-      { nameAr: "فريد زهران", nameEn: "Farid Zahran", votes: 1560000, pct: 3.8 },
-      { nameAr: "عبد السند يمامة", nameEn: "Abdel-Sanad Yamama", votes: 1150000, pct: 2.1 },
-    ],
-  },
-  {
-    year: 2018,
-    dateAr: "26–28 مارس 2018",
-    dateEn: "Mar 26–28, 2018",
-    turnout: 41.1,
-    totalVotes: 24253432,
-    candidates: [
-      { nameAr: "عبد الفتاح السيسي", nameEn: "Abdel Fattah el-Sisi", votes: 21834000, pct: 97.1, winner: true },
-      { nameAr: "موسى مصطفى موسى", nameEn: "Mousa Mostafa Mousa", votes: 656000, pct: 2.9 },
-    ],
-  },
-  {
-    year: 2014,
-    dateAr: "26–28 مايو 2014",
-    dateEn: "May 26–28, 2014",
-    turnout: 47.5,
-    totalVotes: 25578233,
-    candidates: [
-      { nameAr: "عبد الفتاح السيسي", nameEn: "Abdel Fattah el-Sisi", votes: 23780000, pct: 96.9, winner: true },
-      { nameAr: "حمدين صباحي", nameEn: "Hamdeen Sabahi", votes: 757000, pct: 3.1 },
-    ],
-  },
-];
+
+
 
 // Grid layout (row, col) — approximate geographic position
 const governorateResults: GovernorateResult[] = [
@@ -593,11 +558,10 @@ export default function ElectionsPage() {
 
   const isLoading = convexPresidential === undefined;
 
-  // Use live data when available, fallback ONLY when Convex returns empty (not during loading)
+  // Use live Convex data — show empty state when Convex returns empty
   const activePresidentialElections: PresidentialElection[] | null = isLoading
     ? null
-    : convexPresidential.length > 0
-    ? (convexPresidential as unknown as ConvexElection[]).map((e) => ({
+    : (convexPresidential as unknown as ConvexElection[]).map((e) => ({
         year: e.year,
         dateAr: e.dateHeld,
         dateEn: e.dateHeld,
@@ -610,8 +574,7 @@ export default function ElectionsPage() {
           pct: r.percentage,
           winner: r.isWinner,
         })),
-      }))
-    : presidentialElections;
+      }));
 
   return (
     <div className="page-content" dir={dir}>
@@ -649,11 +612,15 @@ export default function ElectionsPage() {
                   {isAr ? "الانتخابات الرئاسية" : "Presidential Elections"} — 2014 · 2018 · 2024
                 </h2>
                 <Skeleton name="elections-cards" loading={isLoading}>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {activePresidentialElections?.map((election) => (
-                      <ElectionCard key={election.year} election={election} />
-                    ))}
-                  </div>
+                  {activePresidentialElections && activePresidentialElections.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-20">{isAr ? "لا توجد بيانات متاحة" : "No data available"}</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {activePresidentialElections?.map((election) => (
+                        <ElectionCard key={election.year} election={election} />
+                      ))}
+                    </div>
+                  )}
                 </Skeleton>
               </div>
 

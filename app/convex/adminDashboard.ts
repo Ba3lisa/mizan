@@ -1,5 +1,6 @@
 import { query } from "./_generated/server";
 
+
 // Source URLs keyed by category — used for display in the admin data management page.
 const SOURCE_URLS: Record<string, string> = {
   officials: "https://www.cabinet.gov.eg/English/TheMinistry/Pages/default.aspx",

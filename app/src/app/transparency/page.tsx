@@ -36,55 +36,6 @@ interface Change {
   issueUrl?: string;
 }
 
-const recentRuns: RefreshRun[] = [
-  {
-    id: "r1", timestamp: "2026-04-05 18:00 UTC", timestampAr: "٥ أبريل ٢٠٢٦ — ١٨:٠٠",
-    category: "debt", categoryAr: "الدين العام", status: "success", recordsUpdated: 2, duration: "4.2s",
-    changes: [
-      { action: "updated", table: "debtRecords", descriptionEn: "Updated external debt: $152.8B → $155.2B (Q4 2024)", descriptionAr: "تحديث الدين الخارجي: ١٥٢.٨ → ١٥٥.٢ مليار$ (الربع الرابع ٢٠٢٤)", sourceUrl: "https://api.worldbank.org/v2/country/EGY/indicator/DT.DOD.DECT.CD", previousValue: "$152.8B", newValue: "$155.2B" },
-      { action: "validated", table: "debtRecords", descriptionEn: "Validated 5 debt records — debt-to-GDP ratios within expected range", descriptionAr: "تم التحقق من ٥ سجلات — نسب الدين للناتج المحلي ضمن النطاق المتوقع", sourceUrl: "https://data.worldbank.org/country/egypt-arab-rep" },
-    ],
-  },
-  {
-    id: "r2", timestamp: "2026-04-05 18:00 UTC", timestampAr: "٥ أبريل ٢٠٢٦ — ١٨:٠٠",
-    category: "budget", categoryAr: "الموازنة", status: "success", recordsUpdated: 0, duration: "6.8s",
-    changes: [
-      { action: "validated", table: "budgetItems", descriptionEn: "Budget items sum validated: revenue = 1,474B EGP ✓", descriptionAr: "تم التحقق: مجموع الإيرادات = ١,٤٧٤ مليار جنيه ✓", sourceUrl: "https://www.mof.gov.eg/en/posts/statementsAndReports/5" },
-      { action: "no_change", table: "fiscalYears", descriptionEn: "No new fiscal year data found on mof.gov.eg", descriptionAr: "لا توجد بيانات سنة مالية جديدة على موقع وزارة المالية" },
-    ],
-  },
-  {
-    id: "r3", timestamp: "2026-04-05 18:00 UTC", timestampAr: "٥ أبريل ٢٠٢٦ — ١٨:٠٠",
-    category: "government", categoryAr: "الحكومة", status: "success", recordsUpdated: 0, duration: "3.1s",
-    changes: [
-      { action: "no_change", table: "officials", descriptionEn: "Checked cabinet.gov.eg — no minister changes detected", descriptionAr: "تم فحص موقع مجلس الوزراء — لا توجد تغييرات في التشكيل الوزاري", sourceUrl: "https://www.cabinet.gov.eg/English/TheMinistry/Pages/default.aspx" },
-    ],
-  },
-  {
-    id: "r4", timestamp: "2026-04-05 12:00 UTC", timestampAr: "٥ أبريل ٢٠٢٦ — ١٢:٠٠",
-    category: "parliament", categoryAr: "البرلمان", status: "success", recordsUpdated: 0, duration: "1.2s",
-    changes: [
-      { action: "flagged", table: "parliamentMembers", descriptionEn: "⚠ Parliament.gov.eg returned 594 members — expected 596. Discrepancy logged, AI investigating alternative sources.", descriptionAr: "⚠ موقع البرلمان أظهر ٥٩٤ عضواً — المتوقع ٥٩٦. تم تسجيل التعارض، الذكاء الاصطناعي يبحث في مصادر بديلة." },
-    ],
-  },
-  {
-    id: "r5", timestamp: "2026-04-04 18:00 UTC", timestampAr: "٤ أبريل ٢٠٢٦ — ١٨:٠٠",
-    category: "debt", categoryAr: "الدين العام", status: "failed", recordsUpdated: 0, duration: "12.0s",
-    changes: [
-      { action: "flagged", table: "debtRecords", descriptionEn: "World Bank API timeout after 10s — retained existing data", descriptionAr: "انتهت مهلة API البنك الدولي بعد ١٠ ثوانٍ — تم الاحتفاظ بالبيانات الحالية" },
-    ],
-  },
-];
-
-const categoryHealth = [
-  { key: "government", ar: "الحكومة", en: "Government", lastRefresh: "2h ago", lastRefreshAr: "منذ ساعتين", status: "success" as const, records: 49, source: "cabinet.gov.eg" },
-  { key: "parliament", ar: "البرلمان", en: "Parliament", lastRefresh: "2h ago", lastRefreshAr: "منذ ساعتين", status: "flagged" as const, records: 596, source: "parliament.gov.eg" },
-  { key: "constitution", ar: "الدستور", en: "Constitution", lastRefresh: "Static", lastRefreshAr: "ثابت", status: "success" as const, records: 247, source: "presidency.eg" },
-  { key: "budget", ar: "الموازنة", en: "Budget", lastRefresh: "2h ago", lastRefreshAr: "منذ ساعتين", status: "success" as const, records: 18, source: "mof.gov.eg" },
-  { key: "debt", ar: "الدين العام", en: "Debt", lastRefresh: "2h ago", lastRefreshAr: "منذ ساعتين", status: "success" as const, records: 5, source: "worldbank.org" },
-  { key: "elections", ar: "الانتخابات", en: "Elections", lastRefresh: "Static", lastRefreshAr: "ثابت", status: "success" as const, records: 3, source: "elections.eg" },
-];
-
 // ─── Components ──────────────────────────────────────────────────────────────
 
 function StatusIcon({ status }: { status: string }) {
@@ -289,11 +240,10 @@ export default function TransparencyPage() {
 
   const isLoading = convexActivity === undefined || convexCategoryHealth === undefined;
 
-  // ─── Map Convex data or fall back to demo data ────────────────────────────
+  // ─── Map Convex data to UI types ──────────────────────────────────────────
   const activeRuns: RefreshRun[] | null = isLoading
     ? null
-    : convexActivity && (convexActivity as unknown as ConvexRefreshLog[]).length > 0
-    ? (convexActivity as unknown as ConvexRefreshLog[]).map((log) => ({
+    : (convexActivity as unknown as ConvexRefreshLog[]).map((log) => ({
         id: log._id,
         timestamp: new Date(log.startedAt).toISOString().replace("T", " ").slice(0, 16) + " UTC",
         timestampAr: new Date(log.startedAt).toLocaleString("ar-EG"),
@@ -313,32 +263,32 @@ export default function TransparencyPage() {
           previousValue: c.previousValue,
           newValue: c.newValue,
         })),
-      }))
-    : recentRuns;
+      }));
 
-  // Known record counts for each category (from seed data)
-  const knownCounts: Record<string, number> = {
-    government: 49, parliament: 596, constitution: 247,
-    budget: 18, debt: 5, elections: 3,
+  const categoryLabelsMap: Record<string, { ar: string; en: string }> = {
+    government: { ar: "الحكومة", en: "Government" },
+    parliament: { ar: "البرلمان", en: "Parliament" },
+    constitution: { ar: "الدستور", en: "Constitution" },
+    budget: { ar: "الموازنة", en: "Budget" },
+    debt: { ar: "الدين العام", en: "Debt" },
+    elections: { ar: "الانتخابات", en: "Elections" },
   };
 
   const activeCategoryHealth = isLoading
     ? null
-    : convexCategoryHealth && (convexCategoryHealth as unknown as ConvexCategoryHealth[]).length > 0
-    ? (convexCategoryHealth as unknown as ConvexCategoryHealth[]).map((ch) => {
-        const demo = categoryHealth.find(c => c.key === ch.category);
+    : (convexCategoryHealth as unknown as ConvexCategoryHealth[]).map((ch) => {
+        const label = categoryLabelsMap[ch.category];
         return {
           key: ch.category,
-          ar: demo?.ar ?? ch.category,
-          en: demo?.en ?? ch.category.charAt(0).toUpperCase() + ch.category.slice(1),
+          ar: label?.ar ?? ch.category,
+          en: label?.en ?? ch.category.charAt(0).toUpperCase() + ch.category.slice(1),
           lastRefresh: formatRelativeTime(ch.lastRefreshTime),
           lastRefreshAr: formatRelativeTime(ch.lastRefreshTime),
           status: mapConvexStatus(ch.lastStatus),
-          records: knownCounts[ch.category] ?? demo?.records ?? 0,
-          source: ch.sourceUrl ?? demo?.source ?? "",
+          records: ch.recordsUpdated ?? 0,
+          source: ch.sourceUrl ?? "",
         };
-      })
-    : categoryHealth;
+      });
 
   return (
     <div className="page-content" dir={dir}>

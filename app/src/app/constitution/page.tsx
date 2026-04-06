@@ -62,138 +62,6 @@ const ARABIC_ORDINALS = [
   "الباب العاشر",
 ] as const;
 
-// ─── Fallback Data ────────────────────────────────────────────────────────────
-
-const FALLBACK_PARTS: ConstitutionPart[] = [
-  { id: "p1", numberAr: "الباب الأول", numberEn: "Part I", titleAr: "الدولة", titleEn: "The State", color: "var(--chart-1)" },
-  { id: "p2", numberAr: "الباب الثاني", numberEn: "Part II", titleAr: "الحقوق والحريات والواجبات العامة", titleEn: "Rights, Freedoms & Public Duties", color: "var(--chart-2)" },
-  { id: "p3", numberAr: "الباب الثالث", numberEn: "Part III", titleAr: "السيادة", titleEn: "Sovereignty", color: "var(--chart-3)" },
-  { id: "p4", numberAr: "الباب الرابع", numberEn: "Part IV", titleAr: "سيادة القانون", titleEn: "Rule of Law", color: "var(--chart-4)" },
-  { id: "p5", numberAr: "الباب الخامس", numberEn: "Part V", titleAr: "نظام الحكم", titleEn: "System of Government", color: "var(--chart-5)" },
-  { id: "p6", numberAr: "الباب السادس", numberEn: "Part VI", titleAr: "أحكام عامة وانتقالية", titleEn: "General & Transitional Provisions", color: "var(--chart-6)" },
-];
-
-const articles: ConstitutionArticle[] = [
-  {
-    id: "a1", number: 1, partId: "p1",
-    textAr: "جمهورية مصر العربية دولة ذات سيادة، موحدة، لا تقبل التجزئة، ونظامها جمهوري ديمقراطي، يقوم على أساس المواطنة وسيادة القانون.",
-    textEn: "The Arab Republic of Egypt is a sovereign, united and indivisible state, with a republican, democratic system of government, based on the principles of citizenship and the rule of law.",
-    summaryAr: "تعريف الدولة: جمهورية ديمقراطية موحدة قائمة على المواطنة.",
-    summaryEn: "Defines Egypt as a sovereign unified democratic republic.",
-    amended: false, crossRefs: [4, 5, 6],
-  },
-  {
-    id: "a2", number: 2, partId: "p1",
-    textAr: "الإسلام دين الدولة، واللغة العربية لغتها الرسمية، ومبادئ الشريعة الإسلامية المصدر الرئيسي للتشريع.",
-    textEn: "Islam is the religion of the state and Arabic is its official language. The principles of Islamic Sharia are the main source of legislation.",
-    summaryAr: "يحدد الدين الرسمي والأسس التشريعية للدولة.",
-    summaryEn: "Establishes Islam as state religion and Islamic Sharia as basis of legislation.",
-    amended: false, crossRefs: [3, 7],
-  },
-  {
-    id: "a3", number: 3, partId: "p1",
-    textAr: "لمواطني مصر من المسيحيين واليهود حق التحكيم في شؤونهم الشخصية وشؤونهم الدينية، وفق قوانينهم الخاصة.",
-    textEn: "Egyptian citizens of the Christian or Jewish faith have the right to resort to their respective religious legislation in matters of personal status, religious affairs, and the selection of their spiritual leaders.",
-    summaryAr: "يكفل حقوق الأقليات الدينية في الشؤون الشخصية.",
-    summaryEn: "Guarantees rights of Christian and Jewish minorities in personal and religious affairs.",
-    amended: false, crossRefs: [2, 64, 93],
-  },
-  {
-    id: "a4", number: 4, partId: "p1",
-    textAr: "السيادة للشعب وحده، يمارسها ويحميها، وهو مصدر السلطات، ويصون وحدته الوطنية التي تقوم على مبادئ المساواة والعدل وتكافؤ الفرص بين المواطنين.",
-    textEn: "Sovereignty belongs to the people alone, who exercise and protect it. The people are the source of authority and are the ones who safeguard national unity, which is based on the principles of equality, justice and equal opportunity for citizens.",
-    summaryAr: "سيادة الشعب ومصدر السلطات في الدولة.",
-    summaryEn: "People are the sole source of sovereignty and authority.",
-    amended: false, crossRefs: [1, 5, 226],
-  },
-  {
-    id: "a5", number: 5, partId: "p1",
-    textAr: "يقوم النظام السياسي على أساس التعددية السياسية والحزبية، والتداول السلمي للسلطة، والفصل بين السلطات والتوازن بينها.",
-    textEn: "The political system is based on the principles of political and party pluralism, peaceful transfer of power, separation of powers and balance among them.",
-    summaryAr: "يؤسس للتعددية السياسية وتداول السلطة والفصل بين السلطات.",
-    summaryEn: "Establishes political pluralism, peaceful transfer of power, and separation of powers.",
-    amended: false, crossRefs: [1, 4, 101],
-  },
-  {
-    id: "a33", number: 33, partId: "p2",
-    textAr: "المواطنون لدى القانون سواء، وهم متساوون في الحقوق والحريات والواجبات العامة، لا تمييز بينهم بسبب الدين أو العقيدة أو الجنس أو الأصل أو العرق أو اللون أو اللغة أو الإعاقة أو المستوى الاجتماعي أو الانتماء السياسي أو الجغرافي أو لأي سبب آخر.",
-    textEn: "Citizens are equal before the law. They have equal public rights, freedoms and duties without discrimination based on religion, belief, sex, origin, race, color, language, disability, social class, political or geographical affiliation or for any other reason.",
-    summaryAr: "مبدأ المساواة وعدم التمييز بين المواطنين.",
-    summaryEn: "Equality principle — no discrimination based on religion, sex, race, color, language, disability, or social class.",
-    amended: false, crossRefs: [9, 10, 93],
-  },
-  {
-    id: "a53", number: 53, partId: "p2",
-    textAr: "المواطنون لدى القانون سواء، وهم متساوون في الحقوق والحريات والواجبات العامة، لا تمييز بينهم.",
-    textEn: "Citizens are equal before the law, and they are equal in public rights and duties. There is no discrimination.",
-    summaryAr: "يؤكد مبدأ المساواة.",
-    summaryEn: "Reaffirms the principle of equality before the law.",
-    amended: true,
-    originalTextAr: "المواطنون لدى القانون سواء، وهم متساوون في الحقوق والحريات والواجبات العامة.",
-    originalTextEn: "Citizens are equal before the law, equal in rights, freedoms, and general duties.",
-    crossRefs: [33, 93],
-  },
-  {
-    id: "a54", number: 54, partId: "p2",
-    textAr: "الحرية الشخصية حق طبيعي وهي مصونة لا تمس، وفيما عدا حالة التلبس، لا يجوز القبض على أحد أو تفتيشه أو حبسه أو تقييد حريته بأي قيد إلا بأمر قضائي مسبب يستلزمه التحقيق.",
-    textEn: "Personal freedom is a natural right, it is safeguarded and inviolable. Except in cases of flagrante delicto, no one may be arrested, searched, imprisoned, or have their freedom restricted in any manner, except on the basis of a reasoned judicial order necessitated by an investigation.",
-    summaryAr: "يكفل الحرية الشخصية ويمنع الاعتقال التعسفي.",
-    summaryEn: "Guarantees personal freedom; prohibits arbitrary arrest without judicial order.",
-    amended: false, crossRefs: [55, 93],
-  },
-  {
-    id: "a73", number: 73, partId: "p2",
-    textAr: "للمواطنين حق تنظيم الاجتماعات العامة والمواكب والتظاهرات السلمية وجميع أشكال الاحتجاجات السلمية، غير مسلحة، بإخطار ينظمه القانون.",
-    textEn: "Citizens have the right to organize public meetings, processions and peaceful demonstrations, and all forms of peaceful protest, unarmed, by providing notification regulated by law.",
-    summaryAr: "يكفل حق التجمع السلمي والتظاهر.",
-    summaryEn: "Guarantees the right to peaceful assembly and demonstration.",
-    amended: false, crossRefs: [65, 70],
-  },
-  {
-    id: "a101", number: 101, partId: "p5",
-    textAr: "يتولى مجلس النواب سلطة التشريع، وإقرار السياسة العامة للدولة، والخطة العامة للتنمية الاقتصادية والاجتماعية، والموازنة العامة للدولة، ويمارس الرقابة على أعمال السلطة التنفيذية.",
-    textEn: "The House of Representatives exercises legislative authority, approves the general policy of the state, the general economic and social development plan, the general budget of the state, and oversees the executive authority.",
-    summaryAr: "يحدد اختصاصات مجلس النواب التشريعية والرقابية.",
-    summaryEn: "Defines legislative powers of the House of Representatives.",
-    amended: false, crossRefs: [102, 131, 5],
-  },
-  {
-    id: "a140", number: 140, partId: "p5",
-    textAr: "مدة رئاسة الجمهورية ست سنوات ميلادية، تبدأ من اليوم التالي لانتهاء مدة سلفه.",
-    textEn: "The presidential term is six Gregorian years, starting from the day following the expiry of the predecessor's term.",
-    amended: true,
-    originalTextAr: "مدة رئاسة الجمهورية أربع سنوات ميلادية.",
-    originalTextEn: "The presidential term is four Gregorian years.",
-    summaryAr: "تم تعديلها عام 2019 لتمديد الفترة الرئاسية من 4 إلى 6 سنوات.",
-    summaryEn: "Amended in 2019 to extend presidential term from 4 to 6 years.",
-    crossRefs: [141, 158],
-  },
-  {
-    id: "a226", number: 226, partId: "p6",
-    textAr: "لرئيس الجمهورية أو لمجلس النواب حق اقتراح تعديل مادة أو أكثر من مواد الدستور.",
-    textEn: "The President of the Republic or the House of Representatives may propose the amendment of one or more articles of the Constitution.",
-    summaryAr: "يحدد إجراءات تعديل الدستور.",
-    summaryEn: "Outlines the procedure for amending the Constitution.",
-    amended: false, crossRefs: [4, 1],
-  },
-  {
-    id: "a244", number: 244, partId: "p6",
-    textAr: "تعمل الدولة على تمثيل الشباب والمسيحيين والأشخاص ذوي الإعاقة والمصريين المقيمين في الخارج في أول مجلس نواب يعقب العمل بهذا الدستور، على النحو الذي يبينه القانون.",
-    textEn: "The state works to represent youth, Christians, persons with disabilities and Egyptians residing abroad in the first House of Representatives following the application of this Constitution.",
-    summaryAr: "يكفل تمثيل الفئات المهمشة في البرلمان.",
-    summaryEn: "Ensures representation of youth, Christians, disabled persons and expatriates in parliament.",
-    amended: false, crossRefs: [180, 102],
-  },
-  {
-    id: "a247", number: 247, partId: "p6",
-    textAr: "يكفل الدستور للأجيال القادمة حق التنمية المستدامة والبيئة النظيفة.",
-    textEn: "The Constitution guarantees for future generations the right to sustainable development and a clean environment.",
-    summaryAr: "يكفل حق الأجيال القادمة في التنمية المستدامة.",
-    summaryEn: "Guarantees future generations' right to sustainable development.",
-    amended: false, crossRefs: [44, 45, 46],
-  },
-];
-
 // ─── Article Row ──────────────────────────────────────────────────────────────
 
 function ArticleRow({
@@ -333,7 +201,7 @@ function ArticleRow({
 export default function ConstitutionPage() {
   const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
-  // selectedPart stores a fallback part ID (p1..p6) for article filtering
+  // selectedPart stores a Convex-derived part ID (p1..p6) for article filtering
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAmendedOnly, setShowAmendedOnly] = useState(false);
@@ -345,58 +213,51 @@ export default function ConstitutionPage() {
 
   const isLoading = liveParts === undefined || liveAmendedArticles === undefined || liveArticles === undefined;
 
-  // Build a partId lookup: Convex part _id → fallback part id (p1..p6)
+  // Build a partId lookup: Convex part _id → stable UI id by index
   const partIdMap = useMemo(() => {
     const map: Record<string, string> = {};
     if (liveParts && liveParts.length > 0) {
       liveParts.forEach((p, idx) => {
-        map[p._id] = FALLBACK_PARTS[idx]?.id ?? p._id;
+        map[p._id] = `p${idx + 1}`;
       });
     }
     return map;
   }, [liveParts]);
 
-  // Adapt Convex parts to UI shape
+  // Adapt Convex parts to UI shape — empty array when no data
   const parts: ConstitutionPart[] = useMemo(() => {
-    if (liveParts === undefined) return FALLBACK_PARTS;
-    if (liveParts.length > 0) {
-      return liveParts.map((p, idx) => ({
-        id: FALLBACK_PARTS[idx]?.id ?? p._id,
-        numberAr: ARABIC_ORDINALS[idx] ?? `الباب ${idx + 1}`,
-        numberEn: `Part ${p.partNumber}`,
-        titleAr: p.titleAr,
-        titleEn: p.titleEn,
-        color: PART_COLORS[idx % PART_COLORS.length],
-      }));
-    }
-    return FALLBACK_PARTS;
+    if (!liveParts || liveParts.length === 0) return [];
+    return liveParts.map((p, idx) => ({
+      id: `p${idx + 1}`,
+      numberAr: ARABIC_ORDINALS[idx] ?? `الباب ${idx + 1}`,
+      numberEn: `Part ${p.partNumber}`,
+      titleAr: p.titleAr,
+      titleEn: p.titleEn,
+      color: PART_COLORS[idx % PART_COLORS.length],
+    }));
   }, [liveParts]);
 
-  // Adapt Convex articles to UI shape, falling back to static articles
+  // Adapt Convex articles to UI shape — empty array when no data
   const allArticles: ConstitutionArticle[] = useMemo(() => {
-    if (liveArticles && liveArticles.length > 0) {
-      return liveArticles
-        .map((a) => ({
-          id: a._id,
-          number: a.articleNumber,
-          partId: partIdMap[a.partId] ?? a.partId,
-          textAr: a.textAr,
-          textEn: a.textEn,
-          summaryAr: a.summaryAr ?? "",
-          summaryEn: a.summaryEn ?? "",
-          amended: a.wasAmended2019,
-          originalTextAr: a.originalTextAr,
-          originalTextEn: a.originalTextEn,
-          crossRefs: [],
-        }))
-        .sort((a, b) => a.number - b.number);
-    }
-    return articles;
+    if (!liveArticles || liveArticles.length === 0) return [];
+    return liveArticles
+      .map((a) => ({
+        id: a._id,
+        number: a.articleNumber,
+        partId: partIdMap[a.partId] ?? a.partId,
+        textAr: a.textAr,
+        textEn: a.textEn,
+        summaryAr: a.summaryAr ?? "",
+        summaryEn: a.summaryEn ?? "",
+        amended: a.wasAmended2019,
+        originalTextAr: a.originalTextAr,
+        originalTextEn: a.originalTextEn,
+        crossRefs: [],
+      }))
+      .sort((a, b) => a.number - b.number);
   }, [liveArticles, partIdMap]);
 
-  const amendedCount = isLoading
-    ? allArticles.filter((a) => a.amended).length
-    : (liveAmendedArticles?.length ?? allArticles.filter((a) => a.amended).length);
+  const amendedCount = liveAmendedArticles?.length ?? allArticles.filter((a) => a.amended).length;
 
   const fuse = useMemo(
     () =>

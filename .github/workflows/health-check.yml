@@ -1,0 +1,98 @@
+name: Pipeline Health Check
+
+on:
+  schedule:
+    # Run every 12 hours (offset from the 6h Convex cron)
+    - cron: '0 6,18 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check-pipeline-health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install dependencies
+        working-directory: app
+        run: npm ci --legacy-peer-deps
+
+      - name: Check data freshness
+        working-directory: app
+        env:
+          CONVEX_URL: ${{ secrets.NEXT_PUBLIC_CONVEX_URL }}
+        run: |
+          # Query the Convex deployment for data freshness
+          RESULT=$(npx convex run dataRefresh:getAllLastUpdated 2>/dev/null || echo '{}')
+          echo "Last updated timestamps: $RESULT"
+          echo "result=$RESULT" >> $GITHUB_OUTPUT
+
+          # Check if any category hasn't been updated in 48 hours
+          NOW=$(date +%s)
+          THRESHOLD=$((NOW - 172800))  # 48 hours in seconds
+          THRESHOLD_MS=$((THRESHOLD * 1000))
+
+          echo "Checking freshness (threshold: 48h ago = $THRESHOLD_MS ms)..."
+
+          # Parse JSON and check each category
+          STALE_CATEGORIES=""
+          for category in government parliament budget debt; do
+            LAST=$(echo "$RESULT" | python3 -c "import json,sys; d=json.load(sys.stdin); v=d.get('$category'); print(v if v else 0)" 2>/dev/null || echo "0")
+            if [ "$LAST" = "0" ] || [ "$LAST" = "null" ] || [ "$LAST" = "None" ]; then
+              STALE_CATEGORIES="$STALE_CATEGORIES $category(never)"
+            elif [ "$LAST" -lt "$THRESHOLD_MS" ] 2>/dev/null; then
+              STALE_CATEGORIES="$STALE_CATEGORIES $category(stale)"
+            fi
+          done
+
+          if [ -n "$STALE_CATEGORIES" ]; then
+            echo "STALE CATEGORIES:$STALE_CATEGORIES"
+            echo "stale=true" >> $GITHUB_OUTPUT
+            echo "stale_categories=$STALE_CATEGORIES" >> $GITHUB_OUTPUT
+          else
+            echo "All categories fresh"
+            echo "stale=false" >> $GITHUB_OUTPUT
+          fi
+        id: freshness
+
+      - name: Create issue if pipeline is stale
+        if: steps.freshness.outputs.stale == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const staleCategories = '${{ steps.freshness.outputs.stale_categories }}'.trim();
+
+            // Check if there's already an open pipeline health issue
+            const { data: existingIssues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'pipeline-health',
+              state: 'open',
+            });
+
+            if (existingIssues.length > 0) {
+              // Update existing issue with latest status
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingIssues[0].number,
+                body: `**Pipeline Health Check Update** (${new Date().toISOString()})\n\nStale categories: ${staleCategories}\n\nThe data pipeline has not refreshed these categories in the last 48 hours.`,
+              });
+            } else {
+              // Create new issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: '[ALERT] Data pipeline stale - categories need attention',
+                body: `## Pipeline Health Alert\n\n**Stale categories:** ${staleCategories}\n\nThe data pipeline has not refreshed these categories in the last 48 hours. This could indicate:\n- API key expiration (ANTHROPIC_API_KEY or GITHUB_TOKEN)\n- Source website changes (cabinet.gov.eg, mof.gov.eg)\n- Convex cron job failure\n- Network issues\n\n### Action Required\n1. Check the [Convex Dashboard](https://dashboard.convex.dev) for cron job logs\n2. Verify API keys are valid\n3. Check source website accessibility\n4. Review the [/transparency](https://mizanmasr.com/transparency) page for error details\n\n_This issue was created automatically by the pipeline health check._`,
+                labels: ['pipeline-health', 'needs-human-review'],
+              });
+            }
