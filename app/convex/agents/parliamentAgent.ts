@@ -44,21 +44,17 @@ export const refreshParliament = internalAction({
       await loadCompositionFromWikipedia(ctx);
     }
 
-    // Step 3: If we have members but names are placeholders, trigger the scraper
+    // Step 3: Name scraping is disabled until the upsertMember logic is fixed
+    // to update existing placeholders instead of creating duplicates.
+    // TODO: Fix parliamentScraper to match placeholders by party + seat number
+    // and update their names in-place.
     const placeholderCount: number = await ctx.runQuery(
       internal.parliamentQueries.getPlaceholderCount,
       {}
     );
-
     if (placeholderCount > 0) {
       console.log(
-        `[parliamentAgent] ${placeholderCount} placeholder members found, scheduling name scraper...`
-      );
-      // Schedule the scraper to run in background (chains batches via scheduler)
-      await ctx.scheduler.runAfter(
-        0,
-        internal.agents.parliamentScraper.scrapeAndContinue,
-        { startId: 1, maxId: 600, batchSize: 10, totalSaved: 0 }
+        `[parliamentAgent] ${placeholderCount} placeholder members need real names (scraper disabled pending fix)`
       );
     }
 
