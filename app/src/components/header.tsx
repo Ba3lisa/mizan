@@ -39,11 +39,14 @@ export function Header() {
     { href: "/transparency", label: t.navTransparency },
   ];
 
+  const toolsNav = [
+    { href: "/budget/your-share", label: t.navTaxCalculator },
+  ];
+
   const moreNav = [
     { href: "/elections", label: t.navElections },
     { href: "/economy", label: t.navEconomy },
     { href: "/governorate", label: t.navGovernorate },
-    { href: "/budget/your-share", label: t.navTaxCalculator },
     { href: "/funding", label: t.navFunding },
     { href: "/methodology", label: t.navMethodology },
   ];
@@ -82,6 +85,32 @@ export function Header() {
               )}
             </Link>
           ))}
+          {/* Tools dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className={cn(
+                "text-[0.8125rem] font-medium no-underline transition-colors whitespace-nowrap relative py-1 flex items-center gap-1 cursor-pointer",
+                toolsNav.some(n => isActive(n.href))
+                  ? "text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              )}>
+                {t.navTools} <ChevronDown size={12} />
+                {toolsNav.some(n => isActive(n.href)) && (
+                  <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />
+                )}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              {toolsNav.map((n) => (
+                <DropdownMenuItem key={n.href} asChild>
+                  <Link href={n.href} className={cn("no-underline w-full", isActive(n.href) && "text-primary")}>
+                    {n.label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* More dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -133,7 +162,7 @@ export function Header() {
               </SheetHeader>
               <Separator className="my-3" />
               <nav className="flex flex-col gap-0.5" dir={dir}>
-                {[...nav, ...moreNav].map((n) => (
+                {[...nav, ...toolsNav, ...moreNav].map((n) => (
                   <SheetClose asChild key={n.href}>
                     <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
                   </SheetClose>
