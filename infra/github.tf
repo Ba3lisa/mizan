@@ -76,3 +76,45 @@ resource "github_issue_label" "feature_request" {
   name       = "feature-request"
   color      = "6C8EEF"
 }
+
+resource "github_issue_label" "council_approved" {
+  repository  = "mizan"
+  name        = "council-approved"
+  color       = "30A46C"
+  description = "Data correction approved by the LLM Council"
+}
+
+resource "github_issue_label" "council_rejected" {
+  repository  = "mizan"
+  name        = "council-rejected"
+  color       = "E5484D"
+  description = "Data correction rejected by the LLM Council"
+}
+
+resource "github_issue_label" "needs_human_review" {
+  repository  = "mizan"
+  name        = "needs-human-review"
+  color       = "F5A623"
+  description = "Requires manual review by a maintainer"
+}
+
+resource "github_issue_label" "ui_issue" {
+  repository  = "mizan"
+  name        = "ui-issue"
+  color       = "8B5CF6"
+  description = "UI/UX suggestion or improvement"
+}
+
+resource "github_issue_label" "estimated_data" {
+  repository  = "mizan"
+  name        = "estimated-data"
+  color       = "FFB224"
+  description = "Data from non-governmental source, marked as estimated"
+}
+
+resource "github_issue_label" "spam" {
+  repository  = "mizan"
+  name        = "spam"
+  color       = "6E7781"
+  description = "Issue identified as spam by the AI agent"
+}

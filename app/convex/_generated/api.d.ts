@@ -22,6 +22,7 @@ import type * as elections from "../elections.js";
 import type * as government from "../government.js";
 import type * as lineage from "../lineage.js";
 import type * as parliament from "../parliament.js";
+import type * as seedConstitutionMissing from "../seedConstitutionMissing.js";
 import type * as seedData from "../seedData.js";
 import type * as transparency from "../transparency.js";
 
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   government: typeof government;
   lineage: typeof lineage;
   parliament: typeof parliament;
+  seedConstitutionMissing: typeof seedConstitutionMissing;
   seedData: typeof seedData;
   transparency: typeof transparency;
 }>;

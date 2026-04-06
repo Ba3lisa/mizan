@@ -1,2 +1,26 @@
 
+# Dependencies
+node_modules/
+
+# Build
+.next/
+out/
+dist/
+
+# Environment / Secrets
+.env
 .env.local
+.env.*.local
+*.pem
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo

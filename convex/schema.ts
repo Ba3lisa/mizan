@@ -41,9 +41,16 @@ export default defineSchema({
     websiteUrl: v.optional(v.string()),
     employeeCount: v.optional(v.number()),
     establishedYear: v.optional(v.number()),
+    sector: v.optional(v.union(
+      v.literal("sovereignty"),
+      v.literal("economic"),
+      v.literal("social"),
+      v.literal("infrastructure")
+    )),
     sortOrder: v.number(),
   })
-    .index("by_sortOrder", ["sortOrder"]),
+    .index("by_sortOrder", ["sortOrder"])
+    .index("by_sector", ["sector"]),
 
   governorates: defineTable({
     nameAr: v.string(),
@@ -410,8 +417,175 @@ export default defineSchema({
     errorMessage: v.optional(v.string()),
     startedAt: v.number(),
     completedAt: v.optional(v.number()),
+    // Used by maintenance compaction to mark weekly summary entries
+    isCompacted: v.optional(v.boolean()),
   })
     .index("by_category", ["category"])
     .index("by_category_and_startedAt", ["category", "startedAt"])
     .index("by_category_and_status_and_startedAt", ["category", "status", "startedAt"]),
+
+  // LLM COUNCIL — multi-model data verification system
+  councilSessions: defineTable({
+    triggerType: v.union(
+      v.literal("github_issue"),
+      v.literal("data_refresh"),
+      v.literal("manual")
+    ),
+    triggerRef: v.string(),
+    category: v.union(
+      v.literal("government"),
+      v.literal("parliament"),
+      v.literal("constitution"),
+      v.literal("budget"),
+      v.literal("debt"),
+      v.literal("elections")
+    ),
+    tableName: v.string(),
+    fieldName: v.optional(v.string()),
+    proposedValue: v.optional(v.string()),
+    currentValue: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+    sourceType: v.union(
+      v.literal("gov_eg"),
+      v.literal("international_org"),
+      v.literal("media"),
+      v.literal("other")
+    ),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("needs_human_review")
+    ),
+    finalConfidence: v.optional(
+      v.union(v.literal("high"), v.literal("medium"), v.literal("low"))
+    ),
+    resolvedAt: v.optional(v.number()),
+    resolvedBy: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_triggerType", ["triggerType"])
+    .index("by_createdAt", ["createdAt"])
+    .index("by_category", ["category"]),
+
+  councilVotes: defineTable({
+    sessionId: v.id("councilSessions"),
+    model: v.string(),
+    provider: v.string(),
+    vote: v.union(
+      v.literal("approve"),
+      v.literal("reject"),
+      v.literal("abstain")
+    ),
+    confidence: v.union(
+      v.literal("high"),
+      v.literal("medium"),
+      v.literal("low")
+    ),
+    reasoning: v.string(),
+    sourceVerified: v.boolean(),
+    votedAt: v.number(),
+  })
+    .index("by_sessionId", ["sessionId"])
+    .index("by_model", ["model"]),
+
+  // GITHUB ISSUE PROCESSING — batch tracking, dedup, spam prevention
+  githubIssueProcessing: defineTable({
+    issueNumber: v.number(),
+    issueType: v.union(
+      v.literal("data"),
+      v.literal("ui"),
+      v.literal("unknown")
+    ),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("processing"),
+      v.literal("council_review"),
+      v.literal("approved"),
+      v.literal("rejected"),
+      v.literal("applied"),
+      v.literal("spam")
+    ),
+    councilSessionId: v.optional(v.id("councilSessions")),
+    parsedCategory: v.optional(v.string()),
+    parsedDataPoint: v.optional(v.string()),
+    parsedSourceUrl: v.optional(v.string()),
+    authorUsername: v.string(),
+    authorAccountAge: v.optional(v.number()),
+    duplicateOfIssue: v.optional(v.number()),
+    batchId: v.optional(v.string()),
+    processedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_issueNumber", ["issueNumber"])
+    .index("by_status", ["status"])
+    .index("by_batchId", ["batchId"])
+    .index("by_authorUsername", ["authorUsername"]),
+
+  // FUNDING — GitHub Sponsors donations + transparent allocation tracking
+  fundingDonations: defineTable({
+    donorName: v.optional(v.string()),
+    isAnonymous: v.boolean(),
+    amount: v.number(),
+    currency: v.string(),
+    amountUsd: v.number(),
+    paymentProvider: v.union(
+      v.literal("github_sponsors"),
+      v.literal("stripe"),
+      v.literal("other")
+    ),
+    externalTransactionId: v.optional(v.string()),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("confirmed"),
+      v.literal("refunded")
+    ),
+    messageEn: v.optional(v.string()),
+    messageAr: v.optional(v.string()),
+    confirmedAt: v.optional(v.number()),
+    createdAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_createdAt", ["createdAt"])
+    .index("by_paymentProvider", ["paymentProvider"]),
+
+  fundingAllocations: defineTable({
+    categoryEn: v.string(),
+    categoryAr: v.string(),
+    category: v.union(
+      v.literal("infrastructure"),
+      v.literal("ai_api_costs"),
+      v.literal("development"),
+      v.literal("data_acquisition"),
+      v.literal("other")
+    ),
+    amount: v.number(),
+    currency: v.string(),
+    amountUsd: v.number(),
+    descriptionEn: v.string(),
+    descriptionAr: v.string(),
+    receiptUrl: v.optional(v.string()),
+    vendor: v.optional(v.string()),
+    isRecurring: v.boolean(),
+    periodStart: v.string(),
+    periodEnd: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_category", ["category"])
+    .index("by_createdAt", ["createdAt"]),
+
+  fundingSummary: defineTable({
+    month: v.string(),
+    totalDonationsUsd: v.number(),
+    totalAllocatedUsd: v.number(),
+    balanceUsd: v.number(),
+    infrastructureCostUsd: v.number(),
+    aiApiCostUsd: v.number(),
+    developmentCostUsd: v.number(),
+    dataCostUsd: v.number(),
+    otherCostUsd: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_month", ["month"]),
 });

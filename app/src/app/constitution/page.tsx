@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { Skeleton } from "boneyard-js/react";
 import Fuse from "fuse.js";
 import { Search, X, ChevronRight, ChevronDown } from "lucide-react";
 import { useQuery } from "convex/react";
@@ -340,13 +341,26 @@ export default function ConstitutionPage() {
   // Live Convex data
   const liveParts = useQuery(api.constitution.listParts);
   const liveAmendedArticles = useQuery(api.constitution.listAmendedArticles);
+  const liveArticles = useQuery(api.constitution.listAllArticles);
 
-  // Adapt Convex parts to UI shape. Each live part maps to a fallback part by
-  // sort order so article filtering (which uses fallback IDs) stays consistent.
-  const parts: ConstitutionPart[] = useMemo(() => {
+  const isLoading = liveParts === undefined || liveAmendedArticles === undefined || liveArticles === undefined;
+
+  // Build a partId lookup: Convex part _id → fallback part id (p1..p6)
+  const partIdMap = useMemo(() => {
+    const map: Record<string, string> = {};
     if (liveParts && liveParts.length > 0) {
+      liveParts.forEach((p, idx) => {
+        map[p._id] = FALLBACK_PARTS[idx]?.id ?? p._id;
+      });
+    }
+    return map;
+  }, [liveParts]);
+
+  // Adapt Convex parts to UI shape
+  const parts: ConstitutionPart[] = useMemo(() => {
+    if (liveParts === undefined) return FALLBACK_PARTS;
+    if (liveParts.length > 0) {
       return liveParts.map((p, idx) => ({
-        // Use the fallback ID so part filtering against article.partId works
         id: FALLBACK_PARTS[idx]?.id ?? p._id,
         numberAr: ARABIC_ORDINALS[idx] ?? `الباب ${idx + 1}`,
         numberEn: `Part ${p.partNumber}`,
@@ -358,20 +372,44 @@ export default function ConstitutionPage() {
     return FALLBACK_PARTS;
   }, [liveParts]);
 
-  const amendedCount = liveAmendedArticles?.length ?? articles.filter((a) => a.amended).length;
+  // Adapt Convex articles to UI shape, falling back to static articles
+  const allArticles: ConstitutionArticle[] = useMemo(() => {
+    if (liveArticles && liveArticles.length > 0) {
+      return liveArticles
+        .map((a) => ({
+          id: a._id,
+          number: a.articleNumber,
+          partId: partIdMap[a.partId] ?? a.partId,
+          textAr: a.textAr,
+          textEn: a.textEn,
+          summaryAr: a.summaryAr ?? "",
+          summaryEn: a.summaryEn ?? "",
+          amended: a.wasAmended2019,
+          originalTextAr: a.originalTextAr,
+          originalTextEn: a.originalTextEn,
+          crossRefs: [],
+        }))
+        .sort((a, b) => a.number - b.number);
+    }
+    return articles;
+  }, [liveArticles, partIdMap]);
+
+  const amendedCount = isLoading
+    ? allArticles.filter((a) => a.amended).length
+    : (liveAmendedArticles?.length ?? allArticles.filter((a) => a.amended).length);
 
   const fuse = useMemo(
     () =>
-      new Fuse(articles, {
+      new Fuse(allArticles, {
         keys: ["textAr", "textEn", "summaryAr", "summaryEn"],
         threshold: 0.35,
         includeScore: true,
       }),
-    []
+    [allArticles]
   );
 
   const filteredArticles = useMemo(() => {
-    let result = articles;
+    let result = allArticles;
     if (searchQuery) {
       result = fuse.search(searchQuery).map((r) => r.item);
     }
@@ -382,7 +420,7 @@ export default function ConstitutionPage() {
       result = result.filter((a) => a.amended);
     }
     return result;
-  }, [searchQuery, selectedPart, showAmendedOnly, fuse]);
+  }, [searchQuery, selectedPart, showAmendedOnly, fuse, allArticles]);
 
   const partById = useMemo(
     () => Object.fromEntries(parts.map((p) => [p.id, p])),
@@ -432,6 +470,8 @@ export default function ConstitutionPage() {
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                   {t.tableOfContents}
                 </p>
+                <Skeleton name="constitution-toc" loading={isLoading}>
+                <>
                 <button
                   onClick={() => setSelectedPart(null)}
                   className={cn(
@@ -458,6 +498,8 @@ export default function ConstitutionPage() {
                     {isAr ? p.titleAr : p.titleEn}
                   </button>
                 ))}
+                </>
+                </Skeleton>
               </div>
             </ScrollArea>
           </aside>
@@ -499,6 +541,8 @@ export default function ConstitutionPage() {
 
             {/* Mobile part pills */}
             <div className="flex gap-2 flex-wrap md:hidden">
+              <Skeleton name="constitution-part-pills" loading={isLoading}>
+              <>
               <Badge
                 variant={!selectedPart ? "default" : "outline"}
                 className="cursor-pointer"
@@ -521,14 +565,16 @@ export default function ConstitutionPage() {
                   {isAr ? p.numberAr.replace("الباب ", "") : p.numberEn}
                 </Badge>
               ))}
+              </>
+              </Skeleton>
             </div>
 
             {/* Result count */}
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
                 {isAr
-                  ? `عرض ${filteredArticles.length} مادة من ${articles.length}`
-                  : `Showing ${filteredArticles.length} of ${articles.length} articles`}
+                  ? `عرض ${filteredArticles.length} مادة من ${allArticles.length}`
+                  : `Showing ${filteredArticles.length} of ${allArticles.length} articles`}
               </p>
               <a
                 href="https://presidency.eg"

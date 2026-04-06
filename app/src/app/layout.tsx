@@ -6,14 +6,17 @@ import { Footer } from "@/components/footer";
 
 export const metadata: Metadata = {
   title: {
-    default: "ميزان — الحكومة المصرية مرئية",
+    default: "ميزان",
     template: "%s | ميزان",
   },
   description:
     "منصة شفافية مدنية تتيح الوصول إلى بيانات الحكومة المصرية — الوزارات، البرلمان، الدستور، الميزانية، والديون.",
   keywords: ["مصر", "حكومة", "شفافية", "برلمان", "ميزانية", "Egypt", "government", "transparency"],
+  icons: {
+    icon: '/icon.svg',
+  },
   openGraph: {
-    title: "ميزان — الحكومة المصرية مرئية",
+    title: "ميزان",
     description: "Egypt's government, made visible.",
     locale: "ar_EG",
     alternateLocale: "en_US",

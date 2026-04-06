@@ -150,3 +150,67 @@ Government/cabinet changes are NEVER auto-written. The agent:
 5. An admin must manually approve changes
 
 This prevents accidental data corruption from parsing errors.
+
+## LLM Council System
+
+The LLM Council is a multi-model voting system that verifies community-submitted data corrections before they are applied to the database. It adds a layer of automated fact-checking between community input and data changes.
+
+### Current Configuration
+
+The council currently runs on Claude 3.5 Haiku as a single provider. Additional providers (OpenAI, Google models) are planned for v1.2 to enable true multi-model consensus.
+
+### Source Classification
+
+Every data correction includes a source URL. The council classifies sources into tiers that determine how much automated trust they receive:
+
+| Source Type | Domain Pattern | Trust Level | Council Behavior |
+|---|---|---|---|
+| `gov_eg` | *.gov.eg, *.eg official domains | Auto-high | Council votes with high prior confidence; single model approval sufficient |
+| `international_org` | worldbank.org, imf.org, transparencyintl.org | Auto-medium | Council votes normally; majority approval required |
+| `media` | Major news outlets (ahram, reuters, bbc) | Low / estimated | Council votes with skepticism; unanimous approval required, data marked as "estimated" if applied |
+| `other` | Any other domain | Needs human review | Council may vote but result is advisory only; human approval always required regardless of vote outcome |
+
+### Decision Matrix
+
+Votes are tallied differently depending on the source classification:
+
+- **gov_eg sources**: A single `approve` vote from any council member is sufficient. The assumption is that official Egyptian government sources are authoritative for their own data.
+- **international_org sources**: Majority of council members must vote `approve`. Abstentions do not count against the threshold.
+- **media sources**: All council members must vote `approve` (unanimous). Any `reject` vote blocks the change. Applied data is tagged with `confidence: "estimated"` rather than `confidence: "verified"`.
+- **other sources**: Council votes are recorded but treated as advisory. The change is always routed to human review regardless of the vote outcome.
+
+For all source types, if a council member votes `reject` with a reasoning that cites a contradicting official source, the change is automatically blocked and flagged for human review.
+
+### Integration with GitHub Issues
+
+The council is the middle step in the community correction pipeline:
+
+1. A community member opens a GitHub Issue with label `data-correction`, including the incorrect value, the proposed correct value, and a source URL
+2. The GitHub Agent ingests the issue, runs spam detection (rate limiting, duplicate checking, source URL validation), and classifies it
+3. If the issue passes spam checks, it is submitted to the LLM Council as a `councilSession`
+4. Each council provider evaluates the change independently, producing a vote and reasoning
+5. Votes are recorded in the `councilVotes` table and tallied according to the decision matrix above
+6. The final decision is recorded in the `councilSessions` table
+7. Approved changes are applied to the data layer (or queued for human review if the source type or data category requires it)
+8. The original GitHub issue is updated with the council's decision and reasoning
+
+### High-Sensitivity Data Categories
+
+Certain data categories always require human approval, even if the council unanimously approves:
+
+- Government officials (cabinet ministers, governors)
+- Election results
+- Constitutional articles
+- Any change that would modify more than 10 records at once
+
+### Extending the Council
+
+To add a new LLM provider:
+
+1. Create a new file in `convex/agents/providers/` (e.g., `openai.ts`)
+2. Implement the `evaluateDataChange()` function:
+   - Input: proposed change, source URL, current database value, data category
+   - Output: vote (`approve` / `reject` / `abstain`), confidence score (0-1), reasoning text
+3. Register the provider in `convex/agents/providers/registry.ts`
+4. Set the provider's API key as a Convex environment variable
+5. The orchestrator will automatically include the new provider in all future council sessions

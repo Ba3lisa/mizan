@@ -41,9 +41,16 @@ export default defineSchema({
     websiteUrl: v.optional(v.string()),
     employeeCount: v.optional(v.number()),
     establishedYear: v.optional(v.number()),
+    sector: v.optional(v.union(
+      v.literal("sovereignty"),
+      v.literal("economic"),
+      v.literal("social"),
+      v.literal("infrastructure")
+    )),
     sortOrder: v.number(),
   })
-    .index("by_sortOrder", ["sortOrder"]),
+    .index("by_sortOrder", ["sortOrder"])
+    .index("by_sector", ["sector"]),
 
   governorates: defineTable({
     nameAr: v.string(),

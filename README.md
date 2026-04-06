@@ -3,6 +3,7 @@
 [![Deploy](https://github.com/Ba3lisa/mizan/actions/workflows/deploy.yml/badge.svg)](https://github.com/Ba3lisa/mizan/actions/workflows/deploy.yml)
 [![Lint](https://github.com/Ba3lisa/mizan/actions/workflows/lint.yml/badge.svg)](https://github.com/Ba3lisa/mizan/actions/workflows/lint.yml)
 [![Codex Review](https://github.com/Ba3lisa/mizan/actions/workflows/codex-review.yml/badge.svg)](https://github.com/Ba3lisa/mizan/actions/workflows/codex-review.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Egypt's government, made visible.**
 
@@ -10,30 +11,86 @@ Mizan is a civic transparency platform that makes Egyptian government data acces
 
 ميزان هو منصة شفافية مدنية تجعل بيانات الحكومة المصرية متاحة وقابلة للبحث والفهم. مخصصات الموازنة، الدين العام، أعضاء البرلمان، هيكل الحكومة، ومواد الدستور -- كل ذلك في مكان واحد، مدعوم بمصادر رسمية.
 
-## Live Site
+[Live Site](https://mizanmasr.com) | [Roadmap](docs/ROADMAP.md) | [Contributing](CONTRIBUTING.md) | [Architecture](docs/architecture.md)
 
-[mizanmasr.com](https://mizanmasr.com)
+---
 
-## Screenshot
+## Architecture
 
-<!-- TODO: Add screenshot of the landing page -->
+Mizan is built as three layers:
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│               Visual Layer (Next.js 15 + React 19)           │
+│  Budget · Debt · Parliament · Government · Constitution · Elections  │
+├──────────────────────────────────────────────────────────────┤
+│            Data Layer (Convex Database -- 26 tables)          │
+│     Structured data + Agent changelogs + Data lineage         │
+├──────────────────────────────────────────────────────────────┤
+│              Agentic Layer (Convex Actions)                    │
+│  Orchestrator · LLM Council · GitHub Agent · Validators        │
+│  Providers: Anthropic (extensible to OpenAI, Google, etc.)     │
+└──────────────────────────────────────────────────────────────┘
+         ↑ Every 6 hours                    ↑ GitHub Issues
+    Gov sources, APIs, news           Community data corrections
+```
+
+[Interactive architecture diagram (Excalidraw)](https://app.excalidraw.com/s/8B4UFPTVlkA/2QtqeIRt0rX) | [Full architecture docs](docs/architecture.md)
+
+## How It Works
+
+1. **Data Collection**: Every 6 hours, AI agents fetch data from official Egyptian government sources, the World Bank API, and other public datasets.
+2. **Validation**: Deterministic validators check data integrity. An LLM Council verifies community-submitted corrections.
+3. **Transparency**: Every change is logged with source URLs, timestamps, and agent decisions. See it live at [/transparency](https://mizanmasr.com/transparency).
+4. **Visualization**: The React frontend renders the data as interactive charts, maps, and searchable directories.
+
+## Contributing
+
+There are two ways to contribute:
+
+### 1. Data Contributions
+
+Found incorrect or outdated data? Open a [Data Correction](https://github.com/Ba3lisa/mizan/issues/new?template=data-correction.md) issue. The LLM Council will verify your submission automatically.
+
+**Source priority**: `.gov.eg` > International organizations > Media > Other
+
+### 2. UI Contributions
+
+Have a visual improvement in mind? Open a [UI Suggestion](https://github.com/Ba3lisa/mizan/issues/new?template=ui-suggestion.md) issue. These are reviewed by maintainers during sprint planning.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for full details including the LLM Council verification process and source hierarchy.
+
+## Funding and Transparency
+
+Mizan is funded through [GitHub Sponsors](https://github.com/sponsors/Ba3lisa). Every dollar received and spent is tracked transparently in our database and visible on the [/funding](https://mizanmasr.com/funding) page.
+
+Where the money goes:
+- **Infrastructure** -- DigitalOcean hosting, Cloudflare DNS/CDN
+- **AI API costs** -- Anthropic Claude for data extraction and verification
+- **Data acquisition** -- When paid sources are needed
 
 ## Tech Stack
 
 - **Frontend**: Next.js 15, React 19, Tailwind CSS 4
 - **Backend**: Convex (real-time serverless database and functions)
 - **Charts**: Recharts, Visx, Nivo
+- **AI**: Anthropic Claude (data extraction + LLM Council verification)
 - **Hosting**: DigitalOcean App Platform
 - **DNS/CDN**: Cloudflare
 - **CI/CD**: GitHub Actions
+- **IaC**: Terraform (Cloudflare + DigitalOcean + GitHub)
 
 ## Features
 
-- **Budget Explorer** -- Interactive visualization of Egypt's national budget
-- **Debt Tracker** -- External and domestic debt figures with historical trends
-- **Parliament Directory** -- Searchable database of parliament members
-- **Government Structure** -- Current cabinet and ministry organization
-- **Constitution** -- Full text of the Egyptian constitution, searchable
+- **Budget Explorer** -- Interactive Sankey flow visualization of Egypt's national budget
+- **Debt Tracker** -- External and domestic debt with World Bank API integration
+- **Parliament Directory** -- 896 members across House and Senate, searchable
+- **Government Structure** -- Current cabinet, ministries, and governorates
+- **Constitution** -- Full text of the 2014 constitution (247 articles), full-text search
+- **Elections** -- Presidential and parliamentary results with governorate map
+- **AI Data Agent** -- Automated 6-hour refresh cycle from official sources
+- **LLM Council** -- Multi-model verification of community data corrections
+- **Transparency Page** -- Full audit trail of every data change
 - **Bilingual** -- Arabic and English interface
 - **Source Citations** -- Every data point links to its official source
 
@@ -63,16 +120,16 @@ The app will be available at `http://localhost:3000`.
 All data is sourced from official Egyptian government publications and accredited international organizations. See the [methodology page](https://mizanmasr.com/methodology) for full details.
 
 Priority sources:
-1. World Bank API (debt, GDP, economic indicators)
-2. Central Bank of Egypt (exchange rates, reserves)
-3. Ministry of Finance (budget data)
-4. Cabinet.gov.eg (government structure)
-5. Parliament.gov.eg (member directory)
-6. CAPMAS (national statistics)
+1. World Bank API (debt, GDP, economic indicators) -- automated
+2. Central Bank of Egypt (exchange rates, reserves) -- automated
+3. Ministry of Finance (budget data) -- AI-parsed
+4. Cabinet.gov.eg (government structure) -- AI-parsed, human-reviewed
+5. Parliament.gov.eg (member directory) -- manual curation
+6. CAPMAS (national statistics) -- manual + AI-assisted
 
-## Contributing
+## Development Model
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Code is written by Claude Code agents and reviewed by OpenAI Codex. Human maintainers approve all merges. See [docs/agent-development.md](docs/agent-development.md) for details.
 
 ## License
 

@@ -19,4 +19,12 @@ crons.interval(
   {}
 );
 
+// Compact old refresh logs daily (keeps last 30 days, archives the rest).
+crons.interval(
+  "compact-logs",
+  { hours: 24 },
+  internal.agents.maintenance.compactRefreshLogs,
+  {}
+);
+
 export default crons;

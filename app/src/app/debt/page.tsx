@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Skeleton } from "boneyard-js/react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
@@ -189,8 +190,11 @@ function DebtTimeline() {
 
   // Wire to Convex — fall back to demo data when empty or loading
   const convexTimeline = useQuery(api.debt.getDebtTimeline);
+  const isLoading = convexTimeline === undefined;
   const activeTimelineData: TimelineDataPoint[] =
-    convexTimeline && convexTimeline.length > 0
+    isLoading
+      ? timelineData
+      : convexTimeline.length > 0
       ? convexTimeline.map((r) => ({
           year: new Date(r.date).getFullYear(),
           externalDebt: r.totalExternalDebt ?? 0,
@@ -224,6 +228,7 @@ function DebtTimeline() {
   const hovered = hoveredYear ? activeTimelineData.find((d) => d.year === hoveredYear) : null;
 
   return (
+    <Skeleton name="debt-timeline" loading={isLoading}>
     <div className="flex flex-col gap-3">
       <div className="overflow-x-auto">
         <svg
@@ -346,6 +351,7 @@ function DebtTimeline() {
         cbe.org.eg
       </a>
     </div>
+    </Skeleton>
   );
 }
 
@@ -358,9 +364,12 @@ function CreditorBreakdown() {
 
   // Wire to Convex latest debt record for creditor breakdown
   const convexLatest = useQuery(api.debt.getLatestDebtRecord);
+  const isCreditorLoading = convexLatest === undefined;
   const CREDITOR_COLORS = ["#6C8EEF", "#2EC4B6", "#C9A84C", "#E76F51", "#9B72CF", "#E5484D", "#525C72"];
   const activeCreditors: Creditor[] =
-    convexLatest && convexLatest.creditors && convexLatest.creditors.length > 0
+    isCreditorLoading
+      ? creditors
+      : convexLatest?.creditors && convexLatest.creditors.length > 0
       ? convexLatest.creditors.map((c, i) => ({
           nameAr: c.creditorAr,
           nameEn: c.creditorEn,
@@ -380,6 +389,7 @@ function CreditorBreakdown() {
   );
 
   return (
+    <Skeleton name="debt-creditors" loading={isCreditorLoading}>
     <div className="flex flex-col gap-6">
       {/* Sort toggles */}
       <div className="flex items-center gap-2">
@@ -543,6 +553,7 @@ function CreditorBreakdown() {
         <a href="https://imf.org" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">imf.org</a>
       </div>
     </div>
+    </Skeleton>
   );
 }
 
@@ -722,14 +733,16 @@ export default function DebtPage() {
   const convexTimeline = useQuery(api.debt.getDebtTimeline);
   const convexLatest = useQuery(api.debt.getLatestDebtRecord);
 
+  const isPageLoading = convexTimeline === undefined || convexLatest === undefined;
+
   const activeTimelineForPage: TimelineDataPoint[] =
-    convexTimeline && convexTimeline.length > 0
-      ? convexTimeline.map((r) => ({
+    isPageLoading || !convexTimeline || convexTimeline.length === 0
+      ? timelineData
+      : convexTimeline.map((r) => ({
           year: new Date(r.date).getFullYear(),
           externalDebt: r.totalExternalDebt ?? 0,
           debtToGDP: r.debtToGdpRatio ?? 0,
-        }))
-      : timelineData;
+        }));
 
   const latestData =
     convexLatest
@@ -767,6 +780,7 @@ export default function DebtPage() {
         </div>
 
         {/* ── Key Metrics ── */}
+        <Skeleton name="debt-key-metrics" loading={isPageLoading}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="pt-5 pb-5">
@@ -819,6 +833,7 @@ export default function DebtPage() {
             </CardContent>
           </Card>
         </div>
+        </Skeleton>
 
         {/* ── Callout ── */}
         <div className="rounded-lg border border-border bg-muted/20 px-5 py-4 flex flex-col gap-1.5">

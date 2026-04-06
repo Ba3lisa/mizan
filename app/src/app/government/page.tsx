@@ -12,6 +12,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { Skeleton } from "boneyard-js/react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -166,6 +167,8 @@ export default function GovernmentPage() {
   const liveHierarchy = useQuery(api.government.getGovernmentHierarchy);
   const liveGovernorates = useQuery(api.government.listGovernorates);
 
+  const isLoading = liveHierarchy === undefined || liveGovernorates === undefined;
+
   // Adapt Convex officials to UI Official shape
   const president: Official = liveHierarchy?.president
     ? {
@@ -194,7 +197,9 @@ export default function GovernmentPage() {
     : FALLBACK_PM;
 
   // Adapt Convex ministries — Convex schema has no sector field, default to "other"
-  const ministries: Ministry[] = liveHierarchy?.ministries && liveHierarchy.ministries.length > 0
+  const ministries: Ministry[] = isLoading
+    ? []
+    : liveHierarchy?.ministries && liveHierarchy.ministries.length > 0
     ? liveHierarchy.ministries.map((m) => ({
         id: m._id,
         nameAr: m.nameAr,
@@ -207,7 +212,9 @@ export default function GovernmentPage() {
     : FALLBACK_MINISTRIES;
 
   // Adapt Convex governorates
-  const governorates: Governorate[] = liveGovernorates && liveGovernorates.length > 0
+  const governorates: Governorate[] = isLoading
+    ? []
+    : liveGovernorates && liveGovernorates.length > 0
     ? liveGovernorates.map((g) => ({
         id: g._id,
         nameAr: g.nameAr,
@@ -275,6 +282,7 @@ export default function GovernmentPage() {
 
           {/* ═══ LEADERSHIP — Visual Org Chart ═══ */}
           <TabsContent value="leadership">
+            <Skeleton name="gov-leadership" loading={isLoading}>
             <div className="flex flex-col items-center gap-0">
               {/* President */}
               <div className="w-full max-w-md">
@@ -339,10 +347,13 @@ export default function GovernmentPage() {
                 </a>
               </p>
             </div>
+            </Skeleton>
           </TabsContent>
 
           {/* ═══ MINISTRIES — Filterable Grid ═══ */}
           <TabsContent value="ministries">
+            <Skeleton name="gov-ministries" loading={isLoading}>
+            <>
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
               <div className="relative flex-1 max-w-sm">
@@ -389,10 +400,14 @@ export default function GovernmentPage() {
               <p className="text-xs text-muted-foreground">{filteredMinistries.length} {isAr ? "وزارة" : "ministries"}</p>
               <a href="https://cabinet.gov.eg" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1"><ExternalLink size={10} /> cabinet.gov.eg</a>
             </div>
+            </>
+            </Skeleton>
           </TabsContent>
 
           {/* ═══ GOVERNORATES ═══ */}
           <TabsContent value="governorates">
+            <Skeleton name="gov-governorates" loading={isLoading}>
+            <>
             <div className="relative max-w-sm mb-8">
               <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
               <Input value={govSearch} onChange={e => setGovSearch(e.target.value)} placeholder={isAr ? "بحث في المحافظات..." : "Search governorates..."} className="ps-9 text-sm" />
@@ -430,6 +445,8 @@ export default function GovernmentPage() {
               <p className="text-xs text-muted-foreground">{filteredGovernorates.length} {isAr ? "محافظة" : "governorates"}</p>
               <a href="https://capmas.gov.eg" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline inline-flex items-center gap-1"><ExternalLink size={10} /> capmas.gov.eg</a>
             </div>
+            </>
+            </Skeleton>
           </TabsContent>
         </Tabs>
       </div>

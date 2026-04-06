@@ -97,6 +97,15 @@ export const searchArticles = query({
   },
 });
 
+export const listAllArticles = query({
+  args: {},
+  handler: async (ctx) => {
+    return await ctx.db
+      .query("constitutionArticles")
+      .collect();
+  },
+});
+
 export const listAmendedArticles = query({
   args: {},
   handler: async (ctx) => {

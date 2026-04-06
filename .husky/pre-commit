@@ -1,1 +1,15 @@
+# Block commits containing secrets (exclude hook/workflow pattern files)
+SECRETS_FOUND=$(git diff --cached --diff-filter=d -U0 -- ':!.husky/*' ':!.github/workflows/secret-scan.yml' | grep -E \
+  'cfat_[A-Za-z0-9]{10,}|dop_v1_[a-f0-9]{10,}|sk-ant-[A-Za-z0-9]{10,}|ghp_[A-Za-z0-9]{10,}' \
+  2>/dev/null || true)
+
+if [ -n "$SECRETS_FOUND" ]; then
+  echo "SECRET DETECTED in staged changes! Commit blocked."
+  echo "$SECRETS_FOUND"
+  echo ""
+  echo "Remove the secret and use environment variables or GitHub secrets instead."
+  exit 1
+fi
+
+# Lint staged files
 cd app && npx lint-staged

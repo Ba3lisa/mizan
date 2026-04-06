@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Vertical pillar -->
+  <line x1="16" y1="6" x2="16" y2="28" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Base -->
+  <line x1="10" y1="28" x2="22" y2="28" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Fulcrum triangle -->
+  <polygon points="16,4 13,8 19,8" fill="#C9A84C"/>
+  <!-- Horizontal beam -->
+  <line x1="6" y1="10" x2="26" y2="10" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round"/>
+  <!-- Left arm rope -->
+  <line x1="7" y1="10" x2="6" y2="16" stroke="#C9A84C" stroke-width="1" stroke-linecap="round"/>
+  <!-- Right arm rope -->
+  <line x1="25" y1="10" x2="26" y2="16" stroke="#C9A84C" stroke-width="1" stroke-linecap="round"/>
+  <!-- Left pan -->
+  <path d="M3 16 Q6 19 9 16" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+  <!-- Right pan -->
+  <path d="M23 16 Q26 19 29 16" stroke="#C9A84C" stroke-width="1.5" stroke-linecap="round" fill="none"/>
+</svg>
