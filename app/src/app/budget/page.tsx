@@ -149,11 +149,7 @@ const _FISCAL_YEAR_GDP: Record<FiscalYear, number> = {
   "2022-2023": 9100,
 };
 
-const FISCAL_YEAR_POPULATION: Record<FiscalYear, number> = {
-  "2024-2025": 105_000_000,
-  "2023-2024": 104_000_000,
-  "2022-2023": 103_000_000,
-};
+// Population fetched live from Convex economy indicators (World Bank)
 
 // Historical data removed -- YearComparisonChart now reads from Convex fiscal years
 
@@ -221,85 +217,207 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
     );
   }
 
-  // Mobile: show clean vertical bar breakdown instead of Sankey
+  // Mobile: SVG flow diagram showing revenue → spending connections
   if (isMobile) {
     const totalRev = revenueData.reduce((s, r) => s + r.amount, 0);
     const totalSp = spendingData.reduce((s, r) => s + r.amount, 0);
     const sortedRev = [...revenueData].sort((a, b) => b.amount - a.amount);
     const sortedSp = [...spendingData].sort((a, b) => b.amount - a.amount);
 
+    // Layout constants
+    const nodeW = 110; // width of each label+bar column
+    const gapX = 60;   // horizontal gap for SVG flow paths
+    const svgW = nodeW * 2 + gapX;
+    const rowH = 32;   // height per unit in the stacked bars
+    const pad = 4;     // vertical padding between blocks
+
+    // Calculate block heights proportionally (min 20px)
+    const maxTotal = Math.max(totalRev, totalSp);
+    const totalH = sortedRev.length * rowH * 1.5; // approximate total visual height
+    const calcH = (amount: number) => Math.max(20, (amount / maxTotal) * totalH);
+
+    // Compute Y positions for revenue blocks (left column)
+    const revBlocks: Array<{ item: BudgetCategory; y: number; h: number }> = [];
+    let yRev = 0;
+    for (const r of sortedRev) {
+      const h = calcH(r.amount);
+      revBlocks.push({ item: r, y: yRev, h });
+      yRev += h + pad;
+    }
+
+    // Compute Y positions for spending blocks (right column)
+    const spBlocks: Array<{ item: BudgetCategory; y: number; h: number }> = [];
+    let ySp = 0;
+    for (const s of sortedSp) {
+      const h = calcH(s.amount);
+      spBlocks.push({ item: s, y: ySp, h });
+      ySp += h + pad;
+    }
+
+    const svgH = Math.max(yRev, ySp);
+
+    // Build flow paths: each revenue item distributes proportionally to each spending item
+    const flows: Array<{
+      revIdx: number; spIdx: number; value: number;
+      srcY: number; srcH: number; tgtY: number; tgtH: number;
+    }> = [];
+    for (let ri = 0; ri < revBlocks.length; ri++) {
+      let srcOffset = 0;
+      for (let si = 0; si < spBlocks.length; si++) {
+        const flowVal = Math.round(
+          (revBlocks[ri].item.amount / totalRev) *
+          (spBlocks[si].item.amount / totalSp) *
+          Math.min(totalRev, totalSp)
+        );
+        if (flowVal < 1) continue;
+        const flowH_src = (flowVal / revBlocks[ri].item.amount) * revBlocks[ri].h;
+        const flowH_tgt = (flowVal / spBlocks[si].item.amount) * spBlocks[si].h;
+        // Track cumulative offset within each block
+        const srcY = revBlocks[ri].y + srcOffset;
+        srcOffset += flowH_src;
+        flows.push({
+          revIdx: ri, spIdx: si, value: flowVal,
+          srcY, srcH: flowH_src,
+          tgtY: 0, tgtH: flowH_tgt,
+        });
+      }
+    }
+    // Compute target Y offsets
+    const spOffsets = new Array(spBlocks.length).fill(0);
+    for (const f of flows) {
+      f.tgtY = spBlocks[f.spIdx].y + spOffsets[f.spIdx];
+      spOffsets[f.spIdx] += f.tgtH;
+    }
+
+    const leftX = nodeW;
+    const rightX = nodeW + gapX;
+
     return (
-      <div className="flex flex-col gap-8">
-        {/* Revenue */}
-        <div>
-          <div className="flex items-baseline justify-between mb-3">
-            <h3 className="text-sm font-bold text-foreground">{isAr ? "الإيرادات" : "Revenue"}</h3>
-            <span className="font-mono text-xs text-emerald-500">{fmtAmount(totalRev)}</span>
+      <div className="flex flex-col gap-4" dir="ltr">
+        {/* Header */}
+        <div className="flex items-center justify-between px-1" dir={isAr ? "rtl" : "ltr"}>
+          <div>
+            <span className="text-xs font-bold" style={{ color: REVENUE_COLOR }}>{isAr ? "الإيرادات" : "Revenue"}</span>
+            <span className="font-mono text-[0.65rem] text-emerald-500 ms-2">{fmtAmount(totalRev)}</span>
           </div>
-          <div className="flex flex-col gap-2">
-            {sortedRev.map((r) => {
-              const pct = totalRev > 0 ? (r.amount / totalRev) * 100 : 0;
-              return (
-                <div key={r.nameEn}>
-                  <div className="flex items-baseline justify-between mb-1">
-                    <span className="text-xs text-foreground truncate flex-1">{isAr ? r.nameAr : r.nameEn}</span>
-                    <span className="font-mono text-[0.65rem] text-muted-foreground ms-2">{pct.toFixed(1)}%</span>
-                  </div>
-                  <div className="h-6 bg-muted/30 rounded overflow-hidden">
-                    <div
-                      className="h-full rounded flex items-center justify-end px-2"
-                      style={{ width: `${pct}%`, background: REVENUE_COLOR }}
-                    >
-                      {pct > 15 && (
-                        <span className="text-[0.6rem] text-white font-mono">{fmtAmount(r.amount)}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+          <div>
+            <span className="text-xs font-bold" style={{ color: SPENDING_COLOR }}>{isAr ? "المصروفات" : "Spending"}</span>
+            <span className="font-mono text-[0.65rem] text-red-400 ms-2">{fmtAmount(totalSp)}</span>
           </div>
         </div>
 
-        {/* Spending */}
-        <div>
-          <div className="flex items-baseline justify-between mb-3">
-            <h3 className="text-sm font-bold text-foreground">{isAr ? "المصروفات" : "Spending"}</h3>
-            <span className="font-mono text-xs text-red-400">{fmtAmount(totalSp)}</span>
-          </div>
-          <div className="flex flex-col gap-2">
-            {sortedSp.map((s) => {
-              const pct = totalSp > 0 ? (s.amount / totalSp) * 100 : 0;
-              const isDebt = s.nameEn === "Debt Service";
+        {/* Flow diagram */}
+        <div className="relative overflow-x-auto">
+          <svg
+            width={svgW}
+            height={svgH}
+            viewBox={`0 0 ${svgW} ${svgH}`}
+            className="w-full"
+            style={{ minWidth: 300 }}
+          >
+            {/* Flow paths */}
+            {flows.map((f, i) => {
+              const x1 = leftX;
+              const x2 = rightX;
+              const y1top = f.srcY;
+              const y1bot = f.srcY + f.srcH;
+              const y2top = f.tgtY;
+              const y2bot = f.tgtY + f.tgtH;
+              const cx = (x1 + x2) / 2;
+              const isDebt = spBlocks[f.spIdx].item.nameEn === "Debt Service";
+
               return (
-                <div key={s.nameEn}>
-                  <div className="flex items-baseline justify-between mb-1">
-                    <span className={`text-xs truncate flex-1 ${isDebt ? "text-red-400 font-semibold" : "text-foreground"}`}>
-                      {isAr ? s.nameAr : s.nameEn}
-                    </span>
-                    <span className="font-mono text-[0.65rem] text-muted-foreground ms-2">{pct.toFixed(1)}%</span>
-                  </div>
-                  <div className="h-6 bg-muted/30 rounded overflow-hidden">
-                    <div
-                      className="h-full rounded flex items-center justify-end px-2"
-                      style={{ width: `${pct}%`, background: isDebt ? DEBT_SERVICE_COLOR : SPENDING_COLOR }}
-                    >
-                      {pct > 12 && (
-                        <span className="text-[0.6rem] text-white font-mono">{fmtAmount(s.amount)}</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
+                <path
+                  key={i}
+                  d={`M${x1},${y1top} C${cx},${y1top} ${cx},${y2top} ${x2},${y2top} L${x2},${y2bot} C${cx},${y2bot} ${cx},${y1bot} ${x1},${y1bot} Z`}
+                  fill={isDebt ? DEBT_SERVICE_COLOR : REVENUE_COLOR}
+                  opacity={0.18}
+                />
               );
             })}
-          </div>
+
+            {/* Revenue blocks (left) */}
+            {revBlocks.map((rb, i) => {
+              const pct = totalRev > 0 ? ((rb.item.amount / totalRev) * 100).toFixed(0) : "0";
+              return (
+                <g key={`rev-${i}`}>
+                  <rect
+                    x={leftX - 8}
+                    y={rb.y}
+                    width={8}
+                    height={rb.h}
+                    rx={2}
+                    fill={REVENUE_COLOR}
+                  />
+                  <text
+                    x={leftX - 14}
+                    y={rb.y + rb.h / 2}
+                    textAnchor="end"
+                    dominantBaseline="middle"
+                    className="fill-foreground"
+                    style={{ fontSize: 10 }}
+                  >
+                    {isAr ? rb.item.nameAr : rb.item.nameEn}
+                  </text>
+                  <text
+                    x={leftX - 14}
+                    y={rb.y + rb.h / 2 + 12}
+                    textAnchor="end"
+                    dominantBaseline="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: 8, fontFamily: "var(--font-mono)" }}
+                  >
+                    {pct}%
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Spending blocks (right) */}
+            {spBlocks.map((sb, i) => {
+              const pct = totalSp > 0 ? ((sb.item.amount / totalSp) * 100).toFixed(0) : "0";
+              const isDebt = sb.item.nameEn === "Debt Service";
+              return (
+                <g key={`sp-${i}`}>
+                  <rect
+                    x={rightX}
+                    y={sb.y}
+                    width={8}
+                    height={sb.h}
+                    rx={2}
+                    fill={isDebt ? DEBT_SERVICE_COLOR : SPENDING_COLOR}
+                  />
+                  <text
+                    x={rightX + 14}
+                    y={sb.y + sb.h / 2}
+                    textAnchor="start"
+                    dominantBaseline="middle"
+                    className="fill-foreground"
+                    style={{ fontSize: 10 }}
+                  >
+                    {isAr ? sb.item.nameAr : sb.item.nameEn}
+                  </text>
+                  <text
+                    x={rightX + 14}
+                    y={sb.y + sb.h / 2 + 12}
+                    textAnchor="start"
+                    dominantBaseline="middle"
+                    className="fill-muted-foreground"
+                    style={{ fontSize: 8, fontFamily: "var(--font-mono)" }}
+                  >
+                    {fmtAmount(sb.item.amount)} · {pct}%
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
         </div>
 
         {/* Deficit */}
         {totalSp > totalRev && (
-          <div className="border-t border-border pt-3 flex items-baseline justify-between">
-            <span className="text-xs font-semibold text-amber-400">{isAr ? "العجز" : "Deficit"}</span>
-            <span className="font-mono text-sm font-bold text-amber-400">{fmtAmount(totalSp - totalRev)}</span>
+          <div className="border-t border-border pt-3 flex items-baseline justify-between px-1" dir={isAr ? "rtl" : "ltr"}>
+            <span className="text-xs font-semibold" style={{ color: DEFICIT_COLOR }}>{isAr ? "العجز" : "Deficit"}</span>
+            <span className="font-mono text-sm font-bold" style={{ color: DEFICIT_COLOR }}>{fmtAmount(totalSp - totalRev)}</span>
           </div>
         )}
       </div>
@@ -484,13 +602,12 @@ function YearComparisonChart() {
 
 // ─── Per Capita Section ───────────────────────────────────────────────────────
 
-function PerCapitaSection({ year, spendingData, revenueData, populationOverride }: { year: FiscalYear; spendingData?: BudgetCategory[]; revenueData?: BudgetCategory[]; populationOverride?: number }) {
+function PerCapitaSection({ year: _year, spendingData, revenueData, populationOverride }: { year: FiscalYear; spendingData?: BudgetCategory[]; revenueData?: BudgetCategory[]; populationOverride?: number }) {
   const { lang } = useLanguage();
   const { symbol, fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
 
-  const normalizedYear = year.replace("/", "-") as FiscalYear;
-  const pop = populationOverride ?? FISCAL_YEAR_POPULATION[normalizedYear] ?? 105_000_000;
+  const pop = populationOverride ?? 0;
   const activeSpending = spendingData ?? [];
   const activeRevenue = revenueData ?? [];
   const totalRevenue = activeRevenue.reduce((s, r) => s + r.amount, 0);
@@ -716,6 +833,7 @@ export default function BudgetPage() {
 
   // ─── Convex queries ───────────────────────────────────────────────────────
   const convexFiscalYears = useQuery(api.budget.listFiscalYears);
+  const populationData = useQuery(api.economy.getIndicator, { indicator: "population" });
   const _isLoading = convexFiscalYears === undefined;
 
   // Sort newest first for dropdown
@@ -746,8 +864,11 @@ export default function BudgetPage() {
   const totalSpending = selectedFY?.totalExpenditure ?? 0;
   const deficit = selectedFY?.deficit ?? (totalSpending - totalRevenue);
   const gdp = selectedFY?.gdp ?? 0;
-  const normalizedYear = selectedYearStr.replace("/", "-") as FiscalYear;
-  const population = FISCAL_YEAR_POPULATION[normalizedYear] ?? 105_000_000;
+  // Population from Convex (World Bank, stored in millions) — latest value
+  const latestPop = populationData && populationData.length > 0
+    ? populationData[populationData.length - 1].value * 1_000_000
+    : 0;
+  const population = latestPop > 0 ? Math.round(latestPop) : 0;
 
   const _isBudgetLoading = convexBreakdown === undefined || convexRevenue === undefined;
 
