@@ -530,6 +530,112 @@ const WB_INDICATORS: Array<{
   },
 ];
 
+// ─── IMF DATAMAPPER REFRESH ───────────────────────────────────────────────────
+
+// IMF DataMapper indicator codes for Egypt.
+// The API returns both historical values and WEO forecasts through 2030.
+const IMF_INDICATORS: Array<{
+  code: string;
+  indicator: string;
+  unit: string;
+  sourceNameEn: string;
+}> = [
+  {
+    code: "NGDP_RPCH",
+    indicator: "imf_gdp_growth_forecast",
+    unit: "percent",
+    sourceNameEn: "IMF WEO — Real GDP growth (annual %)",
+  },
+  {
+    code: "PCPIPCH",
+    indicator: "imf_inflation_forecast",
+    unit: "percent",
+    sourceNameEn: "IMF WEO — Inflation, average consumer prices (annual %)",
+  },
+  {
+    code: "BCA_NGDPD",
+    indicator: "imf_current_account_forecast",
+    unit: "percent_gdp",
+    sourceNameEn: "IMF WEO — Current account balance (% of GDP)",
+  },
+  {
+    code: "GGXWDG_NGDP",
+    indicator: "imf_gov_debt_gdp",
+    unit: "percent_gdp",
+    sourceNameEn: "IMF WEO — Government gross debt (% of GDP)",
+  },
+];
+
+// IMF DataMapper API response shape
+type IMFResponse = {
+  values?: Record<string, Record<string, Record<string, number>>>;
+};
+
+async function refreshIMFData(
+  ctx: ActionCtx
+): Promise<{ recordsUpdated: number }> {
+  let totalUpdated = 0;
+  const BASE_URL = "https://www.imf.org/external/datamapper/api/v1";
+
+  for (const imf of IMF_INDICATORS) {
+    const url = `${BASE_URL}/${imf.code}/EGY`;
+    let raw: unknown;
+
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      if (!response.ok) {
+        console.warn(
+          `[dataAgent/imf] IMF API returned ${response.status} for indicator ${imf.code}`
+        );
+        continue;
+      }
+      raw = await response.json();
+    } catch (err) {
+      console.warn(
+        `[dataAgent/imf] Failed to fetch ${imf.code}: ${String(err)}`
+      );
+      continue;
+    }
+
+    // Parse IMF response: {"values":{"NGDP_RPCH":{"EGY":{"2024":2.4,"2025":4.3,...}}}}
+    const typed = raw as IMFResponse;
+    const yearMap = typed?.values?.[imf.code]?.["EGY"];
+    if (!yearMap || typeof yearMap !== "object") {
+      console.warn(
+        `[dataAgent/imf] Unexpected IMF response shape for ${imf.code}`
+      );
+      continue;
+    }
+
+    for (const [yearStr, value] of Object.entries(yearMap)) {
+      if (typeof value !== "number" || isNaN(value)) continue;
+
+      // IMF year strings are like "2024"; store as YYYY-12-31 for consistency
+      const date = `${yearStr}-12-31`;
+
+      const updated: number = await ctx.runMutation(
+        internal.dataRefresh.upsertEconomicIndicator,
+        {
+          indicator: imf.indicator,
+          date,
+          year: yearStr,
+          value,
+          unit: imf.unit,
+          sourceUrl: url,
+          sourceNameEn: imf.sourceNameEn,
+        }
+      );
+      totalUpdated += updated;
+    }
+
+    console.log(
+      `[dataAgent/imf] ${imf.code} -> ${imf.indicator}: ${Object.keys(yearMap).length} year(s) processed`
+    );
+  }
+
+  return { recordsUpdated: totalUpdated };
+}
+
 async function refreshEconomyData(
   ctx: ActionCtx
 ): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
@@ -616,6 +722,10 @@ async function refreshEconomyData(
   // Also refresh EGX 30 stock market index
   const stockResult = await refreshStockMarket(ctx);
   totalUpdated += stockResult.recordsUpdated;
+
+  // Fetch IMF DataMapper indicators (includes forecasts through 2030)
+  const imfResult = await refreshIMFData(ctx);
+  totalUpdated += imfResult.recordsUpdated;
 
   return {
     recordsUpdated: totalUpdated,

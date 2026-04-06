@@ -24,11 +24,30 @@
 
 ### Data sources (in priority order):
 1. World Bank API (debt, GDP, economic indicators) — automated
-2. Central Bank of Egypt (exchange rates, reserves) — automated
-3. Ministry of Finance (budget) — AI-parsed from mof.gov.eg
-4. Ahram Online (english.ahram.org.eg) (government structure) — AI-parsed, human-reviewed
-5. Wikipedia + parliament.gov.eg (parliament composition + individual member pages) — automated
-6. CAPMAS (statistics) — manual + AI-assisted
+2. IMF DataMapper API (GDP/inflation/debt forecasts through 2030) — automated
+3. ExchangeRate-API (live USD/EGP daily rate) — automated
+4. Ministry of Finance (budget) — AI-parsed from mof.gov.eg
+5. Ahram Online (english.ahram.org.eg) (government structure + governors) — AI-parsed
+6. Wikipedia + parliament.gov.eg (parliament composition + individual member pages) — automated
+7. countryeconomy.com (EGX 30 stock index) — automated scraping
+8. FAO/FAOLEX (constitution PDF) — automated extraction
+9. CAPMAS (statistics) — manual + AI-assisted
+
+### Centralized Data Registry (`dataSources` table)
+The `dataSources` table in Convex is the **agent's manifest** — the single source of truth for what data the pipeline owns and is responsible for refreshing. Every 6h cron run:
+
+1. The pipeline reads all active sources from `dataSources`
+2. Each source has a `category` linking it to a refresh function
+3. After refreshing, the pipeline updates `lastAccessedDate` on the source
+4. The `/methodology` page reads from this table to show users exactly where data comes from
+5. The `/transparency` page shows the refresh audit trail
+
+**When adding a new data source:**
+- Add it to `dataSources` via `sources.ts:upsertSourceInternal`
+- The pipeline auto-registers sources on each successful refresh
+- New sources added by the community (via GitHub issues) go through the LLM Council first
+
+**Agent rule:** If a source in `dataSources` has `lastAccessedDate` older than 48h, the pipeline MUST attempt to refresh it regardless of the staleness threshold. This prevents data from going permanently stale.
 
 Managed by Father of Projects (FoP). Stack: nextjs-convex.
 

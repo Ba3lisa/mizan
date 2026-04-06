@@ -638,4 +638,15 @@ export default defineSchema({
     updatedAt: v.number(),
   })
     .index("by_month", ["month"]),
+
+  // SOVEREIGN CREDIT RATINGS (S&P, Moody's, Fitch)
+  sovereignRatings: defineTable({
+    agency: v.string(),           // "S&P", "Moody's", "Fitch"
+    rating: v.string(),           // "B-", "Caa1", "B-"
+    outlook: v.string(),          // "Stable", "Positive", "Stable"
+    effectiveDate: v.string(),    // ISO date
+    previousRating: v.optional(v.string()),
+    sourceUrl: v.optional(v.string()),
+  })
+    .index("by_agency", ["agency"]),
 });
