@@ -287,36 +287,19 @@ Be thorough — do NOT skip any ministers. Return an empty array [] if no data i
 Page content:
 ${pageText || "(page content unavailable)"}`;
 
-  // Also fetch governor data from Wikipedia
+  // Fetch governor data from Ahram Online (separate article from cabinet)
   let governorText = "";
   try {
-    const govWikiUrl = "https://en.wikipedia.org/w/api.php?action=query&titles=Subdivisions_of_Egypt&prop=extracts&explaintext=true&format=json";
-    const govRes = await fetch(govWikiUrl, { signal: AbortSignal.timeout(10000) });
-    if (govRes.ok) {
-      const data = await govRes.json() as { query?: { pages?: Record<string, { extract?: string }> } };
-      const pages = data?.query?.pages;
-      if (pages) {
-        governorText = Object.values(pages)[0]?.extract ?? "";
-        governorText = governorText.slice(0, 10000);
-      }
+    const govAhramRes = await fetch("https://english.ahram.org.eg/News/526575.aspx", { signal: AbortSignal.timeout(10000) });
+    if (govAhramRes.ok) {
+      const html = await govAhramRes.text();
+      const titleMarker = html.indexOf("ContentPlaceHolder1_hd");
+      const bodyStart = titleMarker > 0 ? titleMarker : 0;
+      governorText = html.slice(bodyStart, bodyStart + 10000).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
+      console.log(`[dataAgent] Fetched Ahram governor article: ${governorText.length} chars`);
     }
   } catch {
-    console.warn("[dataAgent] Wikipedia governor fetch failed");
-  }
-
-  // Fetch Ahram governor article too
-  if (governorText.length < 500) {
-    try {
-      const govAhramRes = await fetch("https://english.ahram.org.eg/News/526575.aspx", { signal: AbortSignal.timeout(10000) });
-      if (govAhramRes.ok) {
-        const html = await govAhramRes.text();
-        const titleMarker = html.indexOf("ContentPlaceHolder1_hd");
-        const bodyStart = titleMarker > 0 ? titleMarker : 0;
-        governorText = html.slice(bodyStart, bodyStart + 10000).replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#39;/g, "'").replace(/\s+/g, " ").trim();
-      }
-    } catch {
-      console.warn("[dataAgent] Ahram governor article fetch failed");
-    }
+    console.warn("[dataAgent] Ahram governor article fetch failed");
   }
 
   console.log(`[dataAgent] Government: sending ${pageText.length} chars to Claude for ministers...`);
