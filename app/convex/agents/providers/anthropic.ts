@@ -53,6 +53,73 @@ export async function callClaude(
   return extractClaudeText(json);
 }
 
+// ─── STRUCTURED OUTPUT (tool_use) ────────────────────────────────────────────
+
+interface ToolSchema {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
+/**
+ * Calls Claude with a tool definition to force structured JSON output.
+ * Uses Claude's tool_use feature: the model MUST call the tool, and the
+ * tool's input_schema acts as an output validator.
+ *
+ * Returns the parsed tool input (guaranteed to match the schema), or null.
+ */
+export async function callClaudeStructured<T>(
+  prompt: string,
+  schema: ToolSchema,
+  systemPrompt?: string,
+): Promise<T | null> {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    console.warn("[anthropic] ANTHROPIC_API_KEY not set — skipping structured call.");
+    return null;
+  }
+
+  const body: Record<string, unknown> = {
+    model: CLAUDE_MODEL,
+    max_tokens: 4096,
+    messages: [{ role: "user", content: prompt }],
+    tools: [schema],
+    tool_choice: { type: "tool", name: schema.name },
+  };
+  if (systemPrompt) {
+    body.system = systemPrompt;
+  }
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[anthropic] Structured call failed (${response.status}): ${errorText}`);
+    return null;
+  }
+
+  const json = await response.json() as {
+    content?: Array<{ type: string; input?: unknown }>;
+  };
+
+  // Extract the tool_use block
+  const toolUse = json.content?.find((block) => block.type === "tool_use");
+  if (!toolUse?.input) {
+    console.warn("[anthropic] No tool_use block in structured response.");
+    return null;
+  }
+
+  return toolUse.input as T;
+}
+
 // ─── COUNCIL EVALUATION ─────────────────────────────────────────────────────
 
 export interface CouncilEvaluationContext {

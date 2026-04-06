@@ -130,17 +130,17 @@ export const getCategoryHealth = query({
       elections: elections.length,
     };
 
-    const categories = [
+    // Categories that have pipeline refresh logs
+    const pipelineCategories = [
       "government",
       "parliament",
       "constitution",
       "budget",
       "debt",
-      "elections",
     ] as const;
 
-    const result = await Promise.all(
-      categories.map(async (category) => {
+    const pipelineResults = await Promise.all(
+      pipelineCategories.map(async (category) => {
         const lastSuccessful = await ctx.db
           .query("dataRefreshLog")
           .withIndex("by_category_and_status_and_startedAt", (q) =>
@@ -171,7 +171,18 @@ export const getCategoryHealth = query({
       })
     );
 
-    return result;
+    // Elections is static data — no pipeline refresh, just return record count
+    const electionsResult = {
+      category: "elections" as const,
+      lastRefreshTime: null,
+      lastAttemptTime: null,
+      lastStatus: elections.length > 0 ? "success" : null,
+      recordCount: tableCounts.elections ?? 0,
+      recordsUpdated: null,
+      sourceUrl: null,
+    };
+
+    return [...pipelineResults, electionsResult];
   },
 });
 

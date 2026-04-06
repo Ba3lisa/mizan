@@ -14,7 +14,7 @@ import {
   parseWorldBankResponse,
   validateDebtRecord,
 } from "./validators";
-import { callClaude } from "./providers/anthropic";
+import { callClaude, callClaudeStructured } from "./providers/anthropic";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -943,57 +943,82 @@ async function generateEconomicNarrative(ctx: ActionCtx): Promise<void> {
     .join("\n");
 
   const systemPrompt = `You are an economic analyst for Mizan, Egypt's government transparency platform.
-Generate concise, factual, apolitical economic insights based on data.
-Always respond with valid JSON only — no markdown, no prose.`;
+Generate concise, factual, apolitical economic insights based on data.`;
 
   const prompt = `Based on these latest Egyptian economic indicators, generate 3-5 concise economic insights.
-Each insight must:
-- Tell a data-driven story
-- Be apolitical and factual
-- Cite the specific numbers from the data
-- Be bilingual (English and Arabic)
+
+Each insight MUST have a clear title and body, citing specific numbers.
+Keep insights apolitical and factual. Provide both English and Arabic.
+
+Format each insight as: "Title: body text with numbers"
+Separate insights with newlines. Number them 1-5.
 
 Indicators:
-${indicatorSummary}
+${indicatorSummary}`;
 
-Return a JSON object with this structure:
-{
-  "titleEn": "Egypt Economic Update <year>",
-  "titleAr": "تحديث الاقتصاد المصري <year>",
-  "summaryEn": "Brief 1-2 sentence summary in English",
-  "summaryAr": "ملخص موجز بالعربية",
-  "contentEn": "Full narrative with 3-5 insights in English, each citing specific numbers",
-  "contentAr": "السرد الكامل بالعربية مع 3-5 رؤى مع ذكر الأرقام المحددة"
-}`;
+  // Use tool_use to force structured output — no more fragile JSON parsing
+  const narrativeSchema = {
+    name: "submit_economic_narrative",
+    description: "Submit a structured economic narrative report with bilingual insights",
+    input_schema: {
+      type: "object" as const,
+      required: ["titleEn", "titleAr", "summaryEn", "summaryAr", "insights"],
+      properties: {
+        titleEn: { type: "string", description: "Report title in English, e.g. 'Egypt Economic Update 2024-2026'" },
+        titleAr: { type: "string", description: "Report title in Arabic" },
+        summaryEn: { type: "string", description: "1-2 sentence summary in English" },
+        summaryAr: { type: "string", description: "1-2 sentence summary in Arabic" },
+        insights: {
+          type: "array",
+          description: "3-5 economic insights, each with a title and body in both languages",
+          items: {
+            type: "object",
+            required: ["titleEn", "titleAr", "bodyEn", "bodyAr"],
+            properties: {
+              titleEn: { type: "string", description: "Short insight title in English (5-10 words)" },
+              titleAr: { type: "string", description: "Short insight title in Arabic" },
+              bodyEn: { type: "string", description: "Insight body in English citing specific numbers" },
+              bodyAr: { type: "string", description: "Insight body in Arabic citing specific numbers" },
+            },
+          },
+        },
+      },
+    },
+  };
 
-  const claudeResponse = await callClaude(prompt, systemPrompt);
-  if (!claudeResponse) {
-    console.warn("[dataAgent/narrative] Claude returned no narrative.");
+  interface NarrativeResult {
+    titleEn: string;
+    titleAr: string;
+    summaryEn: string;
+    summaryAr: string;
+    insights: Array<{
+      titleEn: string;
+      titleAr: string;
+      bodyEn: string;
+      bodyAr: string;
+    }>;
+  }
+
+  const result = await callClaudeStructured<NarrativeResult>(
+    prompt,
+    narrativeSchema,
+    systemPrompt,
+  );
+
+  if (!result || !result.summaryEn || !result.insights?.length) {
+    console.warn("[dataAgent/narrative] Structured call returned incomplete data.");
     return;
   }
 
-  let parsed: Record<string, unknown>;
-  try {
-    let jsonStr = claudeResponse;
-    const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fence) jsonStr = fence[1];
-    parsed = JSON.parse(jsonStr.trim()) as Record<string, unknown>;
-  } catch {
-    console.warn("[dataAgent/narrative] Could not parse Claude narrative response as JSON.");
-    return;
-  }
+  // Flatten insights into content strings for storage
+  const contentEn = result.insights
+    .map((ins, i) => `${i + 1}. ${ins.titleEn}: ${ins.bodyEn}`)
+    .join("\n\n");
+  const contentAr = result.insights
+    .map((ins, i) => `${i + 1}. ${ins.titleAr}: ${ins.bodyAr}`)
+    .join("\n\n");
 
-  const titleEn = typeof parsed.titleEn === "string" ? parsed.titleEn : "Egypt Economic Update";
-  const titleAr = typeof parsed.titleAr === "string" ? parsed.titleAr : "تحديث الاقتصاد المصري";
-  const summaryEn = typeof parsed.summaryEn === "string" ? parsed.summaryEn : "";
-  const summaryAr = typeof parsed.summaryAr === "string" ? parsed.summaryAr : "";
-  const contentEn = typeof parsed.contentEn === "string" ? parsed.contentEn : "";
-  const contentAr = typeof parsed.contentAr === "string" ? parsed.contentAr : "";
-
-  if (!summaryEn || !contentEn) {
-    console.warn("[dataAgent/narrative] Incomplete narrative from Claude — skipping insert.");
-    return;
-  }
+  const { titleEn, titleAr, summaryEn, summaryAr } = result;
 
   const sourcesChecked = Object.keys(indicatorData).map((k) => ({
     nameEn: `World Bank — ${k}`,
