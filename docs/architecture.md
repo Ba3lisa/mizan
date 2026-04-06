@@ -29,7 +29,7 @@ Mizan is structured in three layers: a Visual Layer that users interact with, a 
 |                        DATA LAYER                             |
 |                    Convex Database                             |
 |                                                               |
-|  26 tables (20 original + 6 agent/council tables)             |
+|  26+ tables (core data + agent/council/funding tables)        |
 |                                                               |
 |  Core data:                                                   |
 |    budgetItems, debtRecords, parliamentMembers,               |
@@ -54,7 +54,7 @@ Mizan is structured in three layers: a Visual Layer that users interact with, a 
 |  LLM Council: multi-model voting on data changes              |
 |  GitHub Agent: issue ingestion, spam filtering                |
 |  Validators: deterministic checks (sums, counts, ranges)      |
-|  Providers: Claude 3.5 Haiku (+ OpenAI, Google planned)       |
+|  Providers: Claude Haiku 4.5 (+ OpenAI, Google planned)       |
 +---------------------------------------------------------------+
         |
         | Fetches from external sources
@@ -66,6 +66,7 @@ Mizan is structured in three layers: a Visual Layer that users interact with, a 
 |  Central Bank of Egypt Cabinet portal (cabinet.gov.eg)        |
 |  Parliament (SPA)      State Information Service (sis.gov.eg) |
 |  CAPMAS statistics     Elections Authority (elections.eg)      |
+|  FAO/FAOLEX (constitution PDF)                                |
 +---------------------------------------------------------------+
 ```
 
@@ -90,31 +91,34 @@ Bilingual support: all pages render in both Arabic (RTL) and English (LTR), swit
 
 **Stack**: Convex (serverless database with real-time subscriptions)
 
-All data lives in Convex as the single source of truth. The schema defines 26 tables across two categories:
+All data lives in Convex as the single source of truth. The schema defines 26+ tables across several categories:
 
-### Core Data Tables (20 tables)
+### Core Data Tables
 
 These store the structured government data that users see:
-- `budgetItems` -- Revenue and expenditure line items with amounts, categories, and fiscal year
-- `debtRecords` -- External debt snapshots by year with total, GDP ratio, and creditor breakdown
-- `parliamentMembers` -- Name, party, governorate, chamber (house/senate), committee assignments
-- `governmentOfficials` -- Ministers and governors with portfolio, appointment date, and biography
-- `constitutionArticles` -- Article number, title, Arabic text, English text, chapter grouping
-- `elections` -- Election type, year, candidates, results by governorate
-- `governorates` -- All 27 governorates with population, area, and geographic data
-- `politicalParties` -- Party name, founding date, ideology, seat counts
+- `officials` (59 records) -- Ministers and governors with portfolio, appointment date, and biography
+- `ministries` (27) -- Ministry names, descriptions, and associated officials
+- `governorates` (27) -- All 27 governorates with population, area, and geographic data
+- `parties` (8) -- Party name, founding date, ideology, seat counts
+- `parliamentMembers` (30) -- Name, party, governorate, chamber (house/senate), committee assignments
+- `committees`, `committeeMemberships` -- Parliamentary committee structure and member assignments
+- `constitutionParts` (6), `constitutionArticles` (247), `articleCrossReferences` -- Full constitution structure with cross-references between articles
+- `fiscalYears` (3), `budgetItems` (31) -- Revenue and expenditure line items with amounts, categories, and fiscal year
+- `debtRecords` (10) -- External debt snapshots by year with total, GDP ratio, and creditor breakdown
+- `debtByCreditor` -- Per-creditor debt breakdown with `interestRate`, `annualDebtService`, and `maturityYears` fields
+- `elections` (3), `electionResults`, `governorateElectionData` -- Election results with governorate-level granularity
+- `taxBrackets` (7 brackets for 2024) -- Income tax brackets per Law 7/2024, powering the /budget/your-share calculator
 
-Additional tables cover supporting data: exchange rates, economic indicators, configuration, and user preferences.
+Additional tables cover supporting data: exchange rates, economic indicators, `dataSources`, `dataLineage`, and `aiResearchReports`.
 
-### Agent Tables (6 tables)
+### Agent and Infrastructure Tables
 
 These support the agentic layer's operations:
-- `dataRefreshLog` -- Every refresh attempt with status, record count, source URL, and timestamps
-- `agentChangelog` -- Detailed record of what changed and why, for the transparency page
-- `councilVotes` -- Individual LLM votes on proposed data changes
-- `councilSessions` -- Aggregated voting sessions with final decisions
-- `githubIssues` -- Ingested community issues awaiting or completed processing
-- `fundingRecords` -- Donation and sponsorship records for the funding transparency page
+- `dataRefreshLog` -- Every refresh attempt with status, record count, source URL, `contentHash` (for skip-if-unchanged), and timestamps
+- `dataChangeLog` -- Detailed record of what changed and why, for the transparency page
+- `councilSessions`, `councilVotes` -- LLM Council voting sessions and individual votes
+- `githubIssueProcessing` -- Ingested community issues awaiting or completed processing
+- `fundingDonations`, `fundingAllocations`, `fundingSummary` -- Donation and sponsorship records for the funding transparency page
 
 ### Data Integrity Rules
 
@@ -126,17 +130,21 @@ These support the agentic layer's operations:
 
 ## Agentic Layer
 
-**Stack**: Convex actions (server-side), Claude API, deterministic validators
+**Stack**: Convex actions (server-side), Claude Haiku 4.5 API, pdf-parse (for constitution PDF extraction), deterministic validators
 
 The Agentic Layer is responsible for keeping data fresh and processing community contributions. It consists of four components:
 
 ### Orchestrator (dataAgent.ts)
 
-A Convex cron job fires every 6 hours and triggers the orchestrator. It checks which data categories are stale (older than 24 hours) and dispatches category-specific refresh actions. Each refresh:
-1. Fetches data from the official source
-2. Parses the response (World Bank API returns JSON; government sites require Claude to extract structured data from HTML)
-3. Runs deterministic validators
-4. Updates the database if validation passes, or logs a failure if it does not
+A Convex cron job fires every 6 hours and triggers the orchestrator. The orchestrator runs the following steps in sequence:
+1. **ensureAllReferenceData** -- checks all 18 tables, loads from backup if empty (zero cost if populated)
+2. **Debt refresh** -- fetches from World Bank API, converts USD to billions, upserts all available years
+3. **Budget refresh** -- fetches MOF page, uses content hashing to skip when unchanged, Claude extracts fiscal year totals
+4. **Government refresh** -- fetches cabinet.gov.eg, Claude detects minister changes, auto-writes via upsertOfficialAndMinistry
+5. **Parliament refresh** -- stub (parliament.gov.eg is JS-rendered SPA, manual curation needed)
+6. **Constitution refresh** -- checks if article count is below 247, downloads PDF from FAO, extracts with pdf-parse + Claude
+7. **GitHub issue processing** -- processes data-correction/stale-data issues via LLM Council
+8. **Log compaction** -- daily cron deletes refresh logs older than 30 days
 
 ### LLM Council
 

@@ -67,7 +67,7 @@ The current pipeline:
 1. A community member opens a GitHub Issue with a data correction (e.g., "Minister X was replaced by Minister Y") and includes a source URL
 2. The GitHub Agent ingests the issue, classifies it, and checks for spam
 3. The issue is submitted to the LLM Council for evaluation
-4. Council members (currently Claude 3.5 Haiku; OpenAI and Google models planned) independently evaluate the correction against the cited source
+4. Council members (currently Claude Haiku 4.5 / `claude-haiku-4-5-20251001`; OpenAI and Google models planned) independently evaluate the correction against the cited source
 5. Votes are tallied according to the decision matrix (see `ai-data-pipeline.md` for details on source classification)
 6. If the council approves, the change is queued for application to the data layer
 7. High-sensitivity changes (government officials, election results) still require human approval even after council approval
@@ -131,6 +131,12 @@ npx convex run referenceData:ensureAllReferenceData
 
 # Check data freshness
 npx convex run dataRefresh:getAllLastUpdated
+
+# Backfill debt creditor interest rate and service terms
+npx convex run debtInterestData:backfillCreditorTerms
+
+# Ensure tax brackets are loaded (7 brackets for 2024, Law 7/2024)
+npx convex run taxData:ensureTaxBrackets
 ```
 
 ### Development Setup

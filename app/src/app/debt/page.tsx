@@ -5,6 +5,7 @@ import { Skeleton } from "boneyard-js/react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useLanguage, useCurrency } from "@/components/providers";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
@@ -37,14 +38,25 @@ interface RegionalCountry {
 
 // ─── Static reference data (regional comparison — no Convex equivalent) ──────
 
+// Regional comparison countries -- fallback values, overridden by live WB data
 const regionalData: RegionalCountry[] = [
-  { nameAr: "\u0645\u0635\u0631", nameEn: "Egypt", debtToGDP: 47.2, color: "#C9A84C", isEgypt: true },
+  { nameAr: "\u0645\u0635\u0631", nameEn: "Egypt", debtToGDP: 89.5, color: "#C9A84C", isEgypt: true },
   { nameAr: "\u062a\u0631\u0643\u064a\u0627", nameEn: "Turkey", debtToGDP: 31.8, color: "#6C8EEF" },
   { nameAr: "\u0627\u0644\u0645\u0645\u0644\u0643\u0629 \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u0627\u0644\u0633\u0639\u0648\u062f\u064a\u0629", nameEn: "Saudi Arabia", debtToGDP: 27.7, color: "#2EC4B6" },
   { nameAr: "\u0627\u0644\u0645\u063a\u0631\u0628", nameEn: "Morocco", debtToGDP: 62.4, color: "#E76F51" },
   { nameAr: "\u0646\u064a\u062c\u064a\u0631\u064a\u0627", nameEn: "Nigeria", debtToGDP: 37.5, color: "#9B72CF" },
   { nameAr: "\u062a\u0648\u0646\u0633", nameEn: "Tunisia", debtToGDP: 88.6, color: "#7A8299" },
 ];
+
+// World Bank country codes for regional comparison
+const _REGIONAL_WB_CODES: Record<string, string> = {
+  "Egypt": "EGY",
+  "Turkey": "TUR",
+  "Saudi Arabia": "SAU",
+  "Morocco": "MAR",
+  "Nigeria": "NGA",
+  "Tunisia": "TUN",
+};
 
 // ─── Debt Timeline SVG ────────────────────────────────────────────────────────
 
@@ -387,6 +399,20 @@ function CreditorBreakdown() {
           </button>
         </div>
 
+        {/* Debt type legend */}
+        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+          {[
+            { type: "multilateral", en: "Multilateral", ar: "متعدد الأطراف", desc: isAr ? "منظمات دولية (البنك الدولي، صندوق النقد)" : "International orgs (World Bank, IMF)" },
+            { type: "bilateral", en: "Bilateral", ar: "ثنائي", desc: isAr ? "قروض حكومية مباشرة بين دولتين" : "Government-to-government loans" },
+            { type: "commercial", en: "Commercial", ar: "تجاري", desc: isAr ? "سندات وقروض من الأسواق المالية" : "Bonds and loans from financial markets" },
+          ].map((t) => (
+            <div key={t.type} className="flex items-start gap-1.5 bg-muted/30 rounded-md px-2.5 py-1.5">
+              <Badge variant="outline" className="text-[0.55rem] py-0 px-1.5 shrink-0 mt-0.5">{isAr ? t.ar : t.en}</Badge>
+              <span>{t.desc}</span>
+            </div>
+          ))}
+        </div>
+
         {/* Visual bars */}
         <div className="flex flex-col gap-3">
           {sorted.map((creditor) => (
@@ -396,9 +422,11 @@ function CreditorBreakdown() {
                   <span className="text-sm font-semibold text-foreground">
                     {isAr ? (creditor.creditorNameAr ?? creditor.creditorName) : creditor.creditorName}
                   </span>
-                  <span className="text-[0.625rem] text-muted-foreground ms-2">
-                    {creditor.creditorType}
-                  </span>
+                  <Badge variant="outline" className="text-[0.55rem] ms-2 py-0 px-1.5">
+                    {isAr
+                      ? { multilateral: "متعدد الأطراف", bilateral: "ثنائي", commercial: "تجاري", other: "أخرى" }[creditor.creditorType] ?? creditor.creditorType
+                      : creditor.creditorType}
+                  </Badge>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-mono text-lg font-bold tabular-nums" style={{ color: creditor.color }}>
@@ -529,8 +557,21 @@ function CreditorBreakdown() {
 function RegionalComparison() {
   const { lang } = useLanguage();
   const isAr = lang === "ar";
-  const maxGDP = Math.max(...regionalData.map((c) => c.debtToGDP));
-  const sorted = [...regionalData].sort((a, b) => b.debtToGDP - a.debtToGDP);
+
+  // Use live Egypt debt-to-GDP from Convex instead of hardcoded value
+  const convexTimeline = useQuery(api.debt.getDebtTimeline);
+  const liveEgyptRatio = (() => {
+    if (!convexTimeline || convexTimeline.length === 0) return 89.5;
+    const sorted = [...convexTimeline].sort((a, b) => b.date.localeCompare(a.date));
+    const withRatio = sorted.find((r) => r.debtToGdpRatio != null && r.debtToGdpRatio > 0);
+    return withRatio?.debtToGdpRatio ?? 89.5;
+  })();
+
+  const liveRegionalData = regionalData.map((c) =>
+    c.isEgypt ? { ...c, debtToGDP: liveEgyptRatio } : c
+  );
+  const maxGDP = Math.max(...liveRegionalData.map((c) => c.debtToGDP));
+  const sorted = [...liveRegionalData].sort((a, b) => b.debtToGDP - a.debtToGDP);
 
   return (
     <div className="flex flex-col gap-4 max-w-2xl">

@@ -225,9 +225,11 @@ function formatRelativeTime(timestamp: number | null): string {
   return `${days}d ago`;
 }
 
-function mapConvexStatus(status: string | null): "success" | "failed" | "flagged" {
+function mapConvexStatus(status: string | null, recordCount?: number): "success" | "failed" | "flagged" {
   if (status === "success") return "success";
   if (status === "failed") return "failed";
+  // If no pipeline run but data exists (loaded by reference data), show as success
+  if (status === null && recordCount && recordCount > 0) return "success";
   return "flagged";
 }
 
@@ -283,9 +285,9 @@ export default function TransparencyPage() {
           key: ch.category,
           ar: label?.ar ?? ch.category,
           en: label?.en ?? ch.category.charAt(0).toUpperCase() + ch.category.slice(1),
-          lastRefresh: formatRelativeTime(ch.lastRefreshTime),
-          lastRefreshAr: formatRelativeTime(ch.lastRefreshTime),
-          status: mapConvexStatus(ch.lastStatus),
+          lastRefresh: ch.lastRefreshTime ? formatRelativeTime(ch.lastRefreshTime) : (ch.recordCount > 0 ? "Reference data" : "Never"),
+          lastRefreshAr: ch.lastRefreshTime ? formatRelativeTime(ch.lastRefreshTime) : (ch.recordCount > 0 ? "بيانات مرجعية" : "لم يتم"),
+          status: mapConvexStatus(ch.lastStatus, ch.recordCount),
           records: ch.recordCount ?? ch.recordsUpdated ?? 0,
           source: ch.sourceUrl ?? "",
         };

@@ -36,7 +36,7 @@ When you submit a data correction issue:
 4. Based on the votes and source type, the session resolves to: **approved**, **rejected**, or **needs-human-review**.
 5. A comment is posted on your issue with the council's decision and reasoning.
 
-The council currently uses Anthropic Claude 3.5 Haiku. The architecture supports adding more models (OpenAI, Google, etc.) for multi-model consensus in the future.
+The council currently uses Anthropic Claude Haiku 4.5 (`claude-haiku-4-5-20251001`). The architecture supports adding more models (OpenAI, Google, etc.) for multi-model consensus in the future.
 
 #### Spam Prevention
 

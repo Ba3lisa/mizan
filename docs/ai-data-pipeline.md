@@ -8,10 +8,12 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│                    Convex Cron Job                    │
-│              (every 6 hours)                          │
+│                    Convex Cron Jobs                   │
 │                                                       │
-│  crons.ts → internal.agents.dataAgent.orchestrateRefresh │
+│  Every 6 hours:                                       │
+│    crons.ts → internal.agents.dataAgent.orchestrateRefresh │
+│  Daily:                                               │
+│    crons.ts → log compaction (delete logs >30 days)   │
 └──────────────────────┬──────────────────────────────┘
                        │
                        ▼
@@ -19,69 +21,85 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 │              AI Orchestrator Action                    │
 │           convex/agents/dataAgent.ts                  │
 │                                                       │
-│  1. Query getAllLastUpdated() for staleness check      │
-│  2. For each stale category (>24h):                   │
-│     a. Log refresh start (dataRefreshLog)             │
-│     b. Dispatch category-specific refresh             │
-│     c. Validate results (deterministic checks)        │
-│     d. Update records or flag for human review        │
-│     e. Log success/failure                            │
+│  1. ensureAllReferenceData (18 tables, zero-cost if   │
+│     populated, loads from backup if empty)             │
+│  2. Debt refresh (World Bank API)                     │
+│  3. Budget refresh (MOF + Claude parsing)             │
+│  4. Government refresh (Cabinet + Claude parsing)     │
+│  5. Parliament refresh (stub -- JS-rendered SPA)      │
+│  6. Constitution refresh (PDF extraction if needed)   │
+│  7. GitHub issue processing (LLM Council)             │
+│  8. Log compaction (daily, deletes logs >30 days)     │
 └──────────────────────┬──────────────────────────────┘
                        │
-        ┌──────────────┼──────────────┐
-        ▼              ▼              ▼
-┌──────────────┐ ┌──────────┐ ┌──────────────┐
-│  Debt Data   │ │  Budget  │ │  Government  │
-│              │ │  Data    │ │  Data        │
-│ World Bank   │ │ MOF.gov  │ │ Cabinet.gov  │
-│ API (free)   │ │ + Claude │ │ + Claude     │
-│ No auth      │ │ parsing  │ │ parsing      │
-└──────────────┘ └──────────┘ └──────────────┘
+        ┌──────────┬───┼───────┬──────────┐
+        ▼          ▼   ▼       ▼          ▼
+┌────────────┐ ┌────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐
+│  Debt Data │ │ Budget │ │ Govt   │ │ Constit. │ │ GitHub   │
+│            │ │ Data   │ │ Data   │ │ Data     │ │ Issues   │
+│ World Bank │ │ MOF +  │ │ Cab. + │ │ FAO PDF  │ │ API +    │
+│ API (free) │ │ Claude │ │ Claude │ │ + Claude │ │ Council  │
+└────────────┘ └────────┘ └────────┘ └──────────┘ └──────────┘
 ```
+
+## What the AI Searches
+
+| Source | URL | What It Fetches | How |
+|---|---|---|---|
+| World Bank API | api.worldbank.org/v2/country/EGY/indicator/DT.DOD.DECT.CD | External debt time series (raw USD) | Direct API call, parse JSON, convert to billions |
+| Ministry of Finance | mof.gov.eg/en/open-data | Budget totals (revenue, expenditure, deficit) | Fetch HTML, Claude extracts JSON |
+| Cabinet of Egypt | cabinet.gov.eg/en/ | Minister names and titles | Fetch HTML, Claude extracts minister list |
+| FAO/FAOLEX | faolex.fao.org/docs/pdf/egy127542e.pdf | Constitution full text (247 articles) | pdf-parse extracts text, Claude structures articles |
+| Constitute Project | constituteproject.org/constitution/Egypt_2019 | Constitution reference/verification | Referenced as data source |
+| GitHub Issues | github.com/Ba3lisa/mizan/issues | Community data corrections | GitHub API + Claude parsing + LLM Council vote |
 
 ## Data Sources by Category
 
 ### Debt Data
-- **Primary**: World Bank API (free, no auth) — `DT.DOD.DECT.CD` indicator for Egypt
-- **Secondary**: Central Bank of Egypt (cbe.org.eg) — quarterly reports
+- **Primary**: World Bank API (free, no auth) -- `DT.DOD.DECT.CD` indicator for Egypt
+- **Secondary**: Central Bank of Egypt (cbe.org.eg) -- quarterly reports
 - **Validation**: IMF country data (imf.org/en/Countries/EGY)
-- **Refresh**: Fully automated via World Bank API
+- **Refresh**: Fully automated via World Bank API. Fetches all available years, converts USD to billions, upserts records. Preserves domestic debt and GDP ratio from existing records when present.
+- **Interest rate data**: The `debtByCreditor` table stores per-creditor terms including `interestRate`, `annualDebtService`, and `maturityYears`. These are backfilled via the `debtInterestData:backfillCreditorTerms` function.
 - **Specific URLs**:
   - Debt data: `https://api.worldbank.org/v2/country/EGY/indicator/DT.DOD.DECT.CD?format=json`
   - GDP data: `https://api.worldbank.org/v2/country/EGY/indicator/NY.GDP.MKTP.CD?format=json`
   - Reserves: `https://api.worldbank.org/v2/country/EGY/indicator/FI.RES.TOTL.CD?format=json`
 
 ### Budget Data
-- **Primary**: Ministry of Finance (mof.gov.eg) — annual budget documents
-- **Parsing**: Claude API extracts structured data from budget pages
+- **Primary**: Ministry of Finance open data page (mof.gov.eg/en/open-data)
+- **Parsing**: Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) extracts structured JSON from the page HTML, pulling fiscal year totals for revenue, expenditure, and deficit
+- **Content hashing**: The agent hashes the fetched page content and stores it in `dataRefreshLog.contentHash`. If the hash matches the previous refresh, parsing is skipped entirely (zero AI cost for unchanged pages)
 - **Validation**: Totals must sum correctly (revenue items = total revenue)
 - **Refresh**: Semi-automated (Claude parses, human reviews changes)
 - **Specific URLs**:
+  - Open data: `https://www.mof.gov.eg/en/open-data`
   - Budget statements: `https://www.mof.gov.eg/en/posts/statementsAndReports/5`
   - Financial monthly: `https://www.mof.gov.eg/en/posts/statementsAndReports/6`
 
 ### Government/Cabinet Data
-- **Primary**: Cabinet of Egypt (cabinet.gov.eg) — minister list
-- **Parsing**: Claude API extracts minister names and portfolios
+- **Primary**: Cabinet of Egypt (cabinet.gov.eg) -- minister list
+- **Parsing**: Claude Haiku 4.5 extracts minister names and portfolios from HTML
+- **Auto-write**: Unlike other categories, the government refresh auto-writes via `upsertOfficialAndMinistry` mutation when Claude detects minister changes
 - **Validation**: Cross-referenced with State Information Service (sis.gov.eg)
-- **Refresh**: Semi-automated — changes flagged for human review (never auto-writes cabinet changes)
 - **Specific URLs**:
-  - Cabinet: `https://www.cabinet.gov.eg/English/TheMinistry/Pages/default.aspx`
+  - Cabinet: `https://www.cabinet.gov.eg/en/`
   - SIS: `https://www.sis.gov.eg/section/352/7510?lang=en`
 
 ### Parliament Data
-- **Primary**: Egyptian Parliament (parliament.gov.eg) — member list
-- **Status**: Manual curation (parliament.gov.eg is a JS-rendered SPA, no public API)
+- **Primary**: Egyptian Parliament (parliament.gov.eg) -- member list
+- **Status**: Stub in the orchestrator. Parliament.gov.eg is a JS-rendered SPA with no public API, so automated scraping is not feasible. Data is manually curated.
 - **Validation**: Member count must equal 596 (House) or 300 (Senate)
 - **Specific URLs**:
   - House members: `https://www.parliament.gov.eg/en/MPs`
   - Senate: `https://www.senategov.eg/en/Members`
 
 ### Constitution Data
-- **Primary**: Presidency of Egypt — constitutional text
-- **Status**: Static (constitution changes require national referendum)
+- **Primary**: FAO/FAOLEX PDF of the Egyptian constitution
+- **Extraction**: If the database has fewer than 247 articles, the agent downloads the PDF from `faolex.fao.org/docs/pdf/egy127542e.pdf`, extracts text using `pdf-parse`, then sends the raw text to Claude to structure it into individual articles with part/chapter grouping
+- **Secondary reference**: Constitute Project (`constituteproject.org/constitution/Egypt_2019`)
 - **Validation**: Article count must equal 247
-- **URL**: `https://www.sis.gov.eg/section/10/7527?lang=en`
+- **Refresh**: Only triggered when article count is below 247 (effectively a one-time load)
 
 ### Election Data
 - **Primary**: National Elections Authority (elections.eg)
@@ -109,11 +127,12 @@ Every refresh operation is logged to the `dataRefreshLog` table:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `category` | string | "government", "parliament", "budget", "debt", "all" |
+| `category` | string | "government", "parliament", "budget", "debt", "constitution", "all" |
 | `status` | string | "in_progress", "success", "failed" |
 | `recordsUpdated` | number | How many records changed |
 | `sourceUrl` | string | Which URL was fetched |
 | `errorMessage` | string | Error details if failed |
+| `contentHash` | string | SHA-256 hash of fetched content (used to skip re-parsing unchanged pages) |
 | `startedAt` | number | Timestamp when refresh started |
 | `completedAt` | number | Timestamp when completed |
 
@@ -126,12 +145,25 @@ Every refresh operation is logged to the `dataRefreshLog` table:
 | `getRefreshHistory` | `dataRefresh.ts` | Get last N refresh attempts for a category |
 | `getDataSourceInfo` | Per-module | Get source URLs and names for display |
 
+## Content Hashing
+
+To avoid unnecessary AI API calls, the pipeline uses content hashing on fetched pages:
+
+1. When a page is fetched (e.g., the MOF open data page), the raw HTML is SHA-256 hashed
+2. The hash is stored in the `dataRefreshLog` record's `contentHash` field
+3. On the next refresh cycle, the agent fetches the page again and computes a new hash
+4. If the hash matches the previous successful refresh, Claude parsing is skipped entirely
+5. This means unchanged pages cost zero AI tokens -- only the HTTP fetch is performed
+
+This is particularly valuable for the budget page, which may only change once per fiscal year but is checked every 6 hours.
+
 ## Setup
 
-1. Set `ANTHROPIC_API_KEY` in Convex dashboard (Settings → Environment Variables)
-2. Without the key, World Bank API data still refreshes (no auth needed), but Claude-powered parsing is skipped
-3. Cron job runs automatically every 6 hours
-4. Manual trigger: `npx convex run agents/dataAgent:orchestrateRefresh`
+1. Set `ANTHROPIC_API_KEY` in Convex dashboard (Settings -> Environment Variables)
+2. The model used is `claude-haiku-4-5-20251001` (Claude Haiku 4.5) for all data extraction tasks
+3. Without the key, World Bank API data still refreshes (no auth needed), but Claude-powered parsing is skipped
+4. Cron job runs automatically every 6 hours
+5. Manual trigger: `npx convex run agents/dataAgent:orchestrateRefresh`
 
 ## Graceful Degradation
 
@@ -140,16 +172,13 @@ Every refresh operation is logged to the `dataRefreshLog` table:
 - If a government website is unreachable → log failure, flag for human review
 - If validation fails → reject the data, keep existing records, log discrepancy
 
-## Human Review
+## Alerting
 
-Government/cabinet changes are NEVER auto-written. The agent:
-1. Fetches the current cabinet page
-2. Asks Claude to extract minister names
-3. Compares with existing database records
-4. If differences found → logs them to `dataRefreshLog` with details
-5. An admin must manually approve changes
+A GitHub Actions workflow (`health-check.yml`) runs every 12 hours and checks that each data category has been refreshed within the last 48 hours. If any category is stale, the workflow creates a GitHub issue automatically to flag the problem.
 
-This prevents accidental data corruption from parsing errors.
+## Log Compaction
+
+A daily cron job deletes `dataRefreshLog` entries older than 30 days to prevent unbounded table growth. This runs independently of the 6-hour refresh cycle.
 
 ## LLM Council System
 
@@ -157,7 +186,7 @@ The LLM Council is a multi-model voting system that verifies community-submitted
 
 ### Current Configuration
 
-The council currently runs on Claude 3.5 Haiku as a single provider. Additional providers (OpenAI, Google models) are planned for v1.2 to enable true multi-model consensus.
+The council currently runs on Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) as a single provider. Additional providers (OpenAI, Google models) are planned for v1.2 to enable true multi-model consensus.
 
 ### Source Classification
 

@@ -19,14 +19,17 @@ The foundation: a fully functional transparency platform covering all major bran
 - **AI Data Agent** -- Automated data refresh cycle every 6 hours, pulling from World Bank API, Ministry of Finance, Cabinet portal, and other official sources
 - **Transparency Page** -- Full audit trail of every data refresh the agent has performed, including successes, failures, and data change counts
 - **Bilingual Arabic/English Interface** -- Complete right-to-left Arabic support alongside English, switchable from any page
-- **Your Tax Share** -- Personal tax calculator at /budget/your-share showing where your taxes go, powered by live budget data from Convex and official tax brackets (Law 7/2024)
+- **Your Tax Share** -- Personal tax calculator at /budget/your-share showing where your taxes go, powered by live budget data from Convex and official tax brackets (7 brackets, Law 7/2024)
+- **Stacked Debt Chart** -- External and domestic debt visualized as a stacked area chart with GDP ratio overlay
+- **Pipeline Health Monitoring** -- GitHub Actions workflow (`health-check.yml`) runs every 12 hours, creates issues if any data category has not refreshed in 48 hours
 - **Source Citations** -- Every data point on the platform links to its original source URL; no number exists without a citation
 
 ## v1.1 -- In Progress
 
 Community verification infrastructure and open source readiness.
 
-- **LLM Council** -- Multi-model voting system for community-submitted data corrections; currently powered by Claude 3.5 Haiku, with additional providers planned
+- **LLM Council** -- Multi-model voting system for community-submitted data corrections; currently powered by Claude Haiku 4.5, with additional providers planned
+- **Debt Interest Rate Tracking** -- Per-creditor interest rates, annual debt service, and maturity terms on the `debtByCreditor` table, with backfill tooling
 - **Batch GitHub Issue Processing** -- GitHub Agent that ingests community data correction issues, classifies them, and routes them through the LLM Council with built-in spam prevention
 - **Funding Transparency Page** -- Public display of all project funding via GitHub Sponsors, tracked in Convex so contributors can see exactly where money goes
 - **Open Source Project Infrastructure** -- Contributing guide, issue templates, code of conduct, and CI/CD pipeline for community contributions

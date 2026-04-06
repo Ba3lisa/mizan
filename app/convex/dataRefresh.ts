@@ -144,6 +144,8 @@ export const upsertDebtRecord = internalMutation({
     totalDomesticDebt: v.optional(v.number()),
     debtToGdpRatio: v.optional(v.number()),
     foreignReserves: v.optional(v.number()),
+    totalDebtService: v.optional(v.number()),
+    totalInterestPayments: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -159,6 +161,8 @@ export const upsertDebtRecord = internalMutation({
         totalDomesticDebt: args.totalDomesticDebt,
         debtToGdpRatio: args.debtToGdpRatio,
         foreignReserves: args.foreignReserves,
+        totalDebtService: args.totalDebtService,
+        totalInterestPayments: args.totalInterestPayments,
         sourceUrl: args.sourceUrl,
       });
       return 1;
@@ -179,6 +183,12 @@ export const upsertDebtRecord = internalMutation({
     }
     if (args.foreignReserves !== undefined && args.foreignReserves !== existing.foreignReserves) {
       patch.foreignReserves = args.foreignReserves;
+    }
+    if (args.totalDebtService !== undefined && args.totalDebtService !== existing.totalDebtService) {
+      patch.totalDebtService = args.totalDebtService;
+    }
+    if (args.totalInterestPayments !== undefined && args.totalInterestPayments !== existing.totalInterestPayments) {
+      patch.totalInterestPayments = args.totalInterestPayments;
     }
     if (args.sourceUrl !== undefined) {
       patch.sourceUrl = args.sourceUrl;

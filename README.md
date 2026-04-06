@@ -24,7 +24,7 @@ Mizan is built as three layers:
 │               Visual Layer (Next.js 15 + React 19)           │
 │  Budget · Debt · Parliament · Government · Constitution · Elections  │
 ├──────────────────────────────────────────────────────────────┤
-│            Data Layer (Convex Database -- 26 tables)          │
+│            Data Layer (Convex Database -- 26+ tables)         │
 │     Structured data + Agent changelogs + Data lineage         │
 ├──────────────────────────────────────────────────────────────┤
 │              Agentic Layer (Convex Actions)                    │
@@ -83,13 +83,15 @@ Where the money goes:
 ## Features
 
 - **Budget Explorer** -- Interactive Sankey flow visualization of Egypt's national budget
-- **Debt Tracker** -- External and domestic debt with World Bank API integration
+- **Debt Tracker** -- Stacked external + domestic debt chart with World Bank API integration, interest rate tracking per creditor, GDP ratio overlay
+- **Tax Calculator** -- Personal tax calculator at /budget/your-share using official 2024 brackets (Law 7/2024)
 - **Parliament Directory** -- 896 members across House and Senate, searchable
 - **Government Structure** -- Current cabinet, ministries, and governorates
-- **Constitution** -- Full text of the 2014 constitution (247 articles), full-text search
+- **Constitution** -- Full text of the 2014 constitution (247 articles), full-text search, PDF extraction via pdf-parse + Claude
 - **Elections** -- Presidential and parliamentary results with governorate map
-- **AI Data Agent** -- Automated 6-hour refresh cycle from official sources
-- **LLM Council** -- Multi-model verification of community data corrections
+- **AI Data Agent** -- Automated 6-hour refresh cycle from official sources with content hashing to skip unchanged pages
+- **LLM Council** -- Multi-model verification of community data corrections via Claude Haiku 4.5
+- **Pipeline Health Monitoring** -- GitHub Actions health check every 12 hours, auto-creates issues for stale data
 - **Transparency Page** -- Full audit trail of every data change
 - **Bilingual** -- Arabic and English interface
 - **Source Citations** -- Every data point links to its official source

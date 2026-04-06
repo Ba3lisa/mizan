@@ -27,33 +27,50 @@ const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 async function refreshDebtData(
   ctx: ActionCtx
 ): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
-  const SOURCE_URL =
+  // Fetch both external debt stock AND debt service from World Bank
+  const DEBT_STOCK_URL =
     "https://api.worldbank.org/v2/country/EGY/indicator/DT.DOD.DECT.CD?format=json&per_page=10";
+  const DEBT_SERVICE_URL =
+    "https://api.worldbank.org/v2/country/EGY/indicator/DT.TDS.DECT.CD?format=json&per_page=10";
 
-  const response = await fetch(SOURCE_URL);
-  if (!response.ok) {
+  // Fetch debt stock
+  const stockResponse = await fetch(DEBT_STOCK_URL);
+  if (!stockResponse.ok) {
     throw new Error(
-      `World Bank API request failed with status ${response.status}`
+      `World Bank debt stock API failed with status ${stockResponse.status}`
     );
   }
+  const stockRaw: unknown = await stockResponse.json();
+  const stockEntries = parseWorldBankResponse(stockRaw);
 
-  const raw: unknown = await response.json();
-  const entries = parseWorldBankResponse(raw);
+  // Fetch debt service (interest + principal payments)
+  const serviceByDate: Record<string, number> = {};
+  try {
+    const serviceResponse = await fetch(DEBT_SERVICE_URL);
+    if (serviceResponse.ok) {
+      const serviceRaw: unknown = await serviceResponse.json();
+      const serviceEntries = parseWorldBankResponse(serviceRaw);
+      for (const entry of serviceEntries) {
+        if (entry.value != null) {
+          const date = entry.date.length === 4 ? `${entry.date}-12-31` : entry.date;
+          serviceByDate[date] = entry.value / 1e9; // Convert to billions
+        }
+      }
+    }
+  } catch {
+    console.warn("[dataAgent] Failed to fetch debt service data, continuing with stock only");
+  }
 
-  if (entries.length === 0) {
+  if (stockEntries.length === 0) {
     console.warn("[dataAgent] World Bank returned no debt entries for Egypt.");
     return { recordsUpdated: 0 };
   }
 
-  // Process all entries (not just the most recent)
   let totalUpdated = 0;
-  for (const entry of entries) {
+  for (const entry of stockEntries) {
     const debtValueUsd = entry.value;
     if (debtValueUsd === null || debtValueUsd === undefined) continue;
 
-    // World Bank returns raw USD values. Convert to billions for consistency
-    // with all other debt data in the database (stored as billions USD/EGP).
-    // UI displays with appropriate formatting.
     const debtInBillions = debtValueUsd / 1e9;
     const record = { totalExternalDebt: debtInBillions };
 
@@ -65,21 +82,22 @@ async function refreshDebtData(
       continue;
     }
 
-    // Normalize date: World Bank returns "2024", we want "2024-12-31"
     const date = entry.date.length === 4 ? `${entry.date}-12-31` : entry.date;
+    const debtService = serviceByDate[date];
 
     const updated: number = await ctx.runMutation(
       internal.dataRefresh.upsertDebtRecord,
       {
         date,
         totalExternalDebt: debtInBillions,
-        sourceUrl: SOURCE_URL,
+        totalDebtService: debtService,
+        sourceUrl: DEBT_STOCK_URL,
       }
     );
     totalUpdated += updated;
   }
 
-  return { recordsUpdated: totalUpdated, sourceUrl: SOURCE_URL };
+  return { recordsUpdated: totalUpdated, sourceUrl: DEBT_STOCK_URL };
 }
 
 // ─── BUDGET REFRESH ───────────────────────────────────────────────────────────

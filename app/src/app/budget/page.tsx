@@ -168,36 +168,28 @@ const SPENDING_COLOR = "#8B3535";
 const DEBT_SERVICE_COLOR = "#C94040";
 const DEFICIT_COLOR = "#C9A84C";
 
-function BudgetSankey() {
+function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCategory[]; spendingData: BudgetCategory[] }) {
   const { lang } = useLanguage();
   const { symbol, fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
 
   // Build nivo sankey data: revenue sources → "Revenue" node → "Spending" node → spending categories
-  // Also sub-items feed into parent categories
   const nodes = [
-    // Revenue sub-items (layer 0)
-    ...revenue.flatMap(r => r.subItems?.map(s => ({ id: `rsub_${s.nameEn}`, label: isAr ? s.nameAr : s.nameEn, color: "#2D8A73" })) ?? []),
-    // Revenue groups (layer 1)
-    ...revenue.map(r => ({ id: `rev_${r.nameEn}`, label: isAr ? r.nameAr : r.nameEn, color: REVENUE_COLOR })),
-    // Spending groups (layer 2)
-    ...spending.map(s => ({ id: `sp_${s.nameEn}`, label: isAr ? s.nameAr : s.nameEn, color: s.nameEn === "Debt Service" ? DEBT_SERVICE_COLOR : SPENDING_COLOR })),
-    // Spending sub-items (layer 3)
-    ...spending.flatMap(s => s.subItems?.map(sub => ({ id: `ssub_${sub.nameEn}`, label: isAr ? sub.nameAr : sub.nameEn, color: s.nameEn === "Debt Service" ? "#D45555" : "#A04040" })) ?? []),
+    ...revenueData.flatMap(r => r.subItems?.map(s => ({ id: `rsub_${s.nameEn}`, label: isAr ? s.nameAr : s.nameEn, color: "#2D8A73" })) ?? []),
+    ...revenueData.map(r => ({ id: `rev_${r.nameEn}`, label: isAr ? r.nameAr : r.nameEn, color: REVENUE_COLOR })),
+    ...spendingData.map(s => ({ id: `sp_${s.nameEn}`, label: isAr ? s.nameAr : s.nameEn, color: s.nameEn === "Debt Service" ? DEBT_SERVICE_COLOR : SPENDING_COLOR })),
+    ...spendingData.flatMap(s => s.subItems?.map(sub => ({ id: `ssub_${sub.nameEn}`, label: isAr ? sub.nameAr : sub.nameEn, color: s.nameEn === "Debt Service" ? "#D45555" : "#A04040" })) ?? []),
   ];
 
   const links = [
-    // Revenue sub-items → parent revenue group
-    ...revenue.flatMap(r => r.subItems?.map(s => ({ source: `rsub_${s.nameEn}`, target: `rev_${r.nameEn}`, value: s.amount })) ?? []),
-    // Revenue groups without sub-items: self-link (add a dummy sub-item)
-    ...revenue.filter(r => !r.subItems?.length).map(r => ({ source: `rev_${r.nameEn}`, target: `rev_${r.nameEn}`, value: 0 })),
-    // Revenue groups → Spending groups (distribute proportionally)
+    ...revenueData.flatMap(r => r.subItems?.map(s => ({ source: `rsub_${s.nameEn}`, target: `rev_${r.nameEn}`, value: s.amount })) ?? []),
+    ...revenueData.filter(r => !r.subItems?.length).map(r => ({ source: `rev_${r.nameEn}`, target: `rev_${r.nameEn}`, value: 0 })),
     ...(() => {
-      const totalRev = revenue.reduce((s, r) => s + r.amount, 0);
-      const totalSp = spending.reduce((s, r) => s + r.amount, 0);
+      const totalRev = revenueData.reduce((s, r) => s + r.amount, 0);
+      const totalSp = spendingData.reduce((s, r) => s + r.amount, 0);
       const result: Array<{ source: string; target: string; value: number }> = [];
-      for (const r of revenue) {
-        for (const s of spending) {
+      for (const r of revenueData) {
+        for (const s of spendingData) {
           const flow = Math.round((r.amount / totalRev) * (s.amount / totalSp) * Math.min(totalRev, totalSp));
           if (flow > 5) {
             result.push({ source: `rev_${r.nameEn}`, target: `sp_${s.nameEn}`, value: flow });
@@ -207,13 +199,15 @@ function BudgetSankey() {
       return result;
     })(),
     // Spending groups → spending sub-items
-    ...spending.flatMap(s => s.subItems?.map(sub => ({ source: `sp_${s.nameEn}`, target: `ssub_${sub.nameEn}`, value: sub.amount })) ?? []),
+    ...spendingData.flatMap(s => s.subItems?.map(sub => ({ source: `sp_${s.nameEn}`, target: `ssub_${sub.nameEn}`, value: sub.amount })) ?? []),
   ];
 
   // Filter out self-links and zero values
   const validLinks = links.filter(l => l.source !== l.target && l.value > 0);
 
+  const totalBudget = spendingData.reduce((s, r) => s + r.amount, 0);
   const fmtAmount = (v: number) => `${fmt(fromEGP(v * 1e9), { compact: true })} ${symbol}`;
+  const _fmtPct = (v: number) => totalBudget > 0 ? `${((v / totalBudget) * 100).toFixed(1)}%` : "";
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -370,16 +364,19 @@ function YearComparisonChart() {
 
 // ─── Per Capita Section ───────────────────────────────────────────────────────
 
-function PerCapitaSection({ year }: { year: FiscalYear }) {
+function PerCapitaSection({ year, spendingData, revenueData, populationOverride }: { year: FiscalYear; spendingData?: BudgetCategory[]; revenueData?: BudgetCategory[]; populationOverride?: number }) {
   const { lang } = useLanguage();
   const { symbol, fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
 
-  const pop = FISCAL_YEAR_POPULATION[year];
-  const totalRevenue = revenue.reduce((s, r) => s + r.amount, 0);
-  const totalSpending = spending.reduce((s, r) => s + r.amount, 0);
-  const debtService = spending.find((s) => s.nameEn === "Debt Service")?.amount ?? 0;
-  const education = spending.find((s) => s.nameEn === "Education")?.amount ?? 0;
+  const normalizedYear = year.replace("/", "-") as FiscalYear;
+  const pop = populationOverride ?? FISCAL_YEAR_POPULATION[normalizedYear] ?? 105_000_000;
+  const activeSpending = spendingData ?? spending;
+  const activeRevenue = revenueData ?? revenue;
+  const totalRevenue = activeRevenue.reduce((s, r) => s + r.amount, 0);
+  const totalSpending = activeSpending.reduce((s, r) => s + r.amount, 0);
+  const debtService = activeSpending.find((s) => s.nameEn === "Debt Service" || s.nameEn.includes("Debt"))?.amount ?? 0;
+  const education = activeSpending.find((s) => s.nameEn === "Education" || s.nameEn.includes("Education"))?.amount ?? 0;
 
   const items = [
     {
@@ -595,28 +592,64 @@ export default function BudgetPage() {
   const { symbol, fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
 
-  const [selectedYear, setSelectedYear] = useState<FiscalYear>("2024-2025");
+  const [selectedYearStr, setSelectedYearStr] = useState<string>("2024/2025");
 
   // ─── Convex queries ───────────────────────────────────────────────────────
-  // NOTE: The Sankey and breakdown components use the hardcoded demo data
-  // structure (BudgetCategory with sub-items) which requires restructuring
-  // the flat Convex budgetItems before they can replace the demo data.
-  // Fiscal year list is fetched to allow future year-selector wiring.
-  const _convexFiscalYears = useQuery(api.budget.listFiscalYears);
-  // Future: use _convexFiscalYears to populate the year selector when
-  // the budgetItems data structure is refactored to match BudgetCategory shape.
+  const convexFiscalYears = useQuery(api.budget.listFiscalYears);
+  const _isLoading = convexFiscalYears === undefined;
 
-  const gdp = FISCAL_YEAR_GDP[selectedYear];
-  const population = FISCAL_YEAR_POPULATION[selectedYear];
+  // Find the selected fiscal year from Convex
+  const selectedFY = convexFiscalYears?.find((fy) => fy.year === selectedYearStr)
+    ?? convexFiscalYears?.[0]; // fallback to latest
 
-  const totalRevenue = revenue.reduce((s, r) => s + r.amount, 0);
-  const totalSpending = spending.reduce((s, r) => s + r.amount, 0);
-  const deficit = totalSpending - totalRevenue;
-  const debtServicePct = ((spending.find((s) => s.nameEn === "Debt Service")?.amount ?? 0) / totalSpending * 100).toFixed(1);
+  // Update selectedYearStr if Convex data arrived and current selection doesn't exist
+  const yearOptions = convexFiscalYears?.map((fy) => fy.year) ?? [];
+
+  // Get budget breakdown for selected fiscal year
+  const convexBreakdown = useQuery(
+    api.budget.getBudgetBreakdown,
+    selectedFY ? { fiscalYearId: selectedFY._id, category: "expenditure" as const } : "skip"
+  );
+  const convexRevenue = useQuery(
+    api.budget.getBudgetBreakdown,
+    selectedFY ? { fiscalYearId: selectedFY._id, category: "revenue" as const } : "skip"
+  );
+
+  // Use Convex totals if available, fallback to hardcoded
+  const totalRevenue = selectedFY?.totalRevenue ?? revenue.reduce((s, r) => s + r.amount, 0);
+  const totalSpending = selectedFY?.totalExpenditure ?? spending.reduce((s, r) => s + r.amount, 0);
+  const deficit = selectedFY?.deficit ?? (totalSpending - totalRevenue);
+  // Normalize year format: Convex uses "2024/2025", hardcoded uses "2024-2025"
+  const normalizedYear = selectedYearStr.replace("/", "-") as FiscalYear;
+  const gdp = selectedFY?.gdp ?? FISCAL_YEAR_GDP[normalizedYear] ?? 12100;
+  const population = FISCAL_YEAR_POPULATION[normalizedYear] ?? 105_000_000;
+
+  // Use Convex spending data if available
+  const activeSpending: BudgetCategory[] = convexBreakdown && convexBreakdown.length > 0
+    ? convexBreakdown
+        .filter((item) => !item.parentItemId)
+        .map((item) => ({
+          nameAr: item.sectorAr,
+          nameEn: item.sectorEn,
+          amount: item.amount,
+        }))
+    : spending;
+
+  const activeRevenue: BudgetCategory[] = convexRevenue && convexRevenue.length > 0
+    ? convexRevenue
+        .filter((item) => !item.parentItemId)
+        .map((item) => ({
+          nameAr: item.sectorAr,
+          nameEn: item.sectorEn,
+          amount: item.amount,
+        }))
+    : revenue;
+
+  const debtServicePct = ((activeSpending.find((s) => s.nameEn === "Debt Service" || s.nameEn.includes("Debt"))?.amount ?? 0) / totalSpending * 100).toFixed(1);
 
   const revenueDisplay = `${symbol}${fmt(fromEGP(totalRevenue * 1e9), { compact: true })}`;
   const spendingDisplay = `${symbol}${fmt(fromEGP(totalSpending * 1e9), { compact: true })}`;
-  const deficitDisplay = `${symbol}${fmt(fromEGP(deficit * 1e9), { compact: true })}`;
+  const deficitDisplay = `${symbol}${fmt(fromEGP(Math.abs(deficit) * 1e9), { compact: true })}`;
 
   return (
     <div className="page-content" dir={dir}>
@@ -636,14 +669,14 @@ export default function BudgetPage() {
 
           <div className="flex items-center gap-3 shrink-0 flex-wrap">
             <span className="text-sm text-muted-foreground">{t.fiscalYear}</span>
-            <Select value={selectedYear} onValueChange={(v) => setSelectedYear(v as FiscalYear)}>
+            <Select value={selectedYearStr} onValueChange={(v) => setSelectedYearStr(v)}>
               <SelectTrigger className="w-36 text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {FISCAL_YEARS.map((y) => (
+                {(yearOptions.length > 0 ? yearOptions : FISCAL_YEARS).map((y) => (
                   <SelectItem key={y} value={y} className="text-sm font-mono">
-                    {y}
+                    {y.replace("/", "-")}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -732,7 +765,7 @@ export default function BudgetPage() {
             </p>
           </CardHeader>
           <CardContent>
-            <BudgetSankey />
+            <BudgetSankey revenueData={activeRevenue} spendingData={activeSpending} />
           </CardContent>
         </Card>
 
@@ -789,7 +822,7 @@ export default function BudgetPage() {
               ? `بتقسيم الميزانية على ${(population / 1_000_000).toFixed(0)} مليون مواطن:`
               : `Dividing the budget across ${(population / 1_000_000).toFixed(0)}M citizens:`}
           </p>
-          <PerCapitaSection year={selectedYear} />
+          <PerCapitaSection year={selectedYearStr as FiscalYear} spendingData={activeSpending} revenueData={activeRevenue} populationOverride={population} />
         </div>
 
         {/* ── Sources ── */}
