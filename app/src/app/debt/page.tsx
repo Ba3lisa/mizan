@@ -67,10 +67,10 @@ function DebtTimeline() {
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
 
   // External debt in USD billions, domestic in EGP billions — both converted to user's currency
-  const fmtExtB = (v: number) => `${fmt(fromUSD(v), { compact: true })}B ${symbol}`;
-  const fmtDomB = (v: number) => `${fmt(fromEGP(v), { compact: true })}B ${symbol}`;
+  const fmtExtB = (v: number) => `${symbol} ${fmt(fromUSD(v), { decimals: 1 })}B`;
+  const fmtDomB = (v: number) => `${symbol} ${fmt(fromEGP(v), { compact: true })}B`;
   const fmtTotalB = (ext: number, dom: number) =>
-    `${fmt(fromUSD(ext) + fromEGP(dom), { compact: true })}B ${symbol}`;
+    `${symbol} ${fmt(fromUSD(ext) + fromEGP(dom), { compact: true })}B`;
 
   const convexTimeline = useQuery(api.debt.getDebtTimeline);
   const isLoading = convexTimeline === undefined;
@@ -277,12 +277,12 @@ function DebtTimeline() {
         {/* HTML tooltip -- renders outside SVG for proper RTL support */}
         {hovered && (
           <div
-            className="absolute z-20 pointer-events-none bg-[#1E2330]/95 border border-[#333A4A] rounded-lg shadow-xl px-3 py-2.5 min-w-[200px]"
+            className="absolute z-20 pointer-events-none bg-[#1E2330]/95 border border-[#333A4A] rounded-lg shadow-xl px-3 py-2.5 w-[220px]"
             dir={isAr ? "rtl" : "ltr"}
             style={{
-              left: `${((xScale(hovered.year) - 100) / 400) * 100}%`,
-              top: `${((yScale(hovered.totalConverted) - 80) / 240) * 100}%`,
-              transform: "translate(-50%, calc(-100% - 16px))",
+              left: `clamp(0%, ${((xScale(hovered.year) - 100) / 400) * 100}%, calc(100% - 230px))`,
+              top: `${Math.max(0, ((yScale(hovered.totalConverted) - 80) / 240) * 100)}%`,
+              transform: "translate(0, calc(-100% - 16px))",
             }}
           >
             <div className="flex items-baseline justify-between gap-4 mb-1.5">
@@ -349,7 +349,7 @@ function CreditorBreakdown() {
   const CREDITOR_COLORS = ["#6C8EEF", "#2EC4B6", "#C9A84C", "#E76F51", "#9B72CF", "#E5484D", "#525C72"];
 
   // Creditor amounts are in billions USD (same unit as debt records)
-  const fmtCreditor = (v: number) => `${fmt(fromUSD(v ?? 0), { decimals: 1 })}B ${symbol}`;
+  const fmtCreditor = (v: number) => `${symbol} ${fmt(fromUSD(v ?? 0), { decimals: 1 })}B`;
 
   // Map creditors from Convex latest record
   const rawCreditors = convexLatest?.creditors ?? [];
@@ -660,10 +660,10 @@ export default function DebtPage() {
   })();
 
   // Values in DB are in billions (ext in USD B, dom in EGP B)
-  const fmtExtDebt = (v: number) => `${fmt(fromUSD(v), { decimals: 1 })}B ${symbol}`;
-  const fmtDomDebt = (v: number) => `${fmt(fromEGP(v), { compact: true })}B ${symbol}`;
+  const fmtExtDebt = (v: number) => `${symbol} ${fmt(fromUSD(v), { decimals: 1 })}B`;
+  const fmtDomDebt = (v: number) => `${symbol} ${fmt(fromEGP(v), { compact: true })}B`;
   const fmtTotalDebt = (ext: number, dom: number) =>
-    `${fmt(fromUSD(ext) + fromEGP(dom), { compact: true })}B ${symbol}`;
+    `${symbol} ${fmt(fromUSD(ext) + fromEGP(dom), { compact: true })}B`;
 
   const tabs = [
     { id: "timeline" as const, labelAr: "\u0645\u0633\u0627\u0631 \u0627\u0644\u062f\u064a\u0646", labelEn: "Timeline" },
