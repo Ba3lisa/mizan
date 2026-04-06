@@ -163,8 +163,8 @@ function DebtTimeline() {
 
   const hovered = hoveredYear != null ? convertedData.find((d) => d.year === hoveredYear) : null;
 
-  // Y-axis labels using converted max
-  const fmtAxisVal = (v: number) => fmt(v, { compact: true });
+  // Y-axis labels -- values are in billions, show with B suffix and currency symbol
+  const fmtAxisVal = (v: number) => `${symbol} ${Math.round(v)}B`;
 
   return (
     <Skeleton name="debt-timeline" loading={isLoading}>
@@ -267,51 +267,48 @@ function DebtTimeline() {
               </text>
             ))}
 
-            {/* Tooltip */}
-            {hovered && (() => {
-              const hx = xScale(hovered.year);
-              const hy = yScale(hovered.totalConverted);
-              const boxW = isAr ? 220 : 190;
-              const boxH = 78;
-              const tx = Math.min(Math.max(hx - boxW / 2, 4), svgW - boxW - 4);
-              const ty = Math.max(hy - boxH - 14, 4);
-              return (
-                <g style={{ pointerEvents: "none" }}>
-                  <rect x={tx} y={ty} width={boxW} height={boxH} rx={6} fill="#1E2330" fillOpacity={0.96} stroke="#333A4A" strokeWidth={0.5} />
-                  <text x={tx + 10} y={ty + 16} fill="#E8ECF4" fontSize={11} fontFamily="var(--font-mono)" fontWeight="700">
-                    {hovered.year}
-                    {"  "}
-                    <tspan fill="#7A8299" fontSize={9} fontWeight="400">{hovered.debtToGDP}% GDP</tspan>
-                  </text>
-                  {/* External row */}
-                  <rect x={tx + 10} y={ty + 26} width={6} height={6} rx={1} fill="#C9A84C" />
-                  <text x={tx + 20} y={ty + 32} fill="#C9A84C" fontSize={9} fontFamily={isAr ? "var(--font-sans)" : "var(--font-mono)"}>
-                    {isAr ? "\u062e\u0627\u0631\u062c\u064a" : "External"}
-                  </text>
-                  <text x={tx + boxW - 10} y={ty + 32} fill="#C9A84C" fontSize={9} fontFamily="var(--font-mono)" textAnchor="end">
-                    {fmtExtB(hovered.externalDebt)}
-                  </text>
-                  {/* Domestic row */}
-                  <rect x={tx + 10} y={ty + 42} width={6} height={6} rx={1} fill="#6C8EEF" />
-                  <text x={tx + 20} y={ty + 48} fill="#6C8EEF" fontSize={9} fontFamily={isAr ? "var(--font-sans)" : "var(--font-mono)"}>
-                    {isAr ? "\u0645\u062d\u0644\u064a" : "Domestic"}
-                  </text>
-                  <text x={tx + boxW - 10} y={ty + 48} fill="#6C8EEF" fontSize={9} fontFamily="var(--font-mono)" textAnchor="end">
-                    {fmtDomB(hovered.domesticDebt)}
-                  </text>
-                  {/* Total row */}
-                  <line x1={tx + 10} y1={ty + 56} x2={tx + boxW - 10} y2={ty + 56} stroke="#333A4A" strokeWidth={0.5} />
-                  <text x={tx + 10} y={ty + 68} fill="#E8ECF4" fontSize={9} fontFamily={isAr ? "var(--font-sans)" : "var(--font-mono)"} fontWeight="600">
-                    {isAr ? "\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a" : "Total"}
-                  </text>
-                  <text x={tx + boxW - 10} y={ty + 68} fill="#E8ECF4" fontSize={9} fontFamily="var(--font-mono)" fontWeight="600" textAnchor="end">
-                    {fmtTotalB(hovered.externalDebt, hovered.domesticDebt)}
-                  </text>
-                </g>
-              );
-            })()}
+            {/* Vertical hairline for hovered year */}
+            {hovered && (
+              <line x1={xScale(hovered.year)} y1={padT} x2={xScale(hovered.year)} y2={svgH - padB} stroke="#555" strokeWidth={0.5} strokeDasharray="3,3" />
+            )}
           </svg>
         </div>
+
+        {/* HTML tooltip -- renders outside SVG for proper RTL support */}
+        {hovered && (
+          <div
+            className="absolute z-20 pointer-events-none bg-[#1E2330]/95 border border-[#333A4A] rounded-lg shadow-xl px-3 py-2.5 min-w-[200px]"
+            dir={isAr ? "rtl" : "ltr"}
+            style={{
+              left: `${((xScale(hovered.year) - 100) / 400) * 100}%`,
+              top: `${((yScale(hovered.totalConverted) - 80) / 240) * 100}%`,
+              transform: "translate(-50%, calc(-100% - 16px))",
+            }}
+          >
+            <div className="flex items-baseline justify-between gap-4 mb-1.5">
+              <span className="font-mono text-xs font-bold text-[#E8ECF4]">{hovered.year}</span>
+              <span className="text-[0.6rem] text-[#7A8299]">{hovered.debtToGDP}% GDP</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 mb-1">
+              <span className="flex items-center gap-1.5 text-[0.65rem] text-[#C9A84C]">
+                <span className="w-1.5 h-1.5 rounded-sm bg-[#C9A84C] shrink-0" />
+                {isAr ? "خارجي" : "External"}
+              </span>
+              <span className="font-mono text-[0.65rem] text-[#C9A84C]">{fmtExtB(hovered.externalDebt)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-3 mb-1.5">
+              <span className="flex items-center gap-1.5 text-[0.65rem] text-[#6C8EEF]">
+                <span className="w-1.5 h-1.5 rounded-sm bg-[#6C8EEF] shrink-0" />
+                {isAr ? "محلي" : "Domestic"}
+              </span>
+              <span className="font-mono text-[0.65rem] text-[#6C8EEF]">{fmtDomB(hovered.domesticDebt)}</span>
+            </div>
+            <div className="border-t border-[#333A4A] pt-1 flex items-center justify-between gap-3">
+              <span className="text-[0.65rem] font-semibold text-[#E8ECF4]">{isAr ? "الإجمالي" : "Total"}</span>
+              <span className="font-mono text-[0.65rem] font-semibold text-[#E8ECF4]">{fmtTotalB(hovered.externalDebt, hovered.domesticDebt)}</span>
+            </div>
+          </div>
+        )}
 
         {/* Legend */}
         <div className="flex flex-wrap gap-5 text-xs text-muted-foreground">

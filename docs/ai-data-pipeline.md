@@ -25,8 +25,8 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 │     populated, loads from backup if empty)             │
 │  2. Debt refresh (World Bank API)                     │
 │  3. Budget refresh (MOF + Claude parsing)             │
-│  4. Government refresh (Cabinet + Claude parsing)     │
-│  5. Parliament refresh (stub -- JS-rendered SPA)      │
+│  4. Government refresh (Ahram Online + Claude parsing)│
+│  5. Parliament refresh (Wikipedia + parliament.gov.eg)│
 │  6. Constitution refresh (PDF extraction if needed)   │
 │  7. GitHub issue processing (LLM Council)             │
 │  8. Log compaction (daily, deletes logs >30 days)     │
@@ -37,8 +37,8 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 ┌────────────┐ ┌────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐
 │  Debt Data │ │ Budget │ │ Govt   │ │ Constit. │ │ GitHub   │
 │            │ │ Data   │ │ Data   │ │ Data     │ │ Issues   │
-│ World Bank │ │ MOF +  │ │ Cab. + │ │ FAO PDF  │ │ API +    │
-│ API (free) │ │ Claude │ │ Claude │ │ + Claude │ │ Council  │
+│ World Bank │ │ MOF +  │ │ Ahram  │ │ FAO PDF  │ │ API +    │
+│ API (free) │ │ Claude │ │+Claude │ │ + Claude │ │ Council  │
 └────────────┘ └────────┘ └────────┘ └──────────┘ └──────────┘
 ```
 
@@ -48,7 +48,7 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 |---|---|---|---|
 | World Bank API | api.worldbank.org/v2/country/EGY/indicator/DT.DOD.DECT.CD | External debt time series (raw USD) | Direct API call, parse JSON, convert to billions |
 | Ministry of Finance | mof.gov.eg/en/open-data | Budget totals (revenue, expenditure, deficit) | Fetch HTML, Claude extracts JSON |
-| Cabinet of Egypt | cabinet.gov.eg/en/ | Minister names and titles | Fetch HTML, Claude extracts minister list |
+| Ahram Online | english.ahram.org.eg/News/562168.aspx | Minister names and titles | Fetch HTML, Claude extracts minister list |
 | FAO/FAOLEX | faolex.fao.org/docs/pdf/egy127542e.pdf | Constitution full text (247 articles) | pdf-parse extracts text, Claude structures articles |
 | Constitute Project | constituteproject.org/constitution/Egypt_2019 | Constitution reference/verification | Referenced as data source |
 | GitHub Issues | github.com/Ba3lisa/mizan/issues | Community data corrections | GitHub API + Claude parsing + LLM Council vote |
@@ -78,20 +78,22 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
   - Financial monthly: `https://www.mof.gov.eg/en/posts/statementsAndReports/6`
 
 ### Government/Cabinet Data
-- **Primary**: Cabinet of Egypt (cabinet.gov.eg) -- minister list
-- **Parsing**: Claude Haiku 4.5 extracts minister names and portfolios from HTML
+- **Primary**: Ahram Online (english.ahram.org.eg) -- English-language coverage of cabinet reshuffles and minister appointments. Used because cabinet.gov.eg is a JS-rendered SPA inaccessible to server-side fetch.
+- **Parsing**: Claude Haiku 4.5 extracts minister names and portfolios from the Ahram Online HTML
 - **Auto-write**: Unlike other categories, the government refresh auto-writes via `upsertOfficialAndMinistry` mutation when Claude detects minister changes
 - **Validation**: Cross-referenced with State Information Service (sis.gov.eg)
 - **Specific URLs**:
-  - Cabinet: `https://www.cabinet.gov.eg/en/`
+  - Ahram Online (cabinet reshuffle): `https://english.ahram.org.eg/News/562168.aspx`
   - SIS: `https://www.sis.gov.eg/section/352/7510?lang=en`
 
 ### Parliament Data
-- **Primary**: Egyptian Parliament (parliament.gov.eg) -- member list
-- **Status**: Stub in the orchestrator. Parliament.gov.eg is a JS-rendered SPA with no public API, so automated scraping is not feasible. Data is manually curated.
+- **Composition**: Wikipedia API (2025 Egyptian parliamentary election article) -- party seat counts and election metadata extracted via Claude
+- **Member names**: parliament.gov.eg individual member pages (`/MembersDetails.aspx?id=N`) -- scraped via regex + Claude extraction. The main listing page is a JS-rendered SPA, but individual member detail pages return server-rendered HTML accessible to fetch.
+- **Pipeline**: The parliament scraper uses Convex scheduler to chain batches (avoids action timeout). Each batch fetches a range of member IDs, extracts names via regex, and upserts records.
 - **Validation**: Member count must equal 596 (House) or 300 (Senate)
 - **Specific URLs**:
-  - House members: `https://www.parliament.gov.eg/en/MPs`
+  - Wikipedia (composition): `https://en.wikipedia.org/wiki/2025_Egyptian_parliamentary_election`
+  - Individual member pages: `https://www.parliament.gov.eg/MembersDetails.aspx?id={N}`
   - Senate: `https://www.senategov.eg/en/Members`
 
 ### Constitution Data

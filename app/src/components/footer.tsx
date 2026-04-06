@@ -16,7 +16,7 @@ const nav = [
 
 const srcs = [
   { name: "parliament.gov.eg", url: "https://www.parliament.gov.eg" },
-  { name: "cabinet.gov.eg", url: "https://www.cabinet.gov.eg" },
+  { name: "ahram.org.eg", url: "https://english.ahram.org.eg" },
   { name: "mof.gov.eg", url: "https://www.mof.gov.eg" },
   { name: "cbe.org.eg", url: "https://www.cbe.org.eg" },
   { name: "worldbank.org", url: "https://data.worldbank.org/country/egypt-arab-rep" },

@@ -167,7 +167,7 @@ All data must be cited. Every number on the site must link back to an official s
 |--------|-----|----------------|
 | Egyptian Parliament | https://www.parliament.gov.eg | Member lists, committees, session news, organizational structure |
 | Egyptian Senate | https://www.senategov.eg | Senator lists, committees, leadership |
-| Cabinet of Egypt | https://www.cabinet.gov.eg | Ministry list, ministers, government decisions |
+| Ahram Online | https://english.ahram.org.eg | Cabinet reshuffles, minister appointments (cabinet.gov.eg is JS-rendered, inaccessible to fetch) |
 | Ministry of Finance | https://www.mof.gov.eg | Budget documents, financial statements, debt data |
 | CAPMAS | https://www.capmas.gov.eg | Statistical yearbooks, population, economic indicators |
 | Central Bank of Egypt | https://www.cbe.org.eg | Monetary data, external debt, reserves, exchange rates |

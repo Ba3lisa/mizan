@@ -63,8 +63,8 @@ Mizan is structured in three layers: a Visual Layer that users interact with, a 
 |                   EXTERNAL SOURCES                            |
 |                                                               |
 |  World Bank API        Ministry of Finance (mof.gov.eg)       |
-|  Central Bank of Egypt Cabinet portal (cabinet.gov.eg)        |
-|  Parliament (SPA)      State Information Service (sis.gov.eg) |
+|  Central Bank of Egypt Ahram Online (ahram.org.eg)            |
+|  Wikipedia (parliament) State Information Service (sis.gov.eg)|
 |  CAPMAS statistics     Elections Authority (elections.eg)      |
 |  FAO/FAOLEX (constitution PDF)                                |
 +---------------------------------------------------------------+
@@ -140,8 +140,8 @@ A Convex cron job fires every 6 hours and triggers the orchestrator. The orchest
 1. **ensureAllReferenceData** -- checks all 18 tables, loads from backup if empty (zero cost if populated)
 2. **Debt refresh** -- fetches from World Bank API, converts USD to billions, upserts all available years
 3. **Budget refresh** -- fetches MOF page, uses content hashing to skip when unchanged, Claude extracts fiscal year totals
-4. **Government refresh** -- fetches cabinet.gov.eg, Claude detects minister changes, auto-writes via upsertOfficialAndMinistry
-5. **Parliament refresh** -- stub (parliament.gov.eg is JS-rendered SPA, manual curation needed)
+4. **Government refresh** -- fetches Ahram Online (english.ahram.org.eg), Claude detects minister changes, auto-writes via upsertOfficialAndMinistry. Ahram Online is used because cabinet.gov.eg is JS-rendered and inaccessible to server-side fetch.
+5. **Parliament refresh** -- composition from Wikipedia API (2025 election), member names from parliament.gov.eg individual pages (regex + Claude), batched via Convex scheduler
 6. **Constitution refresh** -- checks if article count is below 247, downloads PDF from FAO, extracts with pdf-parse + Claude
 7. **GitHub issue processing** -- processes data-correction/stale-data issues via LLM Council
 8. **Log compaction** -- daily cron deletes refresh logs older than 30 days

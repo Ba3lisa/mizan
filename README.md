@@ -125,8 +125,8 @@ Priority sources:
 1. World Bank API (debt, GDP, economic indicators) -- automated
 2. Central Bank of Egypt (exchange rates, reserves) -- automated
 3. Ministry of Finance (budget data) -- AI-parsed
-4. Cabinet.gov.eg (government structure) -- AI-parsed, human-reviewed
-5. Parliament.gov.eg (member directory) -- manual curation
+4. Ahram Online (english.ahram.org.eg) (government structure) -- AI-parsed, human-reviewed
+5. Wikipedia + parliament.gov.eg (parliament composition + individual member pages) -- automated
 6. CAPMAS (national statistics) -- manual + AI-assisted
 
 ## Development Model

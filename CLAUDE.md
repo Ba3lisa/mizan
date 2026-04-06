@@ -26,8 +26,8 @@
 1. World Bank API (debt, GDP, economic indicators) — automated
 2. Central Bank of Egypt (exchange rates, reserves) — automated
 3. Ministry of Finance (budget) — AI-parsed from mof.gov.eg
-4. Cabinet.gov.eg (government structure) — AI-parsed, human-reviewed
-5. Parliament.gov.eg (members) — manual curation (JS-rendered SPA)
+4. Ahram Online (english.ahram.org.eg) (government structure) — AI-parsed, human-reviewed
+5. Wikipedia + parliament.gov.eg (parliament composition + individual member pages) — automated
 6. CAPMAS (statistics) — manual + AI-assisted
 
 Managed by Father of Projects (FoP). Stack: nextjs-convex.

@@ -45,14 +45,14 @@ const features = [
 
 const stats = [
   { value: 596, ar: "عضو برلمان", en: "Parliamentarians", source: "parliament.gov.eg", url: "https://www.parliament.gov.eg" },
-  { value: 27, ar: "محافظة", en: "Governorates", source: "cabinet.gov.eg", url: "https://www.cabinet.gov.eg" },
+  { value: 27, ar: "محافظة", en: "Governorates", source: "ahram.org.eg", url: "https://english.ahram.org.eg" },
   { value: 247, ar: "مادة دستورية", en: "Articles", source: "presidency.eg", url: "https://www.presidency.eg" },
   { value: 155.2, ar: "مليار دولار ديون خارجية", en: "Billion USD Ext. Debt", source: "cbe.org.eg", url: "https://www.cbe.org.eg" },
 ];
 
 const sources = [
   { ar: "مجلس النواب — قائمة الأعضاء", en: "Parliament — Members List", url: "https://www.parliament.gov.eg/en/MPs", domain: "parliament.gov.eg/en/MPs" },
-  { ar: "مجلس الوزراء — التشكيل الحالي", en: "Cabinet — Current Formation", url: "https://www.cabinet.gov.eg/English/TheMinistry/Pages/default.aspx", domain: "cabinet.gov.eg" },
+  { ar: "الأهرام أونلاين — التشكيل الوزاري", en: "Ahram Online — Cabinet Lineup", url: "https://english.ahram.org.eg/News/562168.aspx", domain: "ahram.org.eg" },
   { ar: "وزارة المالية — البيانات المالية", en: "MOF — Financial Statements", url: "https://www.mof.gov.eg/en/posts/statementsAndReports/5", domain: "mof.gov.eg/reports" },
   { ar: "البنك المركزي — النشرة الإحصائية", en: "CBE — Statistical Bulletin", url: "https://www.cbe.org.eg/en/economic-research/statistics", domain: "cbe.org.eg/statistics" },
   { ar: "البنك الدولي — بيانات مصر", en: "World Bank — Egypt Data", url: "https://data.worldbank.org/country/egypt-arab-rep", domain: "worldbank.org/egypt" },

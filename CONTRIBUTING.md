@@ -19,7 +19,7 @@ We prioritize data sources in this order:
 
 | Priority | Source Type | Example | Council Behavior |
 |---|---|---|---|
-| 1 (Highest) | Egyptian government (.gov.eg) | mof.gov.eg, cabinet.gov.eg | Auto-approved with high confidence |
+| 1 (Highest) | Egyptian government (.gov.eg) | mof.gov.eg, parliament.gov.eg | Auto-approved with high confidence |
 | 2 | International organizations | World Bank, IMF, UNDP | Auto-approved with medium confidence |
 | 3 | Media | Reuters, BBC, Al-Ahram | Approved but marked as "estimated" |
 | 4 (Lowest) | Other | Blogs, social media, unverified | Requires human review |
