@@ -110,6 +110,9 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ════════ AI PIPELINE STATUS ════════ */}
+      <AiPipelineStatus />
+
       {/* ════════ STATS ════════ */}
       <section className="container-page">
         <div className="border border-border rounded-xl bg-card/50">
@@ -122,9 +125,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      {/* ════════ AI PIPELINE STATUS ════════ */}
-      <AiPipelineStatus />
 
       {/* ════════ FEATURES ════════ */}
       <section className="container-page py-16 md:py-24">

@@ -35,7 +35,7 @@ interface PipelineStep {
 
 interface PipelineProgress {
   steps: PipelineStep[];
-  lastRunAt: number | null;
+  lastCompletedAt: number | null;
 }
 
 // ─── Step name translations ───────────────────────────────────────────────────
@@ -55,8 +55,9 @@ const STEP_NAMES_AR: Record<string, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatCountdown(ms: number, isAr: boolean): string {
-  if (ms <= 0) return isAr ? "جارٍ التحديث الآن..." : "Refreshing now...";
+function formatCountdown(ms: number, isAr: boolean, isRunning: boolean): string {
+  if (isRunning) return isAr ? "جارٍ التحديث الآن..." : "Refreshing now...";
+  if (ms <= 0) return isAr ? "جاهز للتحديث" : "Ready to refresh";
 
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
@@ -76,10 +77,11 @@ function formatCountdown(ms: number, isAr: boolean): string {
   return `Next refresh in ${hStr}${mStr}${sStr}`;
 }
 
-function formatElapsed(startedAt: number | null, completedAt: number | null): string {
-  if (startedAt === null) return "--";
+function formatElapsed(startedAt: number | null | undefined, completedAt: number | null | undefined): string {
+  if (!startedAt) return "--";
   const end = completedAt ?? Date.now();
   const sec = (end - startedAt) / 1000;
+  if (isNaN(sec) || sec < 0) return "--";
   return `${sec.toFixed(1)}s`;
 }
 
@@ -117,7 +119,7 @@ function statusLabel(status: StepStatus, isAr: boolean): string {
 
 // ─── Countdown Hook ───────────────────────────────────────────────────────────
 
-function useCountdown(lastRunAt: number | null): { msUntilNext: number; isRunning: boolean } {
+function useCountdown(lastCompletedAt: number | null, steps: PipelineStep[]): { msUntilNext: number; isRunning: boolean } {
   const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
   const [now, setNow] = useState(() => Date.now());
@@ -127,13 +129,14 @@ function useCountdown(lastRunAt: number | null): { msUntilNext: number; isRunnin
     return () => clearInterval(id);
   }, []);
 
-  if (lastRunAt === null) {
-    return { msUntilNext: 0, isRunning: false };
+  const isRunning = steps.some((s) => s.status === "running");
+
+  if (lastCompletedAt === null) {
+    return { msUntilNext: 0, isRunning };
   }
 
-  const nextRun = lastRunAt + SIX_HOURS_MS;
+  const nextRun = lastCompletedAt + SIX_HOURS_MS;
   const msUntilNext = Math.max(0, nextRun - now);
-  const isRunning = msUntilNext <= 0;
   return { msUntilNext, isRunning };
 }
 
@@ -172,7 +175,7 @@ function StepRow({ step, isAr }: { step: PipelineStep; isAr: boolean }) {
         )}
       </td>
       <td className="px-4 py-2.5 text-xs text-muted-foreground font-mono text-end whitespace-nowrap">
-        {step.status !== "pending" ? elapsed : "--"}
+        {step.status === "success" || step.status === "failed" || step.status === "running" ? elapsed : "--"}
       </td>
     </tr>
   );
@@ -194,7 +197,8 @@ export function AiPipelineStatus() {
 
   const progress = rawProgress as PipelineProgress | null | undefined;
 
-  const { msUntilNext, isRunning } = useCountdown(progress?.lastRunAt ?? null);
+  const progressSteps = progress?.steps ?? [];
+  const { msUntilNext, isRunning } = useCountdown(progress?.lastCompletedAt ?? null, progressSteps);
 
   // Determine whether to start expanded (a run is in progress) or collapsed
   const hasActiveRun = progress?.steps?.some((s) => s.status === "running") ?? false;
@@ -230,9 +234,8 @@ export function AiPipelineStatus() {
     return null;
   }
 
-  const steps = progress.steps ?? [];
-  const successCount = steps.filter((s) => s.status === "success").length;
-  const failedCount = steps.filter((s) => s.status === "failed").length;
+  const successCount = progressSteps.filter((s) => s.status === "success").length;
+  const failedCount = progressSteps.filter((s) => s.status === "failed").length;
 
   return (
     <section className="container-page py-4" dir={dir}>
@@ -280,7 +283,7 @@ export function AiPipelineStatus() {
             {/* Countdown */}
             <span className="text-xs text-muted-foreground font-mono hidden sm:block" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
               <Clock size={10} className="inline me-1 opacity-60" />
-              {formatCountdown(msUntilNext, isAr)}
+              {formatCountdown(msUntilNext, isAr, isRunning)}
             </span>
             {expanded ? (
               <ChevronUp size={14} className="text-muted-foreground" />
@@ -294,12 +297,12 @@ export function AiPipelineStatus() {
         <div className="sm:hidden px-5 pb-2 -mt-1">
           <span className="text-xs text-muted-foreground font-mono" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
             <Clock size={10} className="inline me-1 opacity-60" />
-            {formatCountdown(msUntilNext, isAr)}
+            {formatCountdown(msUntilNext, isAr, isRunning)}
           </span>
         </div>
 
         {/* Collapsible table */}
-        {expanded && steps.length > 0 && (
+        {expanded && progressSteps.length > 0 && (
           <div className="border-t border-border/40 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -319,7 +322,7 @@ export function AiPipelineStatus() {
                 </tr>
               </thead>
               <tbody>
-                {steps.map((step, i) => (
+                {progressSteps.map((step, i) => (
                   <StepRow key={`${step.step}-${i}`} step={step} isAr={isAr} />
                 ))}
               </tbody>
@@ -328,7 +331,7 @@ export function AiPipelineStatus() {
         )}
 
         {/* Empty state when expanded but no steps */}
-        {expanded && steps.length === 0 && (
+        {expanded && progressSteps.length === 0 && (
           <div className="border-t border-border/40 px-5 py-6 text-center text-xs text-muted-foreground">
             {isAr ? "لا توجد بيانات متاحة للمراحل" : "No pipeline step data available"}
           </div>
