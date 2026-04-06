@@ -12,7 +12,7 @@ resource "digitalocean_app" "mizan" {
       github {
         repo           = "Ba3lisa/mizan"
         branch         = "main"
-        deploy_on_push = true
+        deploy_on_push = false  # Deploys only via release workflow (gh release create)
       }
 
       source_dir    = "app"
