@@ -14,6 +14,7 @@ const PIPELINE_STEPS = [
   "constitution",
   "github_issues",
   "narrative",
+  "llm_export",
   "cleanup",
 ] as const;
 

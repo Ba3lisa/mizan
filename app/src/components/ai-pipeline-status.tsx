@@ -49,6 +49,7 @@ const STEP_NAMES_AR: Record<string, string> = {
   constitution: "الدستور",
   github_issues: "مشكلات GitHub",
   narrative: "التحليل الاقتصادي",
+  llm_export: "تصدير الذكاء الاصطناعي",
   cleanup: "التنظيف",
   reference_data: "البيانات المرجعية",
 };
@@ -274,6 +275,11 @@ export function AiPipelineStatus() {
               {!hasActiveRun && successCount > 0 && failedCount === 0 && (
                 <span className="text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500">
                   {isAr ? "مكتمل" : "Complete"}
+                </span>
+              )}
+              {!hasActiveRun && successCount > 0 && (
+                <span className="text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500">
+                  {isAr ? "LLM جاهز" : "LLM Ready"}
                 </span>
               )}
             </div>

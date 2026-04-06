@@ -216,6 +216,52 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ════════ FOR AI AGENTS ════════ */}
+      <section className="container-page py-10">
+        <div className="flex items-center gap-2 mb-2">
+          <Bot size={16} className="text-primary" />
+          <h2 className="text-sm font-bold">
+            {isAr ? "للذكاء الاصطناعي والوكلاء" : "For AI Agents & LLMs"}
+          </h2>
+        </div>
+        <p className="text-xs text-muted-foreground mb-4 max-w-lg">
+          {isAr
+            ? "بيانات ميزان متاحة بتنسيق مُحسّن للذكاء الاصطناعي. يمكن لنماذج اللغة والوكلاء قراءة جميع البيانات مباشرةً."
+            : "Mizan data is available in LLM-optimized formats. Language models and AI agents can read all data directly."}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <a href="/llms.txt" className="no-underline group">
+            <div className="border border-border rounded-lg p-4 hover:border-blue-500/40 transition-colors">
+              <p className="text-sm font-semibold group-hover:text-blue-500 transition-colors inline-flex items-center gap-1.5 font-mono">
+                /llms.txt <ExternalLink size={12} />
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {isAr
+                  ? "ملخص هيكلي لجميع البيانات والمصادر — مثالي لنافذة سياق الذكاء الاصطناعي"
+                  : "Structured overview of all data and sources — ideal for LLM context windows"}
+              </p>
+            </div>
+          </a>
+          <a href="/llms-full.txt" className="no-underline group">
+            <div className="border border-border rounded-lg p-4 hover:border-blue-500/40 transition-colors">
+              <p className="text-sm font-semibold group-hover:text-blue-500 transition-colors inline-flex items-center gap-1.5 font-mono">
+                /llms-full.txt <ExternalLink size={12} />
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {isAr
+                  ? "تصدير كامل لجميع البيانات بتنسيق Markdown — يُحدَّث كل ٦ ساعات"
+                  : "Full data export in Markdown — refreshed every 6 hours with the pipeline"}
+              </p>
+            </div>
+          </a>
+        </div>
+        <p className="text-[0.65rem] text-muted-foreground/50 mt-2">
+          {isAr
+            ? "يدعم أيضاً WebMCP — وكلاء Chrome AI يمكنها اكتشاف أدوات ميزان تلقائياً."
+            : "Also supports WebMCP — Chrome AI agents can auto-discover Mizan tools via navigator.modelContext."}
+        </p>
+      </section>
+
       {/* ════════ SOURCES ════════ */}
       <section className="container-page pb-16">
         <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">

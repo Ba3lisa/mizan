@@ -1547,6 +1547,51 @@ export const orchestrateRefresh = internalAction({
       });
     }
 
+    // ── Step: llm_export ──────────────────────────────────────────────────────
+    await ctx.runMutation(internal.pipelineProgress.updateStep, {
+      runId,
+      step: "llm_export",
+      status: "running",
+      message: "Triggering LLM data export revalidation...",
+      messageAr: "جارٍ تحديث تصدير بيانات الذكاء الاصطناعي...",
+    });
+    try {
+      // Trigger ISR revalidation of /llms-full.txt so it reflects fresh data
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://mizanmasr.com";
+      const revalRes = await fetch(`${siteUrl}/api/revalidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          secret: process.env.REVALIDATION_SECRET ?? "",
+          paths: ["/llms-full.txt"],
+        }),
+      });
+      const revalidated = revalRes.ok;
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "llm_export",
+        status: "success",
+        message: revalidated
+          ? "LLM export revalidated."
+          : "LLM export: revalidation skipped (no webhook configured).",
+        messageAr: revalidated
+          ? "تم تحديث تصدير بيانات الذكاء الاصطناعي."
+          : "تصدير الذكاء الاصطناعي: تم تخطي إعادة التحقق.",
+      });
+    } catch (err) {
+      // Non-critical — the ISR cache will still revalidate on its own within 6h
+      console.warn(
+        `[dataAgent] LLM export revalidation failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "llm_export",
+        status: "success",
+        message: "LLM export: ISR will auto-refresh within 6h.",
+        messageAr: "تصدير الذكاء الاصطناعي: سيتم التحديث التلقائي خلال ٦ ساعات.",
+      });
+    }
+
     // ── Step: cleanup ────────────────────────────────────────────────────────
     await ctx.runMutation(internal.pipelineProgress.updateStep, {
       runId,
