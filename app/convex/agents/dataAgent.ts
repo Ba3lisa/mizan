@@ -92,6 +92,7 @@ async function refreshDebtData(
         totalExternalDebt: debtInBillions,
         totalDebtService: debtService,
         sourceUrl: DEBT_STOCK_URL,
+        sanadLevel: 2,
       }
     );
     totalUpdated += updated;
@@ -190,6 +191,7 @@ ${pageText || "(page content unavailable)"}`;
       totalExpenditure,
       deficit,
       sourceUrl: MOF_URL,
+      sanadLevel: 1,
     }
   );
 
@@ -323,6 +325,7 @@ ${pageText || "(page content unavailable)"}`;
           : "minister" as const,
       })),
       sourceUrl: CABINET_URL,
+      sanadLevel: 3,
     }
   );
 
@@ -359,6 +362,7 @@ ${governorText.slice(0, 8000)}`,
                 role: "governor" as const,
               })),
               sourceUrl: "https://english.ahram.org.eg/News/526575.aspx",
+              sanadLevel: 3,
             }
           );
           recordsUpdated += govUpdated;
@@ -608,6 +612,7 @@ Text: ${imfText}`,
                   unit: meta.unit,
                   sourceUrl: "https://en.wikipedia.org/wiki/Economy_of_Egypt",
                   sourceNameEn: meta.sourceNameEn,
+                  sanadLevel: 2,
                 }
               );
               totalUpdated += updated;
@@ -670,6 +675,7 @@ Text: ${imfText}`,
           unit: imf.unit,
           sourceUrl: url,
           sourceNameEn: imf.sourceNameEn,
+          sanadLevel: 2,
         }
       );
       totalUpdated += updated;
@@ -730,6 +736,7 @@ async function refreshEconomyData(
           unit: wb.unit,
           sourceUrl: url,
           sourceNameEn: wb.sourceNameEn,
+          sanadLevel: 2,
         }
       );
       totalUpdated += updated;
@@ -756,6 +763,7 @@ async function refreshEconomyData(
             unit: "egp_per_usd",
             sourceUrl: "https://open.er-api.com",
             sourceNameEn: "ExchangeRate-API (daily rates)",
+            sanadLevel: 4,
           }
         );
         totalUpdated += updated;
@@ -888,6 +896,7 @@ ${snippet}`,
       unit: "points",
       sourceUrl: SOURCE_URL,
       sourceNameEn: "Country Economy — EGX 30",
+      sanadLevel: 4,
     }
   );
 

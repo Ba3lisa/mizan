@@ -95,6 +95,79 @@ export const getAllLatest = query({
 });
 
 /**
+ * For each known indicator, get ALL records for the latest date (multi-source).
+ * Returns a map of indicator -> { best: record with lowest sanadLevel, alternatives: remaining records }.
+ */
+export const getAllLatestMultiSource = query({
+  args: {},
+  handler: async (ctx) => {
+    const knownIndicators = [
+      "gdp_growth",
+      "inflation",
+      "unemployment",
+      "exchange_rate",
+      "reserves",
+      "suez_revenue",
+      "remittances",
+      "fdi_inflows",
+      "tourism_receipts",
+      "current_account",
+      "gdp_nominal",
+      "gdp_per_capita",
+      "population",
+      "poverty_rate",
+      "debt_service_exports",
+      "egx30",
+      "imf_gdp_growth_forecast",
+      "imf_inflation_forecast",
+      "imf_current_account_forecast",
+      "imf_gov_debt_gdp",
+    ] as const;
+
+    type IndicatorRecord = Doc<"economicIndicators">;
+
+    const result: Record<string, {
+      best: IndicatorRecord | null;
+      alternatives: IndicatorRecord[];
+    }> = {};
+
+    for (const indicator of knownIndicators) {
+      // Find the latest date for this indicator
+      const latest = await ctx.db
+        .query("economicIndicators")
+        .withIndex("by_indicator_and_date", (q) => q.eq("indicator", indicator))
+        .order("desc")
+        .first();
+
+      if (!latest) {
+        result[indicator] = { best: null, alternatives: [] };
+        continue;
+      }
+
+      // Collect all records for that latest date
+      const allForLatestDate = await ctx.db
+        .query("economicIndicators")
+        .withIndex("by_indicator_and_date", (q) =>
+          q.eq("indicator", indicator).eq("date", latest.date)
+        )
+        .collect();
+
+      // Sort by sanadLevel ascending (lower = more authoritative); undefined sanadLevel treated as 99
+      const sorted = allForLatestDate.slice().sort((a, b) => {
+        const aLevel = a.sanadLevel ?? 99;
+        const bLevel = b.sanadLevel ?? 99;
+        return aLevel - bLevel;
+      });
+
+      const [best, ...alternatives] = sorted;
+      result[indicator] = { best: best ?? null, alternatives };
+    }
+
+    return result;
+  },
+});
+
+/**
  * Get the full time series for a given indicator, ordered oldest-first.
  * Suitable for rendering charts.
  */

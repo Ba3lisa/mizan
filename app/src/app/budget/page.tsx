@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { SanadBadge } from "@/components/sanad-badge";
 import { ResponsiveSankey } from "@nivo/sankey";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1004,8 +1005,9 @@ export default function BudgetPage() {
                 <TrendingUp size={13} style={{ color: "#4DCCB3" }} />
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">{t.totalRevenue}</p>
               </div>
-              <p className="font-mono text-3xl font-bold tabular-nums" style={{ color: "#4DCCB3" }}>
+              <p className="font-mono text-3xl font-bold tabular-nums flex items-center gap-1.5" style={{ color: "#4DCCB3" }}>
                 {revenueDisplay}
+                {selectedFY?.sanadLevel && <SanadBadge sanadLevel={selectedFY.sanadLevel} sourceUrl={selectedFY?.sourceUrl} />}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {((totalRevenue / gdp) * 100).toFixed(1)}% {isAr ? "من الناتج المحلي" : "of GDP"}
@@ -1020,8 +1022,9 @@ export default function BudgetPage() {
                 <TrendingUp size={13} style={{ color: "#E07070" }} />
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">{t.totalExpenditure}</p>
               </div>
-              <p className="font-mono text-3xl font-bold tabular-nums" style={{ color: "#E07070" }}>
+              <p className="font-mono text-3xl font-bold tabular-nums flex items-center gap-1.5" style={{ color: "#E07070" }}>
                 {spendingDisplay}
+                {selectedFY?.sanadLevel && <SanadBadge sanadLevel={selectedFY.sanadLevel} sourceUrl={selectedFY?.sourceUrl} />}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {((totalSpending / gdp) * 100).toFixed(1)}% {isAr ? "من الناتج المحلي" : "of GDP"}
@@ -1036,8 +1039,9 @@ export default function BudgetPage() {
                 <TrendingDown size={13} style={{ color: DEFICIT_COLOR }} />
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">{t.deficit}</p>
               </div>
-              <p className="font-mono text-3xl font-bold tabular-nums" style={{ color: DEFICIT_COLOR }}>
+              <p className="font-mono text-3xl font-bold tabular-nums flex items-center gap-1.5" style={{ color: DEFICIT_COLOR }}>
                 -{deficitDisplay}
+                {selectedFY?.sanadLevel && <SanadBadge sanadLevel={selectedFY.sanadLevel} sourceUrl={selectedFY?.sourceUrl} />}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
                 {((deficit / gdp) * 100).toFixed(1)}% {isAr ? "من الناتج المحلي" : "of GDP"}

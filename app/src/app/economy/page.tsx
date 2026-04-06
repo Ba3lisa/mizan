@@ -14,6 +14,7 @@ import {
   ArrowRight,
   BrainCircuit,
 } from "lucide-react";
+import { SanadBadge } from "@/components/sanad-badge";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -49,6 +50,7 @@ interface IndicatorRecord {
   year?: string;
   sourceUrl?: string;
   sourceNameEn?: string;
+  sanadLevel?: number;
 }
 
 interface TimelineRecord {
@@ -445,6 +447,14 @@ function HeroCard({ meta, record, isAr, index }: HeroCardProps) {
                 >
                   {formatValue(record.value, record.unit)}
                 </span>
+                {record.sanadLevel && (
+                  <SanadBadge
+                    sanadLevel={record.sanadLevel}
+                    sourceUrl={record.sourceUrl}
+                    showLabel
+                    className="mb-1"
+                  />
+                )}
               </div>
               <div className="flex items-center gap-2 mb-3" dir="ltr">
                 <TrendIcon size={11} style={{ color: trendColor }} />
@@ -945,8 +955,11 @@ function MoneyFlowCard({ meta, record, isAr, accentColor }: MoneyFlowCardProps) 
         ) : (
           <>
             <div className="flex items-end justify-between mb-2" dir="ltr">
-              <span className="text-xl font-black font-mono text-foreground">
+              <span className="text-xl font-black font-mono text-foreground flex items-center gap-1.5">
                 {formatValue(record.value, record.unit)}
+                {record.sanadLevel && (
+                  <SanadBadge sanadLevel={record.sanadLevel} sourceUrl={record.sourceUrl} />
+                )}
               </span>
               {yoyChange !== null && (
                 <span
@@ -1101,8 +1114,11 @@ function NationalStat({
         <p className="text-base font-black font-mono text-muted-foreground/25">—</p>
       ) : (
         <>
-          <p className="text-xl font-black font-mono text-foreground" dir="ltr">
+          <p className="text-xl font-black font-mono text-foreground flex items-center gap-1.5" dir="ltr">
             {formatValue(record.value, record.unit)}
+            {record.sanadLevel && (
+              <SanadBadge sanadLevel={record.sanadLevel} sourceUrl={record.sourceUrl} />
+            )}
           </p>
           <p className="text-[0.55rem] font-mono text-muted-foreground/40">
             {record.unit} · {record.year ?? record.date.slice(0, 4)}
@@ -1182,11 +1198,14 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
         ) : (
           <>
             <p
-              className="text-3xl font-black font-mono tracking-tight text-foreground mb-1"
+              className="text-3xl font-black font-mono tracking-tight text-foreground mb-1 flex items-center gap-2"
               dir="ltr"
               style={{ color: meta.highlight ? COLORS.gold : undefined }}
             >
               {formatValue(record.value, record.unit)}
+              {record.sanadLevel && (
+                <SanadBadge sanadLevel={record.sanadLevel} sourceUrl={record.sourceUrl} showLabel />
+              )}
             </p>
             <p className="text-[0.6rem] text-muted-foreground/60 mb-3 font-mono">
               {record.unit} · {record.year ?? record.date.slice(0, 4)}

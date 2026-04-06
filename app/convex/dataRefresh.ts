@@ -182,6 +182,8 @@ export const upsertDebtRecord = internalMutation({
     totalDebtService: v.optional(v.number()),
     totalInterestPayments: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
+    sourceNameEn: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -199,6 +201,8 @@ export const upsertDebtRecord = internalMutation({
         totalDebtService: args.totalDebtService,
         totalInterestPayments: args.totalInterestPayments,
         sourceUrl: args.sourceUrl,
+        sourceNameEn: args.sourceNameEn,
+        sanadLevel: args.sanadLevel,
       });
       return 1;
     }
@@ -228,6 +232,12 @@ export const upsertDebtRecord = internalMutation({
     if (args.sourceUrl !== undefined) {
       patch.sourceUrl = args.sourceUrl;
     }
+    if (args.sourceNameEn !== undefined) {
+      patch.sourceNameEn = args.sourceNameEn;
+    }
+    if (args.sanadLevel !== undefined) {
+      patch.sanadLevel = args.sanadLevel;
+    }
 
     if (Object.keys(patch).length > 0) {
       await ctx.db.patch(existing._id, patch);
@@ -250,6 +260,7 @@ export const upsertFiscalYear = internalMutation({
     deficit: v.optional(v.number()),
     gdp: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -271,6 +282,7 @@ export const upsertFiscalYear = internalMutation({
         deficit: args.deficit,
         gdp: args.gdp,
         sourceUrl: args.sourceUrl,
+        sanadLevel: args.sanadLevel,
       });
       return 1;
     }
@@ -288,6 +300,7 @@ export const upsertFiscalYear = internalMutation({
         deficit: args.deficit,
         gdp: args.gdp,
         sourceUrl: args.sourceUrl,
+        sanadLevel: args.sanadLevel,
       });
       return 1;
     }
@@ -297,8 +310,10 @@ export const upsertFiscalYear = internalMutation({
 });
 
 /**
- * Upserts an economic indicator value by indicator + date.
- * Creates a new record if none exists; patches the value if it changed.
+ * Upserts an economic indicator value by indicator + date + sourceUrl.
+ * Supports multiple sources for the same indicator+date (multi-source).
+ * Matches by sourceUrl within the (indicator, date) bucket.
+ * Creates a new record if no match; patches value + sanadLevel if value changed.
  * Returns 1 if a write occurred, 0 if the value was unchanged.
  */
 export const upsertEconomicIndicator = internalMutation({
@@ -310,6 +325,7 @@ export const upsertEconomicIndicator = internalMutation({
     unit: v.string(),
     sourceUrl: v.optional(v.string()),
     sourceNameEn: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     const existing = await ctx.db
@@ -317,9 +333,11 @@ export const upsertEconomicIndicator = internalMutation({
       .withIndex("by_indicator_and_date", (q) =>
         q.eq("indicator", args.indicator).eq("date", args.date)
       )
-      .unique();
+      .collect();
 
-    if (!existing) {
+    const match = existing.find((e) => e.sourceUrl === args.sourceUrl);
+
+    if (!match) {
       await ctx.db.insert("economicIndicators", {
         indicator: args.indicator,
         date: args.date,
@@ -328,22 +346,59 @@ export const upsertEconomicIndicator = internalMutation({
         unit: args.unit,
         sourceUrl: args.sourceUrl,
         sourceNameEn: args.sourceNameEn,
+        sanadLevel: args.sanadLevel,
       });
       return 1;
     }
 
-    if (existing.value !== args.value) {
-      await ctx.db.patch(existing._id, {
+    if (match.value !== args.value) {
+      await ctx.db.patch(match._id, {
         value: args.value,
         year: args.year,
         unit: args.unit,
-        sourceUrl: args.sourceUrl,
-        sourceNameEn: args.sourceNameEn,
+        sanadLevel: args.sanadLevel,
       });
       return 1;
     }
 
     return 0;
+  },
+});
+
+/**
+ * Backfills sanadLevel for all economicIndicators records where it is undefined.
+ * Determines level from sourceUrl:
+ *   worldbank.org -> 2, imf.org -> 2, er-api.com -> 4, countryeconomy.com -> 4, others -> 4
+ * Returns count of patched records.
+ */
+export const backfillEconomicSanadLevels = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("economicIndicators").collect();
+    let patched = 0;
+
+    for (const record of all) {
+      if (record.sanadLevel !== undefined) continue;
+
+      const url = record.sourceUrl ?? "";
+      let sanadLevel: number;
+      if (url.includes("worldbank.org")) {
+        sanadLevel = 2;
+      } else if (url.includes("imf.org")) {
+        sanadLevel = 2;
+      } else if (url.includes("er-api.com")) {
+        sanadLevel = 4;
+      } else if (url.includes("countryeconomy.com")) {
+        sanadLevel = 4;
+      } else {
+        sanadLevel = 4;
+      }
+
+      await ctx.db.patch(record._id, { sanadLevel });
+      patched++;
+    }
+
+    return patched;
   },
 });
 
@@ -422,6 +477,7 @@ export const upsertGovernmentOfficials = internalMutation({
       })
     ),
     sourceUrl: v.string(),
+    sanadLevel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
     let updated = 0;
@@ -464,6 +520,7 @@ export const upsertGovernmentOfficials = internalMutation({
             titleAr: official.titleAr,
             role: official.role,
             sourceUrl: args.sourceUrl,
+            sanadLevel: args.sanadLevel,
           });
           updated++;
         }
@@ -476,6 +533,7 @@ export const upsertGovernmentOfficials = internalMutation({
           role: official.role,
           isCurrent: true,
           sourceUrl: args.sourceUrl,
+          sanadLevel: args.sanadLevel,
         }) as string;
         updated++;
       }
@@ -846,5 +904,67 @@ export const manualRefresh = internalAction({
 
     console.log(`[manualRefresh] Refresh complete for: ${category}`);
     return null;
+  },
+});
+
+/**
+ * Backfills sanadLevel on existing records that don't yet have it set.
+ * Debt → 2 (World Bank), fiscalYears → 1 (MOF), budgetItems → 1 (MOF).
+ * Officials: inferred from sourceUrl (ahram→3, wikipedia→4, .gov.eg→1, else→4).
+ * Returns total count of records updated.
+ */
+export const backfillAllSanadLevels = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    let total = 0;
+
+    // Debt records → sanadLevel 2 (World Bank)
+    const debtRecords = await ctx.db.query("debtRecords").collect();
+    for (const record of debtRecords) {
+      if (record.sanadLevel === undefined) {
+        await ctx.db.patch(record._id, { sanadLevel: 2 });
+        total++;
+      }
+    }
+
+    // Fiscal years → sanadLevel 1 (Ministry of Finance)
+    const fiscalYears = await ctx.db.query("fiscalYears").collect();
+    for (const record of fiscalYears) {
+      if (record.sanadLevel === undefined) {
+        await ctx.db.patch(record._id, { sanadLevel: 1 });
+        total++;
+      }
+    }
+
+    // Budget items → sanadLevel 1 (Ministry of Finance)
+    const budgetItems = await ctx.db.query("budgetItems").collect();
+    for (const record of budgetItems) {
+      if (record.sanadLevel === undefined) {
+        await ctx.db.patch(record._id, { sanadLevel: 1 });
+        total++;
+      }
+    }
+
+    // Officials → infer from sourceUrl
+    const officials = await ctx.db.query("officials").collect();
+    for (const record of officials) {
+      if (record.sanadLevel === undefined) {
+        const url = record.sourceUrl ?? "";
+        let level: number;
+        if (url.includes("ahram")) {
+          level = 3;
+        } else if (url.includes("wikipedia")) {
+          level = 4;
+        } else if (url.includes(".gov.eg")) {
+          level = 1;
+        } else {
+          level = 4;
+        }
+        await ctx.db.patch(record._id, { sanadLevel: level });
+        total++;
+      }
+    }
+
+    return total;
   },
 });

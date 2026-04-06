@@ -26,6 +26,7 @@ export default defineSchema({
     bioAr: v.optional(v.string()),
     bioEn: v.optional(v.string()),
     sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   })
     .index("by_role", ["role"])
     .index("by_isCurrent", ["isCurrent"])
@@ -188,6 +189,7 @@ export default defineSchema({
     deficit: v.optional(v.number()),
     gdp: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   })
     .index("by_year", ["year"]),
 
@@ -201,6 +203,7 @@ export default defineSchema({
     percentageOfTotal: v.optional(v.number()),
     percentageOfGdp: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   })
     .index("by_fiscalYearId", ["fiscalYearId"])
     .index("by_fiscalYearId_and_category", ["fiscalYearId", "category"])
@@ -216,6 +219,8 @@ export default defineSchema({
     totalDebtService: v.optional(v.number()),
     totalInterestPayments: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
+    sourceNameEn: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   })
     .index("by_date", ["date"]),
 
@@ -256,6 +261,7 @@ export default defineSchema({
     totalVotesCast: v.optional(v.number()),
     turnoutPercentage: v.optional(v.number()),
     sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   })
     .index("by_type", ["type"])
     .index("by_year", ["year"])
@@ -269,6 +275,8 @@ export default defineSchema({
     votes: v.number(),
     percentage: v.number(),
     isWinner: v.boolean(),
+    sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   })
     .index("by_electionId", ["electionId"]),
 
@@ -297,6 +305,7 @@ export default defineSchema({
     lawReference: v.optional(v.string()),
     sourceUrl: v.optional(v.string()),
     sortOrder: v.number(),
+    sanadLevel: v.optional(v.number()),
   })
     .index("by_year", ["year"])
     .index("by_year_and_sortOrder", ["year", "sortOrder"]),
@@ -341,6 +350,7 @@ export default defineSchema({
     unit: v.string(),
     sourceUrl: v.optional(v.string()),
     sourceNameEn: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()), // 1=official_gov, 2=intl_org, 3=news, 4=other, 5=derived
   })
     .index("by_indicator", ["indicator"])
     .index("by_indicator_and_date", ["indicator", "date"]),
@@ -670,6 +680,7 @@ export default defineSchema({
     effectiveDate: v.string(),    // ISO date
     previousRating: v.optional(v.string()),
     sourceUrl: v.optional(v.string()),
+    sanadLevel: v.optional(v.number()),
   })
     .index("by_agency", ["agency"]),
 

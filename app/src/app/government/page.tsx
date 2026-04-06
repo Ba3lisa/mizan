@@ -7,6 +7,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
+import { SanadBadge } from "@/components/sanad-badge";
 
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +27,8 @@ interface Official {
   appointedAr?: string;
   appointedEn?: string;
   level: "president" | "pm" | "minister";
+  sanadLevel?: number;
+  sourceUrl?: string;
 }
 
 interface Ministry {
@@ -80,8 +83,9 @@ function OfficialCard({ official, size = "md" }: { official: Official; size?: "l
           {(isAr ? official.nameAr : official.nameEn).charAt(0)}
         </div>
         <div className="min-w-0">
-          <p className={cn("font-bold text-foreground truncate", isLg ? "text-base" : "text-sm")}>
+          <p className={cn("font-bold text-foreground truncate flex items-center gap-1", isLg ? "text-base" : "text-sm")}>
             {isAr ? official.nameAr : official.nameEn}
+            {official.sanadLevel && <SanadBadge sanadLevel={official.sanadLevel} sourceUrl={official.sourceUrl} />}
           </p>
           <p className="text-xs text-muted-foreground truncate">
             {isAr ? official.titleAr : official.titleEn}
@@ -123,6 +127,8 @@ export default function GovernmentPage() {
         appointedAr: liveHierarchy.president.appointmentDate ?? undefined,
         appointedEn: liveHierarchy.president.appointmentDate ?? undefined,
         level: "president",
+        sanadLevel: liveHierarchy.president.sanadLevel ?? undefined,
+        sourceUrl: liveHierarchy.president.sourceUrl ?? undefined,
       }
     : null;
 
@@ -136,6 +142,8 @@ export default function GovernmentPage() {
         appointedAr: liveHierarchy.primeMinister.appointmentDate ?? undefined,
         appointedEn: liveHierarchy.primeMinister.appointmentDate ?? undefined,
         level: "pm",
+        sanadLevel: liveHierarchy.primeMinister.sanadLevel ?? undefined,
+        sourceUrl: liveHierarchy.primeMinister.sourceUrl ?? undefined,
       }
     : null;
 

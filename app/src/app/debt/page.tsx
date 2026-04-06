@@ -16,6 +16,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { SanadBadge } from "@/components/sanad-badge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -714,8 +715,9 @@ export default function DebtPage() {
                 <span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#C9A84C" }} />
                 {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u062e\u0627\u0631\u062c\u064a" : "External Debt"}
               </p>
-              <p className="font-mono text-2xl font-bold tabular-nums text-amber-400">
+              <p className="font-mono text-2xl font-bold tabular-nums text-amber-400 flex items-center gap-1.5">
                 {latestRecord ? fmtExtDebt(latestRecord.externalDebt) : "\u2014"}
+                {convexLatest?.sanadLevel && <SanadBadge sanadLevel={convexLatest.sanadLevel} sourceUrl={convexLatest?.sourceUrl} />}
               </p>
               <a href="https://cbe.org.eg" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
                 cbe.org.eg
@@ -730,8 +732,9 @@ export default function DebtPage() {
                 <span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#6C8EEF" }} />
                 {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u0645\u062d\u0644\u064a" : "Domestic Debt"}
               </p>
-              <p className="font-mono text-2xl font-bold tabular-nums" style={{ color: "#6C8EEF" }}>
+              <p className="font-mono text-2xl font-bold tabular-nums flex items-center gap-1.5" style={{ color: "#6C8EEF" }}>
                 {latestRecord ? fmtDomDebt(latestRecord.domesticDebt) : "\u2014"}
+                {convexLatest?.sanadLevel && <SanadBadge sanadLevel={convexLatest.sanadLevel} sourceUrl={convexLatest?.sourceUrl} />}
               </p>
               <a href="https://mof.gov.eg" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
                 mof.gov.eg
@@ -745,8 +748,9 @@ export default function DebtPage() {
               <p className="text-xs text-muted-foreground mb-1">
                 {isAr ? "\u0646\u0633\u0628\u0629 \u0627\u0644\u062f\u064a\u0646 / \u0627\u0644\u0646\u0627\u062a\u062c" : "Debt-to-GDP"}
               </p>
-              <p className="font-mono text-2xl font-bold tabular-nums text-foreground" dir="ltr">
+              <p className="font-mono text-2xl font-bold tabular-nums text-foreground flex items-center gap-1.5" dir="ltr">
                 {latestRecord ? `${latestRecord.debtToGDP}%` : "\u2014"}
+                {convexLatest?.sanadLevel && <SanadBadge sanadLevel={convexLatest.sanadLevel} sourceUrl={convexLatest?.sourceUrl} />}
               </p>
               <a href="https://worldbank.org" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
                 worldbank.org
