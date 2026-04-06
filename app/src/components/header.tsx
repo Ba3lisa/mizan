@@ -46,7 +46,6 @@ export function Header() {
     { href: "/budget/your-share", label: t.navTaxCalculator },
     { href: "/funding", label: t.navFunding },
     { href: "/methodology", label: t.navMethodology },
-    { href: "/admin", label: t.navAdmin },
   ];
 
   const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);

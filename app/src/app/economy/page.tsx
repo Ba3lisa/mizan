@@ -1267,19 +1267,41 @@ function AiNarrativeSection({ isAr }: { isAr: boolean }) {
               <p className="text-sm text-muted-foreground leading-relaxed mb-5 border-s-2 border-primary/30 ps-3">
                 {isAr ? latestReport.summaryAr : latestReport.summaryEn}
               </p>
-              <div className="space-y-3">
-                {(isAr ? latestReport.contentAr : latestReport.contentEn)
-                  .split("\n")
-                  .filter((line) => line.trim().length > 0)
-                  .slice(0, 5)
-                  .map((line, idx) => (
-                    <div key={idx} className="flex gap-3 text-[0.8rem] text-muted-foreground leading-relaxed">
-                      <span className="text-primary/40 font-mono text-xs mt-0.5 flex-shrink-0 tabular-nums">
-                        {String(idx + 1).padStart(2, "0")}
-                      </span>
-                      <p>{line.trim()}</p>
-                    </div>
-                  ))}
+              <div className="space-y-4">
+                {(() => {
+                  const raw = isAr ? latestReport.contentAr : latestReport.contentEn;
+                  // Split on numbered patterns: "الرؤية N" / "Insight N" / "N." / "N -" at start of line
+                  const sections = raw
+                    .split(/(?=(?:الرؤية|Insight)\s*\d)|(?<=\.)\s*(?=(?:الرؤية|Insight)\s*\d)/gi)
+                    .flatMap((s) => s.split("\n"))
+                    .map((s) => s.trim())
+                    .filter((s) => s.length > 20);
+
+                  return sections.slice(0, 6).map((section, idx) => {
+                    // Extract title (before first colon or period) and body
+                    const colonIdx = section.indexOf(":");
+                    const hasTitle = colonIdx > 0 && colonIdx < 80;
+                    const title = hasTitle ? section.slice(0, colonIdx).trim() : null;
+                    const body = hasTitle ? section.slice(colonIdx + 1).trim() : section;
+
+                    return (
+                      <div key={idx} className="border-s-2 border-primary/20 ps-4 py-1">
+                        {title && (
+                          <p className="text-xs font-semibold text-foreground mb-1">
+                            <span className="text-primary/50 font-mono me-2">{String(idx + 1).padStart(2, "0")}</span>
+                            {title}
+                          </p>
+                        )}
+                        <p className="text-[0.8rem] text-muted-foreground leading-relaxed">
+                          {!title && (
+                            <span className="text-primary/50 font-mono me-2">{String(idx + 1).padStart(2, "0")}</span>
+                          )}
+                          {body}
+                        </p>
+                      </div>
+                    );
+                  });
+                })()}
               </div>
               <div className="mt-5 pt-4 border-t border-border/50 flex items-center gap-3 flex-wrap">
                 <Badge variant="secondary" className="text-[0.6rem] font-mono">
