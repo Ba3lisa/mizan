@@ -10,11 +10,7 @@ const DARK = "#0F1117";
 const SURFACE = "#181C25";
 const MUTED = "#7A8299";
 
-const ARABIC_FONT_URL =
-  "https://fonts.gstatic.com/s/cairo/v31/SLXgc1nY6HkvangtZmpQdkhzfH5lkSs2SgRjCAGMQ1z0hAc5W1Q.ttf";
-
-export default async function OgImage() {
-  const arabicFont = await fetch(ARABIC_FONT_URL).then((r) => r.arrayBuffer());
+export default function OgImage() {
 
   return new ImageResponse(
     (
@@ -71,18 +67,6 @@ export default async function OgImage() {
           }}
         >
           Mizan
-        </div>
-
-        {/* Arabic name */}
-        <div
-          style={{
-            fontSize: 36,
-            color: GOLD,
-            marginTop: 4,
-            fontFamily: "Cairo",
-          }}
-        >
-          {"\u2067"}ميزان{"\u2069"}
         </div>
 
         {/* Tagline */}
@@ -152,16 +136,6 @@ export default async function OgImage() {
         </div>
       </div>
     ),
-    {
-      ...size,
-      fonts: [
-        {
-          name: "Cairo",
-          data: arabicFont,
-          style: "normal",
-          weight: 700,
-        },
-      ],
-    }
+    { ...size }
   );
 }
