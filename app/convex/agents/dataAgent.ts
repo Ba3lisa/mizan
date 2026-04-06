@@ -1056,9 +1056,8 @@ ${indicatorSummary}`;
 
 const GOVERNORATES_WIKI_URL = "https://en.wikipedia.org/wiki/Governorates_of_Egypt";
 const GOVERNORATES_HDI_URL = "https://en.wikipedia.org/wiki/List_of_governorates_of_Egypt_by_Human_Development_Index";
-// Wikipedia API endpoints — returns plain text, far more token-efficient than raw HTML
-const GOVERNORATES_WIKI_API = "https://en.wikipedia.org/w/api.php?action=query&titles=Governorates_of_Egypt&prop=extracts&explaintext=true&format=json";
-const GOVERNORATES_HDI_API = "https://en.wikipedia.org/w/api.php?action=query&titles=List_of_governorates_of_Egypt_by_Human_Development_Index&prop=extracts&explaintext=true&format=json";
+// Note: Wikipedia extracts API doesn't work for these pages (template-heavy).
+// We fetch raw HTML and extract the wikitable, then strip to plain text.
 
 async function refreshGovernorateStatsData(
   ctx: ActionCtx
@@ -1071,39 +1070,42 @@ async function refreshGovernorateStatsData(
     return { recordsUpdated: 0 };
   }
 
-  // Fetch main governorates page via Wikipedia API (plain text — much more token-efficient)
+  // Fetch main governorates page — extract wikitable and strip to plain text
   let page1Text = "";
   try {
-    const res = await fetch(GOVERNORATES_WIKI_API, { signal: AbortSignal.timeout(15000) });
+    const res = await fetch(GOVERNORATES_WIKI_URL, { signal: AbortSignal.timeout(15000) });
     if (res.ok) {
-      const data = await res.json() as { query?: { pages?: Record<string, { extract?: string }> } };
-      const pages = data.query?.pages;
-      if (pages) {
-        page1Text = Object.values(pages)[0]?.extract ?? "";
-        page1Text = page1Text.slice(0, 12000); // Plain text is ~5x more efficient than HTML
+      const html = await res.text();
+      const tableStart = html.indexOf('<table class="wikitable');
+      if (tableStart > 0) {
+        // Extract table HTML and strip tags to plain text (token-efficient)
+        const tableHtml = html.slice(tableStart, tableStart + 30000);
+        page1Text = tableHtml.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#91;/g, "[").replace(/&#93;/g, "]").replace(/&#160;/g, " ").replace(/\s+/g, " ").trim();
+        page1Text = page1Text.slice(0, 8000);
       }
-      console.log(`[dataAgent/govStats] Fetched govs plain text: ${page1Text.length} chars`);
+      console.log(`[dataAgent/govStats] Fetched govs table text: ${page1Text.length} chars`);
     } else {
-      console.warn(`[dataAgent/govStats] Governorates API returned ${res.status}`);
+      console.warn(`[dataAgent/govStats] Governorates page returned ${res.status}`);
     }
   } catch (err) {
     console.warn(`[dataAgent/govStats] Failed to fetch governorates page: ${String(err)}`);
   }
 
-  // Fetch HDI page via Wikipedia API
+  // Fetch HDI page — extract wikitable and strip to plain text
   let page2Text = "";
   try {
-    const res = await fetch(GOVERNORATES_HDI_API, { signal: AbortSignal.timeout(15000) });
+    const res = await fetch(GOVERNORATES_HDI_URL, { signal: AbortSignal.timeout(15000) });
     if (res.ok) {
-      const data = await res.json() as { query?: { pages?: Record<string, { extract?: string }> } };
-      const pages = data.query?.pages;
-      if (pages) {
-        page2Text = Object.values(pages)[0]?.extract ?? "";
-        page2Text = page2Text.slice(0, 8000);
+      const html = await res.text();
+      const tableStart = html.indexOf('<table class="wikitable');
+      if (tableStart > 0) {
+        const tableHtml = html.slice(tableStart, tableStart + 15000);
+        page2Text = tableHtml.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#91;/g, "[").replace(/&#93;/g, "]").replace(/&#160;/g, " ").replace(/\s+/g, " ").trim();
+        page2Text = page2Text.slice(0, 5000);
       }
-      console.log(`[dataAgent/govStats] Fetched HDI plain text: ${page2Text.length} chars`);
+      console.log(`[dataAgent/govStats] Fetched HDI table text: ${page2Text.length} chars`);
     } else {
-      console.warn(`[dataAgent/govStats] HDI API returned ${res.status}`);
+      console.warn(`[dataAgent/govStats] HDI page returned ${res.status}`);
     }
   } catch (err) {
     console.warn(`[dataAgent/govStats] Failed to fetch HDI page: ${String(err)}`);
@@ -1187,16 +1189,46 @@ For HDI, some frontier governorates are grouped — skip those that don't have i
   console.log(`[dataAgent/govStats] Claude returned data for ${parsed.length} governorates`);
 
   // Build a lookup map: normalized nameEn -> governorate _id
+  // Include common Wikipedia name variants for fuzzy matching
   const nameToId = new Map<string, Id<"governorates">>();
   for (const gov of governorates) {
-    nameToId.set(gov.nameEn.toLowerCase().trim(), gov._id);
+    const name = gov.nameEn.toLowerCase().trim();
+    nameToId.set(name, gov._id);
+    // Also register without common prefixes/suffixes
+    nameToId.set(name.replace("governorate", "").trim(), gov._id);
+  }
+  // Add known Wikipedia → DB name mappings
+  const wikiAliases: Record<string, string> = {
+    "faiyum": "fayyum", "fayoum": "fayyum",
+    "kafr el sheikh": "kafr el-sheikh", "kafr el-sheikh": "kafr el-sheikh",
+    "qalyubiya": "qalyubia", "qalyoubia": "qalyubia",
+    "beni suef": "beni suef", "beni-suef": "beni suef",
+    "monufia": "menoufia", "menoufia": "menoufia",
+    "sharqia": "sharqia", "ash sharqiyah": "sharqia",
+    "beheira": "beheira", "al beheira": "beheira",
+    "dakahlia": "dakahlia", "ad daqahliyah": "dakahlia",
+    "gharbia": "gharbia", "al gharbiyah": "gharbia",
+  };
+  for (const [alias, canonical] of Object.entries(wikiAliases)) {
+    const id = nameToId.get(canonical);
+    if (id) nameToId.set(alias, id);
   }
 
   let totalCount = 0;
 
   for (const govEntry of parsed) {
     const normalizedName = govEntry.governorateNameEn.toLowerCase().trim();
-    const governorateId = nameToId.get(normalizedName);
+    let governorateId = nameToId.get(normalizedName);
+
+    // Fuzzy fallback: try substring match if exact fails
+    if (!governorateId) {
+      for (const [key, id] of nameToId.entries()) {
+        if (key.includes(normalizedName) || normalizedName.includes(key)) {
+          governorateId = id;
+          break;
+        }
+      }
+    }
 
     if (!governorateId) {
       console.warn(`[dataAgent/govStats] No DB match for "${govEntry.governorateNameEn}" — skipping.`);
