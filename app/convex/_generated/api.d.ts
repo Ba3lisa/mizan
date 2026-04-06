@@ -35,6 +35,7 @@ import type * as lineage from "../lineage.js";
 import type * as maintenance from "../maintenance.js";
 import type * as parliament from "../parliament.js";
 import type * as referenceData from "../referenceData.js";
+import type * as regionalData from "../regionalData.js";
 import type * as seedConstitutionMissing from "../seedConstitutionMissing.js";
 import type * as seedData from "../seedData.js";
 import type * as taxData from "../taxData.js";
@@ -74,6 +75,7 @@ declare const fullApi: ApiFromModules<{
   maintenance: typeof maintenance;
   parliament: typeof parliament;
   referenceData: typeof referenceData;
+  regionalData: typeof regionalData;
   seedConstitutionMissing: typeof seedConstitutionMissing;
   seedData: typeof seedData;
   taxData: typeof taxData;
