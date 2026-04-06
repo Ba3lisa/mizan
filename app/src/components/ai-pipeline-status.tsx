@@ -35,7 +35,7 @@ interface PipelineStep {
 
 interface PipelineProgress {
   steps: PipelineStep[];
-  lastRunAt: number | null;
+  lastCompletedAt: number | null;
 }
 
 // ─── Step name translations ───────────────────────────────────────────────────
@@ -119,7 +119,7 @@ function statusLabel(status: StepStatus, isAr: boolean): string {
 
 // ─── Countdown Hook ───────────────────────────────────────────────────────────
 
-function useCountdown(lastRunAt: number | null, steps: PipelineStep[]): { msUntilNext: number; isRunning: boolean } {
+function useCountdown(lastCompletedAt: number | null, steps: PipelineStep[]): { msUntilNext: number; isRunning: boolean } {
   const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
   const [now, setNow] = useState(() => Date.now());
@@ -132,11 +132,11 @@ function useCountdown(lastRunAt: number | null, steps: PipelineStep[]): { msUnti
   // Check if any step is actually running
   const isRunning = steps.some((s) => s.status === "running");
 
-  if (lastRunAt === null) {
+  if (lastCompletedAt === null) {
     return { msUntilNext: 0, isRunning };
   }
 
-  const nextRun = lastRunAt + SIX_HOURS_MS;
+  const nextRun = lastCompletedAt + SIX_HOURS_MS;
   const msUntilNext = Math.max(0, nextRun - now);
   return { msUntilNext, isRunning };
 }
@@ -199,7 +199,7 @@ export function AiPipelineStatus() {
   const progress = rawProgress as PipelineProgress | null | undefined;
 
   const steps = progress?.steps ?? [];
-  const { msUntilNext, isRunning } = useCountdown(progress?.lastRunAt ?? null, steps);
+  const { msUntilNext, isRunning } = useCountdown(progress?.lastCompletedAt ?? null, steps);
 
   // Determine whether to start expanded (a run is in progress) or collapsed
   const hasActiveRun = progress?.steps?.some((s) => s.status === "running") ?? false;
