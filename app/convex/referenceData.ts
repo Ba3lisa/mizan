@@ -95,14 +95,14 @@ async function loadGovernmentStructure(_ctx: MutationCtx): Promise<GroupReport> 
 
   // Insert officials first, build ID map
   const officialsIdMap: Record<string, string> = {};
-  for (const rec of ref_officials) {
+  for (const rec of _ref_officials) {
     const { _backupId, ...doc } = rec;
     const newId = await ctx.db.insert("officials", doc as Parameters<typeof ctx.db.insert<"officials">>[1]);
     officialsIdMap[_backupId] = newId as string;
   }
 
   // Insert ministries with remapped currentMinisterId
-  for (const rec of ref_ministries) {
+  for (const rec of _ref_ministries) {
     const { _backupId: _b, currentMinisterId, ...rest } =
       rec as typeof rec & { currentMinisterId?: string };
     const doc: Record<string, unknown> = { ...rest };
@@ -116,7 +116,7 @@ async function loadGovernmentStructure(_ctx: MutationCtx): Promise<GroupReport> 
     await ctx.db.insert("ministries", doc as Parameters<typeof ctx.db.insert<"ministries">>[1]);
   }
 
-  const count = ref_officials.length + ref_ministries.length;
+  const count = _ref_officials.length + _ref_ministries.length;
   return {
     group: "government",
     skipped: false,
@@ -159,7 +159,7 @@ async function loadParliamentData(ctx: MutationCtx): Promise<GroupReport> {
     officialsByName[o.nameEn] = o._id as string;
   }
   const officialsIdMap: Record<string, string> = {};
-  for (const rec of ref_officials) {
+  for (const rec of _ref_officials) {
     const newId = officialsByName[rec["nameEn"] as string];
     if (newId) officialsIdMap[rec._backupId] = newId;
   }

@@ -6,7 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -102,7 +102,7 @@ export default function GovernmentPage() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
   const [ministrySearch, setMinistrySearch] = useState("");
-  const [sectorFilter, setSectorFilter] = useState("all");
+  // Sector filter removed -- pipeline doesn't classify sectors
   const [govSearch, setGovSearch] = useState("");
 
   // Live Convex data
@@ -170,7 +170,7 @@ export default function GovernmentPage() {
   const filteredMinistries = ministries.filter(m => {
     const q = ministrySearch.toLowerCase();
     const matchSearch = !q || m.nameAr.includes(q) || m.nameEn.toLowerCase().includes(q) || m.ministerAr.includes(q) || m.ministerEn.toLowerCase().includes(q);
-    const matchSector = sectorFilter === "all" || m.sector === sectorFilter;
+    const matchSector = true; // Sector filter removed -- pipeline doesn't classify sectors yet
     return matchSearch && matchSector;
   });
 
@@ -186,10 +186,7 @@ export default function GovernmentPage() {
     return acc;
   }, {});
 
-  const sectorCounts = sectors.filter(s => s.key !== "all").map(s => ({
-    ...s,
-    count: ministries.filter(m => m.sector === s.key).length,
-  }));
+  // sectorCounts removed -- sector classification not in pipeline yet
 
   return (
     <div className="page-content" dir={dir}>
@@ -316,16 +313,9 @@ export default function GovernmentPage() {
                 <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <Input value={ministrySearch} onChange={e => setMinistrySearch(e.target.value)} placeholder={isAr ? "\u0628\u062d\u062b \u0628\u0627\u0644\u0627\u0633\u0645 \u0623\u0648 \u0627\u0644\u0648\u0632\u064a\u0631..." : "Search by name or minister..."} className="ps-9 text-sm" />
               </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {sectors.map(s => (
-                  <Button key={s.key} variant={sectorFilter === s.key ? "default" : "outline"} size="sm" onClick={() => setSectorFilter(s.key)}
-                    className={cn("text-xs h-8 rounded-full gap-1.5", sectorFilter === s.key && "shadow-sm")}>
-                    {s.color && <span className="w-2 h-2 rounded-full" style={{ background: s.color }} />}
-                    {isAr ? s.ar : s.en}
-                    {s.key !== "all" && <span className="text-muted-foreground ms-0.5">({sectorCounts.find(sc => sc.key === s.key)?.count})</span>}
-                  </Button>
-                ))}
-              </div>
+              <span className="text-xs text-muted-foreground">
+                {isAr ? `${ministries.length} وزارة` : `${ministries.length} ministries`}
+              </span>
             </div>
 
             {/* Ministry cards */}

@@ -440,12 +440,19 @@ export const upsertGovernmentOfficials = internalMutation({
       args.officials.map((o) => o.nameEn.toLowerCase())
     );
 
-    // Upsert each official from the extracted list
+    // Get existing ministries for matching
+    const existingMinistries = await ctx.db.query("ministries").collect();
+    const ministriesByName = new Map(
+      existingMinistries.map((m) => [m.nameEn.toLowerCase(), m])
+    );
+
+    // Upsert each official + their ministry
     for (const official of args.officials) {
       const existing = existingByName.get(official.nameEn.toLowerCase());
+      let officialId: string;
 
       if (existing) {
-        // Update title if changed
+        officialId = existing._id as string;
         if (existing.titleEn !== official.titleEn || existing.titleAr !== official.titleAr) {
           await ctx.db.patch(existing._id, {
             titleEn: official.titleEn,
@@ -456,8 +463,7 @@ export const upsertGovernmentOfficials = internalMutation({
           updated++;
         }
       } else {
-        // New official -- create
-        await ctx.db.insert("officials", {
+        officialId = await ctx.db.insert("officials", {
           nameEn: official.nameEn,
           nameAr: official.nameAr,
           titleEn: official.titleEn,
@@ -465,8 +471,33 @@ export const upsertGovernmentOfficials = internalMutation({
           role: official.role,
           isCurrent: true,
           sourceUrl: args.sourceUrl,
-        });
+        }) as string;
         updated++;
+      }
+
+      // Create/update ministry for ministers (not president/PM)
+      if (official.role === "minister") {
+        // Extract ministry name from title (e.g. "Minister of Health" -> "Ministry of Health")
+        const ministryNameEn = official.titleEn.replace(/^Minister of /, "Ministry of ").replace(/^Deputy Prime Minister.*/, "Deputy PM Office");
+        const ministryNameAr = official.titleAr.replace(/^وزير /, "وزارة ").replace(/^نائب رئيس الوزراء.*/, "مكتب نائب رئيس الوزراء");
+
+        const existingMinistry = ministriesByName.get(ministryNameEn.toLowerCase());
+        if (existingMinistry) {
+          // Update current minister
+          await ctx.db.patch(existingMinistry._id, {
+            currentMinisterId: officialId as unknown as typeof existingMinistries[0]["currentMinisterId"],
+          });
+        } else {
+          // Create new ministry
+          const sortOrder = existingMinistries.length + updated;
+          await ctx.db.insert("ministries", {
+            nameEn: ministryNameEn,
+            nameAr: ministryNameAr,
+            currentMinisterId: officialId as unknown as typeof existingMinistries[0]["currentMinisterId"],
+            sortOrder,
+          });
+          updated++;
+        }
       }
     }
 
