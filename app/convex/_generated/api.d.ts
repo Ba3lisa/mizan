@@ -27,6 +27,7 @@ import type * as data_referenceRecords from "../data/referenceRecords.js";
 import type * as dataRefresh from "../dataRefresh.js";
 import type * as debt from "../debt.js";
 import type * as debtInterestData from "../debtInterestData.js";
+import type * as economy from "../economy.js";
 import type * as elections from "../elections.js";
 import type * as funding from "../funding.js";
 import type * as githubIssueQueries from "../githubIssueQueries.js";
@@ -67,6 +68,7 @@ declare const fullApi: ApiFromModules<{
   dataRefresh: typeof dataRefresh;
   debt: typeof debt;
   debtInterestData: typeof debtInterestData;
+  economy: typeof economy;
   elections: typeof elections;
   funding: typeof funding;
   githubIssueQueries: typeof githubIssueQueries;

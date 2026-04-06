@@ -13,6 +13,7 @@ const categoryValidator = v.union(
   v.literal("constitution"),
   v.literal("budget"),
   v.literal("debt"),
+  v.literal("economy"),
   v.literal("all")
 );
 
@@ -47,6 +48,7 @@ export const getAllLastUpdated = query({
       "constitution",
       "budget",
       "debt",
+      "economy",
       "all",
     ] as const;
 
@@ -262,6 +264,57 @@ export const upsertFiscalYear = internalMutation({
 });
 
 /**
+ * Upserts an economic indicator value by indicator + date.
+ * Creates a new record if none exists; patches the value if it changed.
+ * Returns 1 if a write occurred, 0 if the value was unchanged.
+ */
+export const upsertEconomicIndicator = internalMutation({
+  args: {
+    indicator: v.string(),
+    date: v.string(),
+    year: v.optional(v.string()),
+    value: v.number(),
+    unit: v.string(),
+    sourceUrl: v.optional(v.string()),
+    sourceNameEn: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("economicIndicators")
+      .withIndex("by_indicator_and_date", (q) =>
+        q.eq("indicator", args.indicator).eq("date", args.date)
+      )
+      .unique();
+
+    if (!existing) {
+      await ctx.db.insert("economicIndicators", {
+        indicator: args.indicator,
+        date: args.date,
+        year: args.year,
+        value: args.value,
+        unit: args.unit,
+        sourceUrl: args.sourceUrl,
+        sourceNameEn: args.sourceNameEn,
+      });
+      return 1;
+    }
+
+    if (existing.value !== args.value) {
+      await ctx.db.patch(existing._id, {
+        value: args.value,
+        year: args.year,
+        unit: args.unit,
+        sourceUrl: args.sourceUrl,
+        sourceNameEn: args.sourceNameEn,
+      });
+      return 1;
+    }
+
+    return 0;
+  },
+});
+
+/**
  * Receives a list of ministers detected by the AI agent and flags any that do
  * not match existing records for human review (by logging a console warning).
  * This does NOT automatically overwrite officials — government structure changes
@@ -321,7 +374,8 @@ const changeCategoryValidator = v.union(
   v.literal("constitution"),
   v.literal("budget"),
   v.literal("debt"),
-  v.literal("elections")
+  v.literal("elections"),
+  v.literal("economy")
 );
 
 const changeActionValidator = v.union(
@@ -442,6 +496,7 @@ export const manualRefresh = internalAction({
         v.literal("constitution"),
         v.literal("budget"),
         v.literal("debt"),
+        v.literal("economy"),
         v.literal("all")
       )
     ),

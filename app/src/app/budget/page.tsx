@@ -142,7 +142,7 @@ const spending: BudgetCategory[] = [
 const FISCAL_YEARS = ["2024-2025", "2023-2024", "2022-2023"] as const;
 type FiscalYear = (typeof FISCAL_YEARS)[number];
 
-const FISCAL_YEAR_GDP: Record<FiscalYear, number> = {
+const _FISCAL_YEAR_GDP: Record<FiscalYear, number> = {
   "2024-2025": 12100,
   "2023-2024": 10800,
   "2022-2023": 9100,
@@ -371,8 +371,8 @@ function PerCapitaSection({ year, spendingData, revenueData, populationOverride 
 
   const normalizedYear = year.replace("/", "-") as FiscalYear;
   const pop = populationOverride ?? FISCAL_YEAR_POPULATION[normalizedYear] ?? 105_000_000;
-  const activeSpending = spendingData ?? spending;
-  const activeRevenue = revenueData ?? revenue;
+  const activeSpending = spendingData ?? [];
+  const activeRevenue = revenueData ?? [];
   const totalRevenue = activeRevenue.reduce((s, r) => s + r.amount, 0);
   const totalSpending = activeSpending.reduce((s, r) => s + r.amount, 0);
   const debtService = activeSpending.find((s) => s.nameEn === "Debt Service" || s.nameEn.includes("Debt"))?.amount ?? 0;
@@ -615,17 +615,18 @@ export default function BudgetPage() {
     selectedFY ? { fiscalYearId: selectedFY._id, category: "revenue" as const } : "skip"
   );
 
-  // Use Convex totals if available, fallback to hardcoded
-  const totalRevenue = selectedFY?.totalRevenue ?? revenue.reduce((s, r) => s + r.amount, 0);
-  const totalSpending = selectedFY?.totalExpenditure ?? spending.reduce((s, r) => s + r.amount, 0);
+  // All data from Convex -- no hardcoded fallbacks
+  const totalRevenue = selectedFY?.totalRevenue ?? 0;
+  const totalSpending = selectedFY?.totalExpenditure ?? 0;
   const deficit = selectedFY?.deficit ?? (totalSpending - totalRevenue);
-  // Normalize year format: Convex uses "2024/2025", hardcoded uses "2024-2025"
+  const gdp = selectedFY?.gdp ?? 0;
   const normalizedYear = selectedYearStr.replace("/", "-") as FiscalYear;
-  const gdp = selectedFY?.gdp ?? FISCAL_YEAR_GDP[normalizedYear] ?? 12100;
   const population = FISCAL_YEAR_POPULATION[normalizedYear] ?? 105_000_000;
 
-  // Use Convex spending data if available
-  const activeSpending: BudgetCategory[] = convexBreakdown && convexBreakdown.length > 0
+  const _isBudgetLoading = convexBreakdown === undefined || convexRevenue === undefined;
+
+  // Spending/revenue from Convex only
+  const activeSpending: BudgetCategory[] = convexBreakdown
     ? convexBreakdown
         .filter((item) => !item.parentItemId)
         .map((item) => ({
@@ -633,9 +634,9 @@ export default function BudgetPage() {
           nameEn: item.sectorEn,
           amount: item.amount,
         }))
-    : spending;
+    : [];
 
-  const activeRevenue: BudgetCategory[] = convexRevenue && convexRevenue.length > 0
+  const activeRevenue: BudgetCategory[] = convexRevenue
     ? convexRevenue
         .filter((item) => !item.parentItemId)
         .map((item) => ({
@@ -643,7 +644,7 @@ export default function BudgetPage() {
           nameEn: item.sectorEn,
           amount: item.amount,
         }))
-    : revenue;
+    : [];
 
   const debtServicePct = ((activeSpending.find((s) => s.nameEn === "Debt Service" || s.nameEn.includes("Debt"))?.amount ?? 0) / totalSpending * 100).toFixed(1);
 

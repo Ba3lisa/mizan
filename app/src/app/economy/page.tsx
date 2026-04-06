@@ -1,131 +1,86 @@
 "use client";
 
+import { useQuery } from "convex/react";
+import { api } from "../../../convex/_generated/api";
+import { Skeleton } from "boneyard-js/react";
 import { useLanguage } from "@/components/providers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ExternalLink, TrendingUp, TrendingDown } from "lucide-react";
+import { ExternalLink, TrendingUp, TrendingDown, Database } from "lucide-react";
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Indicator {
+/**
+ * Indicator display config for known DB keys.
+ * Maps the Convex indicator key to bilingual metadata.
+ */
+interface IndicatorMeta {
+  key: string;
   nameAr: string;
   nameEn: string;
-  value: string;
-  change: string;
-  trend: "up" | "down";
-  unit: string;
-  data: number[];
+  sourceEn: string;
+  sourceAr: string;
+  sourceUrl: string;
   highlight?: boolean;
-  sourceAr?: string;
-  sourceEn?: string;
-  sourceUrl?: string;
 }
 
-const indicators: Indicator[] = [
+const INDICATOR_META: IndicatorMeta[] = [
   {
+    key: "gdp_growth",
     nameAr: "الناتج المحلي الإجمالي",
     nameEn: "GDP",
-    value: "$476B",
-    change: "+3.8%",
-    trend: "up",
-    unit: "USD",
-    data: [305, 332, 363, 394, 404, 400, 420, 450, 476],
     sourceEn: "World Bank",
     sourceAr: "البنك الدولي",
     sourceUrl: "https://data.worldbank.org/country/egypt-arab-rep",
   },
   {
+    key: "inflation",
     nameAr: "معدل التضخم",
     nameEn: "Inflation Rate",
-    value: "28.1%",
-    change: "-5.2%",
-    trend: "down",
-    unit: "%",
-    data: [5.3, 5.7, 6.2, 13.9, 21.9, 36.5, 38.2, 33.3, 28.1],
     sourceEn: "CAPMAS",
     sourceAr: "الجهاز المركزي للتعبئة",
     sourceUrl: "https://www.capmas.gov.eg",
   },
   {
+    key: "unemployment",
     nameAr: "معدل البطالة",
     nameEn: "Unemployment",
-    value: "7.1%",
-    change: "-0.5%",
-    trend: "down",
-    unit: "%",
-    data: [9.8, 11.9, 11.4, 10.5, 9.3, 7.4, 7.2, 7.6, 7.1],
     sourceEn: "CAPMAS",
     sourceAr: "الجهاز المركزي للتعبئة",
     sourceUrl: "https://www.capmas.gov.eg",
   },
   {
+    key: "exchange_rate",
     nameAr: "سعر الدولار",
     nameEn: "USD/EGP Rate",
-    value: "48.5",
-    change: "+195%",
-    trend: "up",
-    unit: "EGP",
-    data: [8.9, 15.7, 17.8, 18.1, 15.7, 19.2, 30.9, 30.9, 48.5],
-    highlight: true,
     sourceEn: "Central Bank of Egypt",
     sourceAr: "البنك المركزي المصري",
     sourceUrl: "https://www.cbe.org.eg/en/economic-research/statistics",
+    highlight: true,
   },
   {
+    key: "reserves",
     nameAr: "الاحتياطي الأجنبي",
     nameEn: "Foreign Reserves",
-    value: "$46.4B",
-    change: "+15%",
-    trend: "up",
-    unit: "USD",
-    data: [36.1, 31.3, 38.2, 40.1, 40.3, 33.4, 34.2, 35.2, 46.4],
     sourceEn: "Central Bank of Egypt",
     sourceAr: "البنك المركزي المصري",
     sourceUrl: "https://www.cbe.org.eg/en/economic-research/statistics",
   },
   {
+    key: "suez_revenue",
     nameAr: "إيرادات قناة السويس",
     nameEn: "Suez Canal Revenue",
-    value: "$7.2B",
-    change: "-23%",
-    trend: "down",
-    unit: "USD/yr",
-    data: [5.3, 5.6, 5.7, 5.8, 5.6, 6.3, 8.0, 9.4, 7.2],
     sourceEn: "Suez Canal Authority",
-    sourceUrl: "https://www.suezcanal.gov.eg",
     sourceAr: "هيئة قناة السويس",
-  },
-  {
-    nameAr: "تحويلات المصريين بالخارج",
-    nameEn: "Remittances",
-    value: "$22.1B",
-    change: "+8%",
-    trend: "up",
-    unit: "USD/yr",
-    data: [19.6, 25.2, 28.9, 26.6, 29.6, 31.5, 22.1, 20.8, 22.1],
-    sourceEn: "Central Bank of Egypt",
-    sourceAr: "البنك المركزي المصري",
-    sourceUrl: "https://www.cbe.org.eg/en/economic-research/statistics",
-  },
-  {
-    nameAr: "السياحة",
-    nameEn: "Tourism Revenue",
-    value: "$14.4B",
-    change: "+5%",
-    trend: "up",
-    unit: "USD/yr",
-    data: [6.0, 3.8, 4.4, 7.6, 9.9, 11.6, 13.6, 13.7, 14.4],
-    sourceEn: "Ministry of Tourism",
-    sourceUrl: "https://www.tourism.gov.eg",
-    sourceAr: "وزارة السياحة",
+    sourceUrl: "https://www.suezcanal.gov.eg",
   },
 ];
-
-const YEARS = ["2016", "2017", "2018", "2019", "2020", "2021", "2022", "2023", "2024"];
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 
 function Sparkline({ data, trend }: { data: number[]; trend: "up" | "down" }) {
+  if (data.length < 2) return null;
+
   const min = Math.min(...data);
   const max = Math.max(...data);
   const range = max - min || 1;
@@ -144,7 +99,6 @@ function Sparkline({ data, trend }: { data: number[]; trend: "up" | "down" }) {
   const polyline = points.join(" ");
   const color = trend === "up" ? "#3FC380" : "#E5484D";
 
-  // Area fill
   const firstX = pad;
   const lastX = pad + innerW;
   const area = `${firstX},${h} ${polyline} ${lastX},${h}`;
@@ -152,8 +106,14 @@ function Sparkline({ data, trend }: { data: number[]; trend: "up" | "down" }) {
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="overflow-visible">
       <polygon points={area} fill={color} fillOpacity={0.12} />
-      <polyline points={polyline} fill="none" stroke={color} strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" />
-      {/* Last point dot */}
+      <polyline
+        points={polyline}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.5}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
       {(() => {
         const last = points[points.length - 1].split(",");
         return <circle cx={last[0]} cy={last[1]} r={2.5} fill={color} />;
@@ -164,24 +124,89 @@ function Sparkline({ data, trend }: { data: number[]; trend: "up" | "down" }) {
 
 // ─── Indicator Card ───────────────────────────────────────────────────────────
 
-function IndicatorCard({ ind, isAr }: { ind: Indicator; isAr: boolean }) {
-  const isPositive = ind.change.startsWith("+");
-  const TrendIcon = ind.trend === "up" ? TrendingUp : TrendingDown;
+interface IndicatorCardProps {
+  meta: IndicatorMeta;
+  record: {
+    value: number;
+    unit: string;
+    date: string;
+    year?: string;
+    sourceUrl?: string;
+    sourceNameEn?: string;
+  } | null;
+  timeline: number[];
+  isAr: boolean;
+}
+
+function formatValue(value: number, unit: string): string {
+  if (unit === "USD" || unit === "USD B") {
+    return `$${value.toFixed(1)}B`;
+  }
+  if (unit === "%" || unit === "percent") {
+    return `${value.toFixed(1)}%`;
+  }
+  if (unit === "EGP") {
+    return `${value.toFixed(1)}`;
+  }
+  if (unit === "USD/yr" || unit === "USD/yr B") {
+    return `$${value.toFixed(1)}B`;
+  }
+  return `${value.toFixed(2)}`;
+}
+
+function IndicatorCard({ meta, record, timeline, isAr }: IndicatorCardProps) {
+  if (!record) {
+    return (
+      <Card
+        className={`border-border/60 bg-card/60 backdrop-blur-sm ${
+          meta.highlight ? "border-[#C9A84C]/50 bg-[#C9A84C]/5" : ""
+        }`}
+      >
+        <CardContent className="p-5 flex flex-col items-center justify-center min-h-[160px] text-center">
+          <Database size={18} className="text-muted-foreground/30 mb-2" />
+          <p className="text-xs font-medium text-muted-foreground mb-0.5">
+            {isAr ? meta.nameAr : meta.nameEn}
+          </p>
+          <p className="text-[0.625rem] text-muted-foreground/50">
+            {isAr ? "لا توجد بيانات بعد" : "No data available yet"}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const displayValue = formatValue(record.value, record.unit);
+  const displayYear = record.year ?? record.date.slice(0, 4);
+
+  // Determine trend from timeline direction
+  const trend: "up" | "down" =
+    timeline.length >= 2
+      ? timeline[timeline.length - 1] >= timeline[timeline.length - 2]
+        ? "up"
+        : "down"
+      : "up";
+
+  const TrendIcon = trend === "up" ? TrendingUp : TrendingDown;
+  const sourceUrl = record.sourceUrl ?? meta.sourceUrl;
+  const sourceNameEn = record.sourceNameEn ?? meta.sourceEn;
 
   return (
     <Card
       className={`border-border/60 bg-card/60 backdrop-blur-sm hover:border-primary/30 transition-all ${
-        ind.highlight ? "border-[#C9A84C]/50 bg-[#C9A84C]/5" : ""
+        meta.highlight ? "border-[#C9A84C]/50 bg-[#C9A84C]/5" : ""
       }`}
     >
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1 min-w-0">
             <p className="text-xs text-muted-foreground font-medium truncate">
-              {isAr ? ind.nameAr : ind.nameEn}
+              {isAr ? meta.nameAr : meta.nameEn}
             </p>
-            {ind.highlight && (
-              <Badge variant="outline" className="text-[0.6rem] mt-1 border-[#C9A84C]/50 text-[#C9A84C]">
+            {meta.highlight && (
+              <Badge
+                variant="outline"
+                className="text-[0.6rem] mt-1 border-[#C9A84C]/50 text-[#C9A84C]"
+              >
                 {isAr ? "أكبر تحول" : "Biggest shift"}
               </Badge>
             )}
@@ -189,54 +214,73 @@ function IndicatorCard({ ind, isAr }: { ind: Indicator; isAr: boolean }) {
           <Badge
             variant="secondary"
             className={`text-xs font-mono flex-shrink-0 ms-2 ${
-              isPositive
+              trend === "up"
                 ? "bg-green-500/10 text-green-400 border-green-500/20"
                 : "bg-red-500/10 text-red-400 border-red-500/20"
             }`}
           >
             <TrendIcon size={10} className="inline me-0.5" />
-            {ind.change}
+            {trend === "up" ? "+" : "-"}
           </Badge>
         </div>
 
-        <p className="font-mono text-3xl font-black tracking-tight text-foreground mb-1" dir="ltr">
-          {ind.value}
+        <p
+          className="font-mono text-3xl font-black tracking-tight text-foreground mb-1"
+          dir="ltr"
+        >
+          {displayValue}
         </p>
         <p className="text-[0.625rem] text-muted-foreground mb-4">
-          {ind.unit} · 2024
+          {record.unit} · {displayYear}
         </p>
 
         {/* Sparkline */}
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex-1">
-            <Sparkline data={ind.data} trend={ind.trend} />
+        {timeline.length >= 2 && (
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1">
+              <Sparkline data={timeline} trend={trend} />
+            </div>
           </div>
-          <div className="flex-shrink-0 text-end">
-            <p className="text-[0.55rem] text-muted-foreground/60">2016 – 2024</p>
-          </div>
-        </div>
+        )}
 
-        {/* Years axis */}
-        <div className="flex justify-between mt-1" dir="ltr">
-          {[YEARS[0], YEARS[4], YEARS[8]].map((y) => (
-            <span key={y} className="text-[0.55rem] text-muted-foreground/50 font-mono">{y}</span>
-          ))}
-        </div>
-
-        {(ind.sourceEn || ind.sourceAr) && (
-          ind.sourceUrl ? (
-            <a href={ind.sourceUrl} target="_blank" rel="noopener noreferrer"
-              className="text-[0.6rem] text-primary/50 hover:text-primary no-underline hover:underline mt-2 truncate block">
-              {isAr ? ind.sourceAr : ind.sourceEn}
-            </a>
-          ) : (
-            <p className="text-[0.6rem] text-muted-foreground/50 mt-2 truncate">
-              {isAr ? ind.sourceAr : ind.sourceEn}
-            </p>
-          )
+        {/* Source */}
+        {sourceUrl ? (
+          <a
+            href={sourceUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[0.6rem] text-primary/50 hover:text-primary no-underline hover:underline mt-2 truncate block"
+          >
+            {isAr ? meta.sourceAr : sourceNameEn}
+          </a>
+        ) : (
+          <p className="text-[0.6rem] text-muted-foreground/50 mt-2 truncate">
+            {isAr ? meta.sourceAr : sourceNameEn}
+          </p>
         )}
       </CardContent>
     </Card>
+  );
+}
+
+
+// ─── Timeline fetcher per indicator ──────────────────────────────────────────
+
+function IndicatorCardWithTimeline({
+  meta,
+  record,
+  isAr,
+}: Omit<IndicatorCardProps, "timeline">) {
+  const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
+    indicator: meta.key,
+  });
+
+  const timeline: number[] = timelineRecords
+    ? timelineRecords.map((r) => r.value)
+    : [];
+
+  return (
+    <IndicatorCard meta={meta} record={record} timeline={timeline} isAr={isAr} />
   );
 }
 
@@ -245,6 +289,10 @@ function IndicatorCard({ ind, isAr }: { ind: Indicator; isAr: boolean }) {
 export default function EconomyPage() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
+
+  const allLatest = useQuery(api.economy.getAllLatest);
+
+  const isLoading = allLatest === undefined;
 
   return (
     <div className="page-content" dir={dir}>
@@ -259,25 +307,45 @@ export default function EconomyPage() {
           </h1>
           <p className="text-muted-foreground text-sm max-w-lg">
             {isAr
-              ? "مؤشرات اقتصادية رئيسية لمصر من ٢٠١٦ إلى ٢٠٢٤ — من البنك الدولي والبنك المركزي وجهاز التعبئة والإحصاء"
-              : "Key Egyptian economic indicators from 2016 to 2024 — World Bank, CBE, CAPMAS"}
+              ? "مؤشرات اقتصادية رئيسية لمصر — من البنك الدولي والبنك المركزي وجهاز التعبئة والإحصاء"
+              : "Key Egyptian economic indicators — World Bank, CBE, CAPMAS"}
           </p>
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {indicators.map((ind) => (
-            <IndicatorCard key={ind.nameEn} ind={ind} isAr={isAr} />
-          ))}
-        </div>
+        <Skeleton name="economy-indicators" loading={isLoading}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {!isLoading &&
+              INDICATOR_META.map((meta) => {
+                const record = allLatest[meta.key] ?? null;
+                return (
+                  <IndicatorCardWithTimeline
+                    key={meta.key}
+                    meta={meta}
+                    record={record}
+                    isAr={isAr}
+                  />
+                );
+              })}
+          </div>
+        </Skeleton>
 
-        {/* Sources */}
+        {/* Sources footer */}
         <div className="mt-10 pt-6 border-t border-border flex flex-wrap gap-4 text-[0.625rem] text-muted-foreground">
           {[
-            { label: "World Bank", url: "https://data.worldbank.org/country/egypt-arab-rep" },
-            { label: "Central Bank of Egypt", url: "https://www.cbe.org.eg/en/economic-research/statistics" },
+            {
+              label: "World Bank",
+              url: "https://data.worldbank.org/country/egypt-arab-rep",
+            },
+            {
+              label: "Central Bank of Egypt",
+              url: "https://www.cbe.org.eg/en/economic-research/statistics",
+            },
             { label: "CAPMAS", url: "https://www.capmas.gov.eg" },
-            { label: "Suez Canal Authority", url: "https://www.suezcanal.gov.eg" },
+            {
+              label: "Suez Canal Authority",
+              url: "https://www.suezcanal.gov.eg",
+            },
           ].map((s) => (
             <a
               key={s.label}

@@ -116,28 +116,18 @@ export default function YourSharePage() {
 
   const _isLoading = convexBrackets === undefined || convexSpending === undefined;
 
-  // Map Convex tax brackets to local format
-  const TAX_BRACKETS: Bracket[] = convexBrackets && convexBrackets.length > 0
+  // All data from Convex -- no hardcoded fallbacks
+  const TAX_BRACKETS: Bracket[] = convexBrackets
     ? convexBrackets.map((b) => ({
         from: b.fromAmount,
         to: b.toAmount ?? null,
         rate: b.rate,
       }))
-    : [
-        // Fallback: 2024 brackets per Law 7/2024
-        { from: 0, to: 40000, rate: 0 },
-        { from: 40001, to: 55000, rate: 0.10 },
-        { from: 55001, to: 70000, rate: 0.15 },
-        { from: 70001, to: 200000, rate: 0.20 },
-        { from: 200001, to: 400000, rate: 0.225 },
-        { from: 400001, to: 1200000, rate: 0.25 },
-        { from: 1200001, to: null, rate: 0.275 },
-      ];
+    : [];
 
-  const personalExemption = convexBrackets?.[0]?.personalExemption ?? 20000;
+  const personalExemption = convexBrackets?.[0]?.personalExemption ?? 0;
 
-  // Map Convex spending data to local format
-  const SPENDING: SpendingCategory[] = convexSpending?.items && convexSpending.items.length > 0
+  const SPENDING: SpendingCategory[] = convexSpending?.items
     ? convexSpending.items.map((item, i) => ({
         key: `sector_${i}`,
         nameAr: item.sectorAr,
@@ -145,17 +135,7 @@ export default function YourSharePage() {
         pct: item.percentageOfTotal,
         color: SECTOR_COLORS[item.sectorEn] ?? `hsl(${i * 45}, 60%, 55%)`,
       }))
-    : [
-        // Fallback spending data (MOF 2024/2025)
-        { key: "debt", nameAr: "خدمة الدين", nameEn: "Debt Service", pct: 22.6, color: "#E5484D" },
-        { key: "wages", nameAr: "الأجور", nameEn: "Wages", pct: 18.3, color: "#C9A84C" },
-        { key: "subsidies", nameAr: "الدعم", nameEn: "Subsidies", pct: 13.6, color: "#F76B15" },
-        { key: "infra", nameAr: "البنية التحتية", nameEn: "Infrastructure", pct: 9.7, color: "#2EC4B6" },
-        { key: "edu", nameAr: "التعليم", nameEn: "Education", pct: 7.0, color: "#6C8EEF" },
-        { key: "health", nameAr: "الصحة", nameEn: "Health", pct: 4.7, color: "#3FC380" },
-        { key: "defence", nameAr: "الدفاع", nameEn: "Defence", pct: 3.7, color: "#8E8E93" },
-        { key: "other", nameAr: "أخرى", nameEn: "Other", pct: 20.3, color: "#5E5CE6" },
-      ];
+    : [];
 
   const handleInput = useCallback((raw: string) => {
     setInputVal(raw);

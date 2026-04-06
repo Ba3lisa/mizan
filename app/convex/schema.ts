@@ -318,6 +318,19 @@ export default defineSchema({
   })
     .index("by_type", ["type"]),
 
+  // ECONOMIC INDICATORS (fetched from World Bank and CBE every 6 hours)
+  economicIndicators: defineTable({
+    indicator: v.string(),
+    year: v.optional(v.string()),
+    date: v.string(),
+    value: v.number(),
+    unit: v.string(),
+    sourceUrl: v.optional(v.string()),
+    sourceNameEn: v.optional(v.string()),
+  })
+    .index("by_indicator", ["indicator"])
+    .index("by_indicator_and_date", ["indicator", "date"]),
+
   // DATA CHANGE LOG (detailed per-operation audit trail)
   dataChangeLog: defineTable({
     refreshLogId: v.id("dataRefreshLog"),
@@ -327,7 +340,8 @@ export default defineSchema({
       v.literal("constitution"),
       v.literal("budget"),
       v.literal("debt"),
-      v.literal("elections")
+      v.literal("elections"),
+      v.literal("economy")
     ),
     action: v.union(
       v.literal("created"),
@@ -428,6 +442,7 @@ export default defineSchema({
       v.literal("constitution"),
       v.literal("budget"),
       v.literal("debt"),
+      v.literal("economy"),
       v.literal("all")
     ),
     status: v.union(

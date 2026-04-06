@@ -5,7 +5,7 @@ import { useLanguage } from "@/components/providers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ExternalLink, CheckCircle2, Clock, PauseCircle } from "lucide-react";
+import { ExternalLink, CheckCircle2, Clock, PauseCircle, Database } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -22,99 +22,6 @@ interface GovPromise {
   descEn: string;
   source: string;
 }
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
-
-const promises: GovPromise[] = [
-  {
-    nameAr: "رؤية مصر ٢٠٣٠",
-    nameEn: "Egypt Vision 2030",
-    status: "in_progress",
-    progress: 45,
-    dateAr: "فبراير ٢٠١٦",
-    dateEn: "Feb 2016",
-    descAr: "خطة التنمية المستدامة الشاملة",
-    descEn: "Comprehensive sustainable development plan",
-    source: "https://sfrp.eg",
-  },
-  {
-    nameAr: "العاصمة الإدارية الجديدة",
-    nameEn: "New Administrative Capital",
-    status: "in_progress",
-    progress: 70,
-    dateAr: "مارس ٢٠١٥",
-    dateEn: "Mar 2015",
-    descAr: "نقل الحكومة إلى عاصمة جديدة شرق القاهرة",
-    descEn: "Relocating government to new capital east of Cairo",
-    source: "https://www.acud.eg",
-  },
-  {
-    nameAr: "توسعة قناة السويس",
-    nameEn: "Suez Canal Expansion",
-    status: "completed",
-    progress: 100,
-    dateAr: "أغسطس ٢٠١٤",
-    dateEn: "Aug 2014",
-    descAr: "قناة موازية بطول ٣٥ كم",
-    descEn: "35km parallel waterway",
-    source: "https://www.suezcanal.gov.eg",
-  },
-  {
-    nameAr: "القضاء على العشوائيات",
-    nameEn: "Eliminate Slums",
-    status: "in_progress",
-    progress: 60,
-    dateAr: "٢٠١٤",
-    dateEn: "2014",
-    descAr: "إعادة إسكان سكان المناطق العشوائية",
-    descEn: "Relocating informal settlement residents",
-    source: "",
-  },
-  {
-    nameAr: "مشروع الضبعة النووي",
-    nameEn: "El Dabaa Nuclear Plant",
-    status: "in_progress",
-    progress: 30,
-    dateAr: "ديسمبر ٢٠١٧",
-    dateEn: "Dec 2017",
-    descAr: "أول محطة نووية مصرية بالتعاون مع روسيا",
-    descEn: "Egypt's first nuclear plant with Russia",
-    source: "",
-  },
-  {
-    nameAr: "تخفيض الدين العام لأقل من ٨٠٪",
-    nameEn: "Reduce Debt Below 80% of GDP",
-    status: "stalled",
-    progress: 20,
-    dateAr: "٢٠١٨",
-    dateEn: "2018",
-    descAr: "خفض نسبة الدين للناتج المحلي",
-    descEn: "Reduce debt-to-GDP ratio",
-    source: "",
-  },
-  {
-    nameAr: "١٠٠ مليون صحة",
-    nameEn: "100 Million Health Initiative",
-    status: "completed",
-    progress: 100,
-    dateAr: "أكتوبر ٢٠١٨",
-    dateEn: "Oct 2018",
-    descAr: "مسح صحي شامل والقضاء على فيروس سي",
-    descEn: "National health screening + Hep C elimination",
-    source: "",
-  },
-  {
-    nameAr: "تحقيق الاكتفاء الذاتي من الغاز",
-    nameEn: "Gas Self-Sufficiency",
-    status: "completed",
-    progress: 100,
-    dateAr: "٢٠١٨",
-    dateEn: "2018",
-    descAr: "حقل ظُهر وتحقيق فائض للتصدير",
-    descEn: "Zohr field + export surplus achieved",
-    source: "",
-  },
-];
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
 
@@ -171,7 +78,7 @@ function PromiseCard({ promise, isAr }: { promise: GovPromise; isAr: boolean }) 
   const Icon = cfg.Icon;
 
   return (
-    <Card className={`border-border/60 bg-card/60 backdrop-blur-sm hover:border-primary/30 transition-all`}>
+    <Card className="border-border/60 bg-card/60 backdrop-blur-sm hover:border-primary/30 transition-all">
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex-1 min-w-0">
@@ -234,6 +141,26 @@ function PromiseCard({ promise, isAr }: { promise: GovPromise; isAr: boolean }) 
   );
 }
 
+// ─── Empty state ──────────────────────────────────────────────────────────────
+
+function EmptyState({ isAr }: { isAr: boolean }) {
+  return (
+    <Card className="border-border/60 bg-card/60">
+      <CardContent className="p-12 text-center">
+        <Database size={24} className="mx-auto mb-3 text-muted-foreground/40" />
+        <p className="text-sm font-medium text-foreground mb-1">
+          {isAr ? "لا توجد بيانات بعد" : "No data available yet"}
+        </p>
+        <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+          {isAr
+            ? "سيتم تحميل بيانات الوعود الحكومية بواسطة وكيل البيانات. تحقق من صفحة الشفافية لمعرفة حالة التحديثات."
+            : "Government promises data will be loaded by the data agent. Check the transparency page for update status."}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function PromisesPage() {
@@ -241,7 +168,12 @@ export default function PromisesPage() {
   const isAr = lang === "ar";
   const [filter, setFilter] = useState<FilterStatus>("all");
 
-  const filtered = filter === "all" ? promises : promises.filter((p) => p.status === filter);
+  // No Convex table for governmentPromises yet.
+  // When the data agent loads promises into Convex, wire this to useQuery.
+  const promises: GovPromise[] = [];
+
+  const filtered =
+    filter === "all" ? promises : promises.filter((p) => p.status === filter);
 
   const counts = {
     total: promises.length,
@@ -307,17 +239,20 @@ export default function PromisesPage() {
           ))}
         </div>
 
-        {/* Promise cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((p) => (
-            <PromiseCard key={p.nameEn} promise={p} isAr={isAr} />
-          ))}
-        </div>
-
-        {filtered.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-12">
-            {isAr ? "لا توجد نتائج" : "No results"}
-          </p>
+        {/* Promise cards or empty state */}
+        {promises.length === 0 ? (
+          <EmptyState isAr={isAr} />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filtered.map((p) => (
+              <PromiseCard key={p.nameEn} promise={p} isAr={isAr} />
+            ))}
+            {filtered.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-12 col-span-2">
+                {isAr ? "لا توجد نتائج" : "No results"}
+              </p>
+            )}
+          </div>
         )}
 
         <p className="text-[0.625rem] text-muted-foreground/60 mt-8">

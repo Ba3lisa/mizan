@@ -40,7 +40,7 @@ interface RegionalCountry {
 
 // Regional comparison countries -- fallback values, overridden by live WB data
 const regionalData: RegionalCountry[] = [
-  { nameAr: "\u0645\u0635\u0631", nameEn: "Egypt", debtToGDP: 89.5, color: "#C9A84C", isEgypt: true },
+  { nameAr: "\u0645\u0635\u0631", nameEn: "Egypt", debtToGDP: 0, color: "#C9A84C", isEgypt: true },
   { nameAr: "\u062a\u0631\u0643\u064a\u0627", nameEn: "Turkey", debtToGDP: 31.8, color: "#6C8EEF" },
   { nameAr: "\u0627\u0644\u0645\u0645\u0644\u0643\u0629 \u0627\u0644\u0639\u0631\u0628\u064a\u0629 \u0627\u0644\u0633\u0639\u0648\u062f\u064a\u0629", nameEn: "Saudi Arabia", debtToGDP: 27.7, color: "#2EC4B6" },
   { nameAr: "\u0627\u0644\u0645\u063a\u0631\u0628", nameEn: "Morocco", debtToGDP: 62.4, color: "#E76F51" },

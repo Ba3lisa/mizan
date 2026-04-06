@@ -18,7 +18,7 @@ import { callClaude } from "./providers/anthropic";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
-type RefreshCategory = "government" | "parliament" | "budget" | "debt";
+type RefreshCategory = "government" | "parliament" | "budget" | "debt" | "economy";
 
 const STALE_THRESHOLD_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -301,6 +301,108 @@ async function refreshParliamentData(
   return { recordsUpdated: 0 };
 }
 
+// ─── ECONOMY REFRESH ──────────────────────────────────────────────────────────
+
+// World Bank indicator codes for Egypt
+const WB_INDICATORS: Array<{
+  code: string;
+  indicator: string;
+  unit: string;
+  sourceNameEn: string;
+  scaleFactor?: number;
+}> = [
+  {
+    code: "NY.GDP.MKTP.KD.ZG",
+    indicator: "gdp_growth",
+    unit: "percent",
+    sourceNameEn: "World Bank — GDP growth (annual %)",
+  },
+  {
+    code: "FP.CPI.TOTL.ZG",
+    indicator: "inflation",
+    unit: "percent",
+    sourceNameEn: "World Bank — Inflation, consumer prices (annual %)",
+  },
+  {
+    code: "SL.UEM.TOTL.ZS",
+    indicator: "unemployment",
+    unit: "percent",
+    sourceNameEn: "World Bank — Unemployment, total (% of total labor force)",
+  },
+  {
+    code: "FI.RES.TOTL.CD",
+    indicator: "reserves",
+    unit: "billion_usd",
+    sourceNameEn: "World Bank — Total reserves (current USD)",
+    scaleFactor: 1e9, // API returns raw USD; divide to get billions
+  },
+  {
+    code: "PA.NUS.FCRF",
+    indicator: "exchange_rate",
+    unit: "egp_per_usd",
+    sourceNameEn: "World Bank — Official exchange rate (LCU per USD, period average)",
+  },
+];
+
+async function refreshEconomyData(
+  ctx: ActionCtx
+): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
+  let totalUpdated = 0;
+  const BASE_URL = "https://api.worldbank.org/v2/country/EGY/indicator";
+
+  for (const wb of WB_INDICATORS) {
+    const url = `${BASE_URL}/${wb.code}?format=json&per_page=15&mrv=15`;
+    let entries: Array<{ date: string; value: number | null }>;
+
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn(
+          `[dataAgent/economy] World Bank API returned ${response.status} for indicator ${wb.code}`
+        );
+        continue;
+      }
+      const raw: unknown = await response.json();
+      entries = parseWorldBankResponse(raw);
+    } catch (err) {
+      console.warn(
+        `[dataAgent/economy] Failed to fetch ${wb.code}: ${String(err)}`
+      );
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (entry.value === null || entry.value === undefined) continue;
+
+      // World Bank dates are either "YYYY" or "YYYY-MM-DD"
+      const date =
+        entry.date.length === 4 ? `${entry.date}-12-31` : entry.date;
+      const year = entry.date.length === 4 ? entry.date : entry.date.slice(0, 4);
+      const value =
+        wb.scaleFactor !== undefined ? entry.value / wb.scaleFactor : entry.value;
+
+      const updated: number = await ctx.runMutation(
+        internal.dataRefresh.upsertEconomicIndicator,
+        {
+          indicator: wb.indicator,
+          date,
+          year,
+          value,
+          unit: wb.unit,
+          sourceUrl: url,
+          sourceNameEn: wb.sourceNameEn,
+        }
+      );
+      totalUpdated += updated;
+    }
+  }
+
+  return {
+    recordsUpdated: totalUpdated,
+    sourceUrl: "https://api.worldbank.org/v2/country/EGY/indicator",
+  };
+}
+
 // ─── CATEGORY DISPATCHER ─────────────────────────────────────────────────────
 
 async function refreshCategory(
@@ -330,6 +432,9 @@ async function refreshCategory(
       case "parliament":
         result = await refreshParliamentData(ctx);
         break;
+      case "economy":
+        result = await refreshEconomyData(ctx);
+        break;
     }
 
     const { recordsUpdated, sourceUrl } = result;
@@ -343,18 +448,21 @@ async function refreshCategory(
         budget: `Updated ${recordsUpdated} budget record(s) from Ministry of Finance`,
         government: `Flagged ${recordsUpdated} potential government change(s) for human review`,
         parliament: `Parliament refresh complete — ${recordsUpdated} record(s) updated`,
+        economy: `Updated ${recordsUpdated} economic indicator(s) from World Bank API`,
       };
       const descriptionArMap: Record<RefreshCategory, string> = {
         debt: `تم تحديث ${recordsUpdated} سجل ديون من بيانات البنك الدولي`,
         budget: `تم تحديث ${recordsUpdated} سجل ميزانية من وزارة المالية`,
         government: `تم الإشارة إلى ${recordsUpdated} تغيير محتمل في الحكومة للمراجعة البشرية`,
         parliament: `اكتمل تحديث البرلمان — ${recordsUpdated} سجل محدث`,
+        economy: `تم تحديث ${recordsUpdated} مؤشر اقتصادي من بيانات البنك الدولي`,
       };
       const tableNameMap: Record<RefreshCategory, string> = {
         debt: "debtRecords",
         budget: "fiscalYears",
         government: "officials",
         parliament: "parliamentMembers",
+        economy: "economicIndicators",
       };
 
       await ctx.runMutation(internal.dataRefresh.logChange, {
@@ -413,6 +521,7 @@ export const orchestrateRefresh = internalAction({
       "parliament",
       "budget",
       "debt",
+      "economy",
     ];
 
     for (const category of categories) {
