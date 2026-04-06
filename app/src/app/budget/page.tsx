@@ -160,6 +160,260 @@ const SPENDING_COLOR = "#8B3535";
 const DEBT_SERVICE_COLOR = "#C94040";
 const DEFICIT_COLOR = "#C9A84C";
 
+// ─── Mobile Flow Diagram (interactive) ──────────────────────────────────────
+
+function MobileBudgetFlow({
+  revenueData, spendingData, isAr, fmtAmount,
+}: {
+  revenueData: BudgetCategory[];
+  spendingData: BudgetCategory[];
+  isAr: boolean;
+  fmtAmount: (v: number) => string;
+}) {
+  // Which node is tapped/selected — null means nothing selected (show all)
+  const [selected, setSelected] = useState<{ side: "rev" | "sp"; idx: number } | null>(null);
+
+  const totalRev = revenueData.reduce((s, r) => s + r.amount, 0);
+  const totalSp = spendingData.reduce((s, r) => s + r.amount, 0);
+  const sortedRev = [...revenueData].sort((a, b) => b.amount - a.amount);
+  const sortedSp = [...spendingData].sort((a, b) => b.amount - a.amount);
+
+  // Layout
+  const nodeW = 110;
+  const gapX = 60;
+  const svgW = nodeW * 2 + gapX;
+  const rowH = 32;
+  const pad = 4;
+  const maxTotal = Math.max(totalRev, totalSp);
+  const totalH = sortedRev.length * rowH * 1.5;
+  const calcH = (amount: number) => Math.max(20, (amount / maxTotal) * totalH);
+
+  const revBlocks = sortedRev.map((item, _i, _a) => ({ item, y: 0, h: calcH(item.amount) }));
+  let yAcc = 0;
+  for (const rb of revBlocks) { rb.y = yAcc; yAcc += rb.h + pad; }
+
+  const spBlocks = sortedSp.map((item) => ({ item, y: 0, h: calcH(item.amount) }));
+  yAcc = 0;
+  for (const sb of spBlocks) { sb.y = yAcc; yAcc += sb.h + pad; }
+
+  const svgH = Math.max(revBlocks.reduce((s, b) => s + b.h + pad, 0), spBlocks.reduce((s, b) => s + b.h + pad, 0));
+
+  // Build flows
+  interface Flow { revIdx: number; spIdx: number; value: number; srcY: number; srcH: number; tgtY: number; tgtH: number }
+  const flows: Flow[] = [];
+  for (let ri = 0; ri < revBlocks.length; ri++) {
+    let srcOffset = 0;
+    for (let si = 0; si < spBlocks.length; si++) {
+      const flowVal = Math.round(
+        (revBlocks[ri].item.amount / totalRev) *
+        (spBlocks[si].item.amount / totalSp) *
+        Math.min(totalRev, totalSp)
+      );
+      if (flowVal < 1) continue;
+      const flowH_src = (flowVal / revBlocks[ri].item.amount) * revBlocks[ri].h;
+      const flowH_tgt = (flowVal / spBlocks[si].item.amount) * spBlocks[si].h;
+      const srcY = revBlocks[ri].y + srcOffset;
+      srcOffset += flowH_src;
+      flows.push({ revIdx: ri, spIdx: si, value: flowVal, srcY, srcH: flowH_src, tgtY: 0, tgtH: flowH_tgt });
+    }
+  }
+  const spOffsets = new Array(spBlocks.length).fill(0) as number[];
+  for (const f of flows) { f.tgtY = spBlocks[f.spIdx].y + spOffsets[f.spIdx]; spOffsets[f.spIdx] += f.tgtH; }
+
+  const leftX = nodeW;
+  const rightX = nodeW + gapX;
+
+  // Interaction: check if a flow connects to the selected node
+  const isFlowActive = (f: Flow) => {
+    if (!selected) return true;
+    return selected.side === "rev" ? f.revIdx === selected.idx : f.spIdx === selected.idx;
+  };
+  const isRevActive = (ri: number) => {
+    if (!selected) return true;
+    if (selected.side === "rev") return selected.idx === ri;
+    return flows.some((f) => f.spIdx === selected.idx && f.revIdx === ri);
+  };
+  const isSpActive = (si: number) => {
+    if (!selected) return true;
+    if (selected.side === "sp") return selected.idx === si;
+    return flows.some((f) => f.revIdx === selected.idx && f.spIdx === si);
+  };
+
+  const handleTap = (side: "rev" | "sp", idx: number) => {
+    setSelected((prev) =>
+      prev && prev.side === side && prev.idx === idx ? null : { side, idx }
+    );
+  };
+
+  // Tooltip for selected node
+  const selectedInfo = selected
+    ? selected.side === "rev"
+      ? revBlocks[selected.idx]
+      : spBlocks[selected.idx]
+    : null;
+  const selectedTotal = selected?.side === "rev" ? totalRev : totalSp;
+
+  return (
+    <div className="flex flex-col gap-3" dir="ltr">
+      {/* Header */}
+      <div className="flex items-center justify-between px-1" dir={isAr ? "rtl" : "ltr"}>
+        <div>
+          <span className="text-xs font-bold" style={{ color: REVENUE_COLOR }}>{isAr ? "الإيرادات" : "Revenue"}</span>
+          <span className="font-mono text-[0.65rem] text-emerald-500 ms-2">{fmtAmount(totalRev)}</span>
+        </div>
+        <div>
+          <span className="text-xs font-bold" style={{ color: SPENDING_COLOR }}>{isAr ? "المصروفات" : "Spending"}</span>
+          <span className="font-mono text-[0.65rem] text-red-400 ms-2">{fmtAmount(totalSp)}</span>
+        </div>
+      </div>
+
+      {/* Tap hint */}
+      <p className="text-[0.6rem] text-muted-foreground/50 text-center">
+        {isAr ? "اضغط على أي عنصر لتتبع تدفق الأموال" : "Tap any item to trace money flow"}
+      </p>
+
+      {/* Selected node tooltip */}
+      {selectedInfo && (
+        <div
+          className="mx-1 rounded-lg px-3 py-2 border text-center transition-all"
+          style={{
+            borderColor: selected?.side === "rev" ? REVENUE_COLOR : (selectedInfo.item.nameEn === "Debt Service" ? DEBT_SERVICE_COLOR : SPENDING_COLOR),
+            background: selected?.side === "rev" ? `${REVENUE_COLOR}10` : `${SPENDING_COLOR}10`,
+          }}
+          dir={isAr ? "rtl" : "ltr"}
+        >
+          <span className="text-sm font-bold">{isAr ? selectedInfo.item.nameAr : selectedInfo.item.nameEn}</span>
+          <span className="text-xs text-muted-foreground ms-2">
+            {fmtAmount(selectedInfo.item.amount)} · {selectedTotal > 0 ? ((selectedInfo.item.amount / selectedTotal) * 100).toFixed(1) : 0}%
+          </span>
+        </div>
+      )}
+
+      {/* Flow diagram */}
+      <div className="relative overflow-x-auto">
+        <svg
+          width={svgW}
+          height={svgH}
+          viewBox={`0 0 ${svgW} ${svgH}`}
+          className="w-full"
+          style={{ minWidth: 300 }}
+          onClick={() => setSelected(null)}
+        >
+          {/* Flow paths */}
+          {flows.map((f, i) => {
+            const x1 = leftX;
+            const x2 = rightX;
+            const y1top = f.srcY;
+            const y1bot = f.srcY + f.srcH;
+            const y2top = f.tgtY;
+            const y2bot = f.tgtY + f.tgtH;
+            const cx = (x1 + x2) / 2;
+            const isDebt = spBlocks[f.spIdx].item.nameEn === "Debt Service";
+            const active = isFlowActive(f);
+
+            return (
+              <path
+                key={i}
+                d={`M${x1},${y1top} C${cx},${y1top} ${cx},${y2top} ${x2},${y2top} L${x2},${y2bot} C${cx},${y2bot} ${cx},${y1bot} ${x1},${y1bot} Z`}
+                fill={isDebt ? DEBT_SERVICE_COLOR : REVENUE_COLOR}
+                opacity={active ? (selected ? 0.45 : 0.18) : 0.04}
+                style={{ transition: "opacity 0.25s ease" }}
+              />
+            );
+          })}
+
+          {/* Revenue blocks (left) */}
+          {revBlocks.map((rb, i) => {
+            const pct = totalRev > 0 ? ((rb.item.amount / totalRev) * 100).toFixed(0) : "0";
+            const active = isRevActive(i);
+            return (
+              <g
+                key={`rev-${i}`}
+                onClick={(e) => { e.stopPropagation(); handleTap("rev", i); }}
+                style={{ cursor: "pointer" }}
+                opacity={active ? 1 : 0.2}
+              >
+                {/* Invisible hit area for easier tapping */}
+                <rect x={0} y={rb.y} width={leftX} height={rb.h} fill="transparent" />
+                <rect x={leftX - 10} y={rb.y} width={10} height={rb.h} rx={3} fill={REVENUE_COLOR} />
+                <text
+                  x={leftX - 16}
+                  y={rb.y + rb.h / 2}
+                  textAnchor="end"
+                  dominantBaseline="middle"
+                  className="fill-foreground"
+                  style={{ fontSize: 10, fontWeight: active && selected ? 600 : 400, transition: "opacity 0.25s" }}
+                >
+                  {isAr ? rb.item.nameAr : rb.item.nameEn}
+                </text>
+                <text
+                  x={leftX - 16}
+                  y={rb.y + rb.h / 2 + 12}
+                  textAnchor="end"
+                  dominantBaseline="middle"
+                  className="fill-muted-foreground"
+                  style={{ fontSize: 8, fontFamily: "var(--font-mono)", transition: "opacity 0.25s" }}
+                >
+                  {pct}%
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Spending blocks (right) */}
+          {spBlocks.map((sb, i) => {
+            const pct = totalSp > 0 ? ((sb.item.amount / totalSp) * 100).toFixed(0) : "0";
+            const isDebt = sb.item.nameEn === "Debt Service";
+            const active = isSpActive(i);
+            return (
+              <g
+                key={`sp-${i}`}
+                onClick={(e) => { e.stopPropagation(); handleTap("sp", i); }}
+                style={{ cursor: "pointer" }}
+                opacity={active ? 1 : 0.2}
+              >
+                {/* Invisible hit area */}
+                <rect x={rightX} y={sb.y} width={nodeW} height={sb.h} fill="transparent" />
+                <rect x={rightX} y={sb.y} width={10} height={sb.h} rx={3} fill={isDebt ? DEBT_SERVICE_COLOR : SPENDING_COLOR} />
+                <text
+                  x={rightX + 16}
+                  y={sb.y + sb.h / 2}
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  className="fill-foreground"
+                  style={{ fontSize: 10, fontWeight: active && selected ? 600 : 400, transition: "opacity 0.25s" }}
+                >
+                  {isAr ? sb.item.nameAr : sb.item.nameEn}
+                </text>
+                <text
+                  x={rightX + 16}
+                  y={sb.y + sb.h / 2 + 12}
+                  textAnchor="start"
+                  dominantBaseline="middle"
+                  className="fill-muted-foreground"
+                  style={{ fontSize: 8, fontFamily: "var(--font-mono)", transition: "opacity 0.25s" }}
+                >
+                  {fmtAmount(sb.item.amount)} · {pct}%
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      {/* Deficit */}
+      {totalSp > totalRev && (
+        <div className="border-t border-border pt-3 flex items-baseline justify-between px-1" dir={isAr ? "rtl" : "ltr"}>
+          <span className="text-xs font-semibold" style={{ color: DEFICIT_COLOR }}>{isAr ? "العجز" : "Deficit"}</span>
+          <span className="font-mono text-sm font-bold" style={{ color: DEFICIT_COLOR }}>{fmtAmount(totalSp - totalRev)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Desktop Sankey Diagram ─────────────────────────────────────────────────
+
 function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCategory[]; spendingData: BudgetCategory[] }) {
   const { lang } = useLanguage();
   const { symbol, fromEGP, fmt } = useCurrency();
@@ -217,210 +471,15 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
     );
   }
 
-  // Mobile: SVG flow diagram showing revenue → spending connections
+  // Mobile: interactive SVG flow diagram showing revenue → spending connections
   if (isMobile) {
-    const totalRev = revenueData.reduce((s, r) => s + r.amount, 0);
-    const totalSp = spendingData.reduce((s, r) => s + r.amount, 0);
-    const sortedRev = [...revenueData].sort((a, b) => b.amount - a.amount);
-    const sortedSp = [...spendingData].sort((a, b) => b.amount - a.amount);
-
-    // Layout constants
-    const nodeW = 110; // width of each label+bar column
-    const gapX = 60;   // horizontal gap for SVG flow paths
-    const svgW = nodeW * 2 + gapX;
-    const rowH = 32;   // height per unit in the stacked bars
-    const pad = 4;     // vertical padding between blocks
-
-    // Calculate block heights proportionally (min 20px)
-    const maxTotal = Math.max(totalRev, totalSp);
-    const totalH = sortedRev.length * rowH * 1.5; // approximate total visual height
-    const calcH = (amount: number) => Math.max(20, (amount / maxTotal) * totalH);
-
-    // Compute Y positions for revenue blocks (left column)
-    const revBlocks: Array<{ item: BudgetCategory; y: number; h: number }> = [];
-    let yRev = 0;
-    for (const r of sortedRev) {
-      const h = calcH(r.amount);
-      revBlocks.push({ item: r, y: yRev, h });
-      yRev += h + pad;
-    }
-
-    // Compute Y positions for spending blocks (right column)
-    const spBlocks: Array<{ item: BudgetCategory; y: number; h: number }> = [];
-    let ySp = 0;
-    for (const s of sortedSp) {
-      const h = calcH(s.amount);
-      spBlocks.push({ item: s, y: ySp, h });
-      ySp += h + pad;
-    }
-
-    const svgH = Math.max(yRev, ySp);
-
-    // Build flow paths: each revenue item distributes proportionally to each spending item
-    const flows: Array<{
-      revIdx: number; spIdx: number; value: number;
-      srcY: number; srcH: number; tgtY: number; tgtH: number;
-    }> = [];
-    for (let ri = 0; ri < revBlocks.length; ri++) {
-      let srcOffset = 0;
-      for (let si = 0; si < spBlocks.length; si++) {
-        const flowVal = Math.round(
-          (revBlocks[ri].item.amount / totalRev) *
-          (spBlocks[si].item.amount / totalSp) *
-          Math.min(totalRev, totalSp)
-        );
-        if (flowVal < 1) continue;
-        const flowH_src = (flowVal / revBlocks[ri].item.amount) * revBlocks[ri].h;
-        const flowH_tgt = (flowVal / spBlocks[si].item.amount) * spBlocks[si].h;
-        // Track cumulative offset within each block
-        const srcY = revBlocks[ri].y + srcOffset;
-        srcOffset += flowH_src;
-        flows.push({
-          revIdx: ri, spIdx: si, value: flowVal,
-          srcY, srcH: flowH_src,
-          tgtY: 0, tgtH: flowH_tgt,
-        });
-      }
-    }
-    // Compute target Y offsets
-    const spOffsets = new Array(spBlocks.length).fill(0);
-    for (const f of flows) {
-      f.tgtY = spBlocks[f.spIdx].y + spOffsets[f.spIdx];
-      spOffsets[f.spIdx] += f.tgtH;
-    }
-
-    const leftX = nodeW;
-    const rightX = nodeW + gapX;
-
     return (
-      <div className="flex flex-col gap-4" dir="ltr">
-        {/* Header */}
-        <div className="flex items-center justify-between px-1" dir={isAr ? "rtl" : "ltr"}>
-          <div>
-            <span className="text-xs font-bold" style={{ color: REVENUE_COLOR }}>{isAr ? "الإيرادات" : "Revenue"}</span>
-            <span className="font-mono text-[0.65rem] text-emerald-500 ms-2">{fmtAmount(totalRev)}</span>
-          </div>
-          <div>
-            <span className="text-xs font-bold" style={{ color: SPENDING_COLOR }}>{isAr ? "المصروفات" : "Spending"}</span>
-            <span className="font-mono text-[0.65rem] text-red-400 ms-2">{fmtAmount(totalSp)}</span>
-          </div>
-        </div>
-
-        {/* Flow diagram */}
-        <div className="relative overflow-x-auto">
-          <svg
-            width={svgW}
-            height={svgH}
-            viewBox={`0 0 ${svgW} ${svgH}`}
-            className="w-full"
-            style={{ minWidth: 300 }}
-          >
-            {/* Flow paths */}
-            {flows.map((f, i) => {
-              const x1 = leftX;
-              const x2 = rightX;
-              const y1top = f.srcY;
-              const y1bot = f.srcY + f.srcH;
-              const y2top = f.tgtY;
-              const y2bot = f.tgtY + f.tgtH;
-              const cx = (x1 + x2) / 2;
-              const isDebt = spBlocks[f.spIdx].item.nameEn === "Debt Service";
-
-              return (
-                <path
-                  key={i}
-                  d={`M${x1},${y1top} C${cx},${y1top} ${cx},${y2top} ${x2},${y2top} L${x2},${y2bot} C${cx},${y2bot} ${cx},${y1bot} ${x1},${y1bot} Z`}
-                  fill={isDebt ? DEBT_SERVICE_COLOR : REVENUE_COLOR}
-                  opacity={0.18}
-                />
-              );
-            })}
-
-            {/* Revenue blocks (left) */}
-            {revBlocks.map((rb, i) => {
-              const pct = totalRev > 0 ? ((rb.item.amount / totalRev) * 100).toFixed(0) : "0";
-              return (
-                <g key={`rev-${i}`}>
-                  <rect
-                    x={leftX - 8}
-                    y={rb.y}
-                    width={8}
-                    height={rb.h}
-                    rx={2}
-                    fill={REVENUE_COLOR}
-                  />
-                  <text
-                    x={leftX - 14}
-                    y={rb.y + rb.h / 2}
-                    textAnchor="end"
-                    dominantBaseline="middle"
-                    className="fill-foreground"
-                    style={{ fontSize: 10 }}
-                  >
-                    {isAr ? rb.item.nameAr : rb.item.nameEn}
-                  </text>
-                  <text
-                    x={leftX - 14}
-                    y={rb.y + rb.h / 2 + 12}
-                    textAnchor="end"
-                    dominantBaseline="middle"
-                    className="fill-muted-foreground"
-                    style={{ fontSize: 8, fontFamily: "var(--font-mono)" }}
-                  >
-                    {pct}%
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Spending blocks (right) */}
-            {spBlocks.map((sb, i) => {
-              const pct = totalSp > 0 ? ((sb.item.amount / totalSp) * 100).toFixed(0) : "0";
-              const isDebt = sb.item.nameEn === "Debt Service";
-              return (
-                <g key={`sp-${i}`}>
-                  <rect
-                    x={rightX}
-                    y={sb.y}
-                    width={8}
-                    height={sb.h}
-                    rx={2}
-                    fill={isDebt ? DEBT_SERVICE_COLOR : SPENDING_COLOR}
-                  />
-                  <text
-                    x={rightX + 14}
-                    y={sb.y + sb.h / 2}
-                    textAnchor="start"
-                    dominantBaseline="middle"
-                    className="fill-foreground"
-                    style={{ fontSize: 10 }}
-                  >
-                    {isAr ? sb.item.nameAr : sb.item.nameEn}
-                  </text>
-                  <text
-                    x={rightX + 14}
-                    y={sb.y + sb.h / 2 + 12}
-                    textAnchor="start"
-                    dominantBaseline="middle"
-                    className="fill-muted-foreground"
-                    style={{ fontSize: 8, fontFamily: "var(--font-mono)" }}
-                  >
-                    {fmtAmount(sb.item.amount)} · {pct}%
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
-        </div>
-
-        {/* Deficit */}
-        {totalSp > totalRev && (
-          <div className="border-t border-border pt-3 flex items-baseline justify-between px-1" dir={isAr ? "rtl" : "ltr"}>
-            <span className="text-xs font-semibold" style={{ color: DEFICIT_COLOR }}>{isAr ? "العجز" : "Deficit"}</span>
-            <span className="font-mono text-sm font-bold" style={{ color: DEFICIT_COLOR }}>{fmtAmount(totalSp - totalRev)}</span>
-          </div>
-        )}
-      </div>
+      <MobileBudgetFlow
+        revenueData={revenueData}
+        spendingData={spendingData}
+        isAr={isAr}
+        fmtAmount={fmtAmount}
+      />
     );
   }
 
