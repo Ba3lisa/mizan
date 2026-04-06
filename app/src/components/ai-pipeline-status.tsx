@@ -55,8 +55,9 @@ const STEP_NAMES_AR: Record<string, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatCountdown(ms: number, isAr: boolean): string {
-  if (ms <= 0) return isAr ? "جارٍ التحديث الآن..." : "Refreshing now...";
+function formatCountdown(ms: number, isAr: boolean, isRunning: boolean): string {
+  if (isRunning) return isAr ? "جارٍ التحديث الآن..." : "Refreshing now...";
+  if (ms <= 0) return isAr ? "جاهز للتحديث" : "Ready to refresh";
 
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
@@ -76,10 +77,11 @@ function formatCountdown(ms: number, isAr: boolean): string {
   return `Next refresh in ${hStr}${mStr}${sStr}`;
 }
 
-function formatElapsed(startedAt: number | null, completedAt: number | null): string {
-  if (startedAt === null) return "--";
+function formatElapsed(startedAt: number | null | undefined, completedAt: number | null | undefined): string {
+  if (!startedAt) return "--";
   const end = completedAt ?? Date.now();
   const sec = (end - startedAt) / 1000;
+  if (isNaN(sec) || sec < 0) return "--";
   return `${sec.toFixed(1)}s`;
 }
 
@@ -117,7 +119,7 @@ function statusLabel(status: StepStatus, isAr: boolean): string {
 
 // ─── Countdown Hook ───────────────────────────────────────────────────────────
 
-function useCountdown(lastRunAt: number | null): { msUntilNext: number; isRunning: boolean } {
+function useCountdown(lastRunAt: number | null, steps: PipelineStep[]): { msUntilNext: number; isRunning: boolean } {
   const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 
   const [now, setNow] = useState(() => Date.now());
@@ -127,13 +129,15 @@ function useCountdown(lastRunAt: number | null): { msUntilNext: number; isRunnin
     return () => clearInterval(id);
   }, []);
 
+  // Check if any step is actually running
+  const isRunning = steps.some((s) => s.status === "running");
+
   if (lastRunAt === null) {
-    return { msUntilNext: 0, isRunning: false };
+    return { msUntilNext: 0, isRunning };
   }
 
   const nextRun = lastRunAt + SIX_HOURS_MS;
   const msUntilNext = Math.max(0, nextRun - now);
-  const isRunning = msUntilNext <= 0;
   return { msUntilNext, isRunning };
 }
 
@@ -172,7 +176,7 @@ function StepRow({ step, isAr }: { step: PipelineStep; isAr: boolean }) {
         )}
       </td>
       <td className="px-4 py-2.5 text-xs text-muted-foreground font-mono text-end whitespace-nowrap">
-        {step.status !== "pending" ? elapsed : "--"}
+        {step.status === "success" || step.status === "failed" || step.status === "running" ? elapsed : "--"}
       </td>
     </tr>
   );
@@ -194,7 +198,8 @@ export function AiPipelineStatus() {
 
   const progress = rawProgress as PipelineProgress | null | undefined;
 
-  const { msUntilNext, isRunning } = useCountdown(progress?.lastRunAt ?? null);
+  const steps = progress?.steps ?? [];
+  const { msUntilNext, isRunning } = useCountdown(progress?.lastRunAt ?? null, steps);
 
   // Determine whether to start expanded (a run is in progress) or collapsed
   const hasActiveRun = progress?.steps?.some((s) => s.status === "running") ?? false;
@@ -230,7 +235,6 @@ export function AiPipelineStatus() {
     return null;
   }
 
-  const steps = progress.steps ?? [];
   const successCount = steps.filter((s) => s.status === "success").length;
   const failedCount = steps.filter((s) => s.status === "failed").length;
 
@@ -252,7 +256,7 @@ export function AiPipelineStatus() {
               <Bot size={14} className="text-primary opacity-70" />
             )}
             <span className="text-sm font-semibold">
-              {isAr ? "حالة خط أنابيب البيانات" : "AI Data Pipeline"}
+              {isAr ? "حالة تدفق البيانات (الذكاء الاصطناعي)" : "AI Data Pipeline"}
             </span>
 
             {/* Status badges */}
@@ -280,7 +284,7 @@ export function AiPipelineStatus() {
             {/* Countdown */}
             <span className="text-xs text-muted-foreground font-mono hidden sm:block" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
               <Clock size={10} className="inline me-1 opacity-60" />
-              {formatCountdown(msUntilNext, isAr)}
+              {formatCountdown(msUntilNext, isAr, isRunning)}
             </span>
             {expanded ? (
               <ChevronUp size={14} className="text-muted-foreground" />
@@ -294,7 +298,7 @@ export function AiPipelineStatus() {
         <div className="sm:hidden px-5 pb-2 -mt-1">
           <span className="text-xs text-muted-foreground font-mono" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
             <Clock size={10} className="inline me-1 opacity-60" />
-            {formatCountdown(msUntilNext, isAr)}
+            {formatCountdown(msUntilNext, isAr, isRunning)}
           </span>
         </div>
 
