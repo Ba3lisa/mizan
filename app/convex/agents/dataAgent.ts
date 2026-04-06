@@ -1187,9 +1187,37 @@ export const orchestrateRefresh = internalAction({
   handler: async (ctx) => {
     console.log("[dataAgent] orchestrateRefresh started.");
 
-    // Ensure reference data is loaded before running the AI refresh.
-    // This is a no-op if all tables are already populated (zero writes).
-    await ctx.runMutation(internal.referenceData.ensureAllReferenceData, {});
+    const runId = Date.now().toString();
+
+    // Initialize pipeline progress tracking — clears old entries and creates
+    // pending rows for every step so the frontend can subscribe immediately.
+    await ctx.runMutation(internal.pipelineProgress.startRun, { runId });
+
+    // ── Step: reference_data ─────────────────────────────────────────────────
+    await ctx.runMutation(internal.pipelineProgress.updateStep, {
+      runId,
+      step: "reference_data",
+      status: "running",
+      message: "Checking reference tables...",
+      messageAr: "جارٍ التحقق من جداول المرجعية...",
+    });
+    try {
+      await ctx.runMutation(internal.referenceData.ensureAllReferenceData, {});
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "reference_data",
+        status: "success",
+        message: "Reference data verified.",
+        messageAr: "تم التحقق من البيانات المرجعية.",
+      });
+    } catch (err) {
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "reference_data",
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     // Fetch last-updated timestamps for all categories
     const lastUpdated = await ctx.runQuery(api.dataRefresh.getAllLastUpdated, {});
@@ -1218,6 +1246,13 @@ export const orchestrateRefresh = internalAction({
         console.log(
           `[dataAgent] Category "${category}" is fresh — skipping.`
         );
+        await ctx.runMutation(internal.pipelineProgress.updateStep, {
+          runId,
+          step: category,
+          status: "skipped",
+          message: "Data is fresh — no refresh needed.",
+          messageAr: "البيانات حديثة — لا حاجة للتحديث.",
+        });
         continue;
       }
 
@@ -1225,37 +1260,149 @@ export const orchestrateRefresh = internalAction({
         console.log(`[dataAgent] Category "${category}" table is EMPTY — forcing refresh.`);
       }
 
-      await refreshCategory(ctx, category);
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: category,
+        status: "running",
+        message: "Fetching...",
+        messageAr: "جارٍ الجلب...",
+      });
+
+      try {
+        await refreshCategory(ctx, category);
+        await ctx.runMutation(internal.pipelineProgress.updateStep, {
+          runId,
+          step: category,
+          status: "success",
+          message: "Done.",
+          messageAr: "اكتمل.",
+        });
+      } catch (err) {
+        await ctx.runMutation(internal.pipelineProgress.updateStep, {
+          runId,
+          step: category,
+          status: "failed",
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
 
     // Ensure reference data exists (zero cost if tables already populated)
     await ctx.runMutation(internal.referenceData.ensureAllReferenceData, {});
 
-    // Ensure constitution is complete (only runs if < 247 articles)
+    // ── Step: constitution ───────────────────────────────────────────────────
+    await ctx.runMutation(internal.pipelineProgress.updateStep, {
+      runId,
+      step: "constitution",
+      status: "running",
+      message: "Verifying articles...",
+      messageAr: "جارٍ التحقق من المواد...",
+    });
     try {
       await ctx.runAction(
         internal.agents.constitutionAgent.refreshConstitution,
         {}
       );
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "constitution",
+        status: "success",
+        message: "Articles verified.",
+        messageAr: "تم التحقق من المواد.",
+      });
     } catch (err) {
       console.warn(
         `[dataAgent] Constitution refresh failed: ${err instanceof Error ? err.message : String(err)}`
       );
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "constitution",
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
-    // After all category refreshes, generate AI economic narrative
+    // ── Step: github_issues ──────────────────────────────────────────────────
+    await ctx.runMutation(internal.pipelineProgress.updateStep, {
+      runId,
+      step: "github_issues",
+      status: "running",
+      message: "Processing community corrections...",
+      messageAr: "جارٍ معالجة التصحيحات المجتمعية...",
+    });
+    try {
+      await ctx.runAction(internal.agents.githubAgent.processGitHubIssues, {});
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "github_issues",
+        status: "success",
+        message: "Community corrections processed.",
+        messageAr: "تمت معالجة التصحيحات المجتمعية.",
+      });
+    } catch (err) {
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "github_issues",
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // ── Step: narrative ──────────────────────────────────────────────────────
+    await ctx.runMutation(internal.pipelineProgress.updateStep, {
+      runId,
+      step: "narrative",
+      status: "running",
+      message: "Generating AI economic narrative...",
+      messageAr: "جارٍ توليد السرد الاقتصادي بالذكاء الاصطناعي...",
+    });
     try {
       await generateEconomicNarrative(ctx);
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "narrative",
+        status: "success",
+        message: "Narrative generated.",
+        messageAr: "تم توليد السرد.",
+      });
     } catch (err) {
       console.warn(
         `[dataAgent] Economic narrative generation failed: ${err instanceof Error ? err.message : String(err)}`
       );
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "narrative",
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // ── Step: cleanup ────────────────────────────────────────────────────────
+    await ctx.runMutation(internal.pipelineProgress.updateStep, {
+      runId,
+      step: "cleanup",
+      status: "running",
+      message: "Compacting logs...",
+      messageAr: "جارٍ ضغط السجلات...",
+    });
+    try {
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "cleanup",
+        status: "success",
+        message: "Done.",
+        messageAr: "اكتمل.",
+      });
+    } catch (err) {
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "cleanup",
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
     console.log("[dataAgent] orchestrateRefresh completed.");
-
-    // After all category refreshes, process community corrections from GitHub
-    await ctx.runAction(internal.agents.githubAgent.processGitHubIssues, {});
 
     return null;
   },

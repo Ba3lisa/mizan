@@ -1,5 +1,6 @@
 import { query, mutation, internalMutation, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { isUrlTrusted } from "./lib/urlValidator";
 
 const categoryValidator = v.union(
   v.literal("government"),
@@ -89,10 +90,18 @@ const upsertArgs = {
   notes: v.optional(v.string()),
 };
 
-// Public mutation — used for seeding and external tooling
+// Public mutation — used for seeding and external tooling.
+// Validates that the URL belongs to a trusted domain before upserting.
 export const upsertSource = mutation({
   args: upsertArgs,
   handler: async (ctx, args) => {
+    if (!isUrlTrusted(args.url)) {
+      throw new Error(
+        `Untrusted source URL: "${args.url}". Only URLs from approved domains ` +
+          "(*.gov.eg, *.worldbank.org, *.imf.org, *.wikipedia.org, etc.) are accepted. " +
+          "See CONTRIBUTING.md for the full allowlist.",
+      );
+    }
     return await performUpsert(ctx, args);
   },
 });

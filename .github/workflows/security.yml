@@ -1,0 +1,72 @@
+name: Security Scan
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1' # Weekly Monday 6am
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci --legacy-peer-deps
+        working-directory: app
+      - name: npm audit
+        working-directory: app
+        run: npm audit --audit-level=high || true
+      - name: Check for known vulnerabilities
+        working-directory: app
+        run: npx better-npm-audit audit --level high
+
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+      - uses: github/codeql-action/analyze@v3
+
+  custom-security-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for unsafe patterns
+        run: |
+          echo "Scanning for security issues..."
+          ISSUES=0
+
+          # Check for eval() usage
+          if grep -rn "eval(" app/src/ --include="*.ts" --include="*.tsx" | grep -v "node_modules"; then
+            echo "::warning::eval() found — potential code injection"
+            ISSUES=$((ISSUES+1))
+          fi
+
+          # Check for dangerouslySetInnerHTML with user input
+          if grep -rn "dangerouslySetInnerHTML" app/src/ --include="*.tsx" | grep -v "layout.tsx" | grep -v "node_modules"; then
+            echo "::warning::dangerouslySetInnerHTML found outside layout — verify no user input"
+          fi
+
+          # Check for unvalidated URLs in fetch/redirect
+          if grep -rn "fetch(.*\burl\b" app/convex/ --include="*.ts" | grep -v "node_modules" | grep -v "const.*=.*\"https"; then
+            echo "::warning::Dynamic URL in fetch — ensure URL validation"
+          fi
+
+          # Check for SQL/NoSQL injection patterns (template literals in queries)
+          if grep -rn 'ctx\.db.*\$\{' app/convex/ --include="*.ts"; then
+            echo "::error::Template literal in database query — potential injection"
+            ISSUES=$((ISSUES+1))
+          fi
+
+          echo "Security scan complete. Issues: $ISSUES"
+          if [ "$ISSUES" -gt 0 ]; then
+            exit 1
+          fi

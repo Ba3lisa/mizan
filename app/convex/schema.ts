@@ -649,4 +649,24 @@ export default defineSchema({
     sourceUrl: v.optional(v.string()),
   })
     .index("by_agency", ["agency"]),
+
+  // PIPELINE PROGRESS — real-time tracking of AI data refresh runs
+  pipelineProgress: defineTable({
+    runId: v.string(),
+    step: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("success"),
+      v.literal("failed"),
+      v.literal("skipped")
+    ),
+    message: v.optional(v.string()),
+    messageAr: v.optional(v.string()),
+    recordsUpdated: v.optional(v.number()),
+    startedAt: v.optional(v.number()),
+    completedAt: v.optional(v.number()),
+    error: v.optional(v.string()),
+  })
+    .index("by_runId", ["runId"]),
 });

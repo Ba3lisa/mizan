@@ -9,6 +9,7 @@ import {
 import { useLanguage } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { AiPipelineStatus } from "@/components/ai-pipeline-status";
 
 function Stat({ value, label, source, sourceUrl }: {
   value: number; label: string; source: string; sourceUrl: string;
@@ -121,6 +122,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ════════ AI PIPELINE STATUS ════════ */}
+      <AiPipelineStatus />
 
       {/* ════════ FEATURES ════════ */}
       <section className="container-page py-16 md:py-24">

@@ -10,12 +10,14 @@ import { Id } from "../_generated/dataModel";
 
 import { callClaude } from "./providers/anthropic";
 import { classifySource } from "./council";
+import { sanitizeHtml, isUrlTrusted } from "../lib/urlValidator";
 
 const GITHUB_REPO = "Ba3lisa/mizan";
 const GITHUB_API = "https://api.github.com";
 const BATCH_LIMIT = 10;
 const SPAM_AUTHOR_THRESHOLD = 3;
 const MIN_ACCOUNT_AGE_DAYS = 7;
+const MAX_ISSUE_BODY_LENGTH = 10_000;
 
 // ─── GITHUB API HELPER ───────────────────────────────────────────────────────
 
@@ -141,6 +143,24 @@ async function processDataIssue(
   batchId: string
 ): Promise<void> {
   console.log(`[githubAgent] Processing data issue #${issue.number}: ${issue.title}`);
+
+  // ── Input sanitization ──────────────────────────────────────────────────
+  // Strip HTML tags and enforce size limits on untrusted input.
+  issue.title = sanitizeHtml(issue.title, 500);
+  issue.body = sanitizeHtml(issue.body, MAX_ISSUE_BODY_LENGTH);
+
+  if (issue.body.length === 0) {
+    console.warn(`[githubAgent] Issue #${issue.number} has empty body after sanitization, skipping`);
+    await ctx.runMutation(internal.githubIssueQueries.recordIssue, {
+      issueNumber: issue.number,
+      issueType: "data" as const,
+      status: "spam" as const,
+      authorUsername: issue.user?.login ?? "unknown",
+      batchId,
+    });
+    return;
+  }
+
   const authorUsername = issue.user?.login ?? "unknown";
 
   // Spam check: rate limit per author
@@ -231,7 +251,20 @@ Issue body: ${issue.body}`
   const dataPoint = typeof parsed.dataPoint === "string" ? parsed.dataPoint : "";
   const correctValue = typeof parsed.correctValue === "string" ? parsed.correctValue : undefined;
   const currentValue = typeof parsed.currentValue === "string" ? parsed.currentValue : undefined;
-  const sourceUrl = typeof parsed.sourceUrl === "string" ? parsed.sourceUrl : undefined;
+  const rawSourceUrl = typeof parsed.sourceUrl === "string" ? parsed.sourceUrl : undefined;
+
+  // Validate source URL against the trusted-domain allowlist
+  let sourceUrl: string | undefined;
+  if (rawSourceUrl) {
+    if (isUrlTrusted(rawSourceUrl)) {
+      sourceUrl = rawSourceUrl;
+    } else {
+      console.warn(
+        `[githubAgent] Issue #${issue.number}: rejected untrusted source URL "${rawSourceUrl}"`,
+      );
+      sourceUrl = undefined;
+    }
+  }
 
   // Update processing record with parsed data
   await ctx.runMutation(internal.githubIssueQueries.updateIssueParsedData, {

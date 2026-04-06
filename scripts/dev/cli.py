@@ -5,7 +5,7 @@ from __future__ import annotations
 import typer
 
 from dev import __version__
-from dev.commands import bug, db, deploy, health, infra, release, start
+from dev.commands import bug, db, deploy, health, infra, release, security, start
 
 app = typer.Typer(
     name="dev",
@@ -53,6 +53,7 @@ _groups = [
     (release.app, "release"),
     (health.app, "health"),
     (infra.app, "infra"),
+    (security.app, "security"),
 ]
 
 for sub_app, name in _groups:
