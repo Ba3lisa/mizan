@@ -42,7 +42,7 @@ interface BudgetCategory {
 }
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
-// TODO: Replace revenue/spending/HISTORICAL_DATA arrays with Convex queries once
+// TODO: Replace revenue/spending/chartData arrays with Convex queries once
 // getBudgetBreakdown (requires fiscalYearId) and getBudgetSankeyData are wired up.
 // The flat budgetItems schema needs restructuring to match BudgetCategory with subItems.
 
@@ -154,12 +154,7 @@ const FISCAL_YEAR_POPULATION: Record<FiscalYear, number> = {
   "2022-2023": 103_000_000,
 };
 
-// Historical totals for YoY chart
-const HISTORICAL_DATA = [
-  { year: "2022-2023", revenue: 1068, spending: 1774 },
-  { year: "2023-2024", revenue: 1252, spending: 2055 },
-  { year: "2024-2025", revenue: 1474, spending: 2565 },
-];
+// Historical data removed -- YearComparisonChart now reads from Convex fiscal years
 
 // ─── Nivo Sankey Visualization ────────────────────────────────────────────────
 
@@ -217,6 +212,14 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  if (nodes.length === 0 || validLinks.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[400px] text-muted-foreground text-sm">
+        {isAr ? "لا توجد بيانات ميزانية متاحة بعد" : "No budget data available yet"}
+      </div>
+    );
+  }
+
   return (
     <div className={isMobile ? "overflow-x-auto" : ""} dir="ltr">
       <div className={isMobile ? "min-w-[900px] h-[700px]" : "h-[700px]"}>
@@ -249,18 +252,30 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
         labelOrientation="horizontal"
         labelPadding={isMobile ? 6 : 12}
         labelTextColor={{ from: "color", modifiers: [["brighter", 1]] }}
-        nodeTooltip={({ node }) => (
-          <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg text-sm">
-            <p className="font-bold text-foreground">{node.label}</p>
-            <p className="font-mono text-xs text-muted-foreground">{fmtAmount(node.value)}</p>
-          </div>
-        )}
-        linkTooltip={({ link }) => (
-          <div className="bg-card border border-border rounded-lg px-3 py-2 shadow-lg text-sm">
-            <p className="text-foreground">{link.source.label} → {link.target.label}</p>
-            <p className="font-mono text-xs text-muted-foreground">{fmtAmount(link.value)}</p>
-          </div>
-        )}
+        nodeTooltip={({ node }) => {
+          const pct = totalBudget > 0 ? ((node.value / totalBudget) * 100).toFixed(1) : "0";
+          return (
+            <div className="bg-card border border-border rounded-lg px-3 py-2.5 shadow-lg min-w-[140px]">
+              <p className="font-bold text-foreground text-sm mb-1">{node.label}</p>
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="font-mono text-sm font-bold text-primary">{fmtAmount(node.value)}</span>
+                <span className="font-mono text-xs text-muted-foreground">{pct}%</span>
+              </div>
+            </div>
+          );
+        }}
+        linkTooltip={({ link }) => {
+          const pct = totalBudget > 0 ? ((link.value / totalBudget) * 100).toFixed(1) : "0";
+          return (
+            <div className="bg-card border border-border rounded-lg px-3 py-2.5 shadow-lg min-w-[160px]">
+              <p className="text-foreground text-xs mb-1.5">{link.source.label} → {link.target.label}</p>
+              <div className="flex items-baseline justify-between gap-4">
+                <span className="font-mono text-sm font-bold text-primary">{fmtAmount(link.value)}</span>
+                <span className="font-mono text-xs text-muted-foreground">{pct}%</span>
+              </div>
+            </div>
+          );
+        }}
         colors={(node) => (node as { color?: string }).color ?? "#666"}
         theme={{
           text: { fill: "var(--muted-foreground)", fontSize: 10, fontFamily: "var(--font-sans)" },
@@ -279,6 +294,16 @@ function YearComparisonChart() {
   const { fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
 
+  // Use Convex fiscal years for year comparison -- no hardcoded data
+  const convexFYs = useQuery(api.budget.listFiscalYears);
+  const chartData = convexFYs
+    ? convexFYs.map((fy) => ({
+        year: fy.year.replace("/", "-").slice(0, 4),
+        revenue: fy.totalRevenue ?? 0,
+        spending: fy.totalExpenditure ?? 0,
+      }))
+    : [];
+
   const svgW = 600;
   const svgH = 260;
   const padL = 60;
@@ -288,8 +313,16 @@ function YearComparisonChart() {
   const innerW = svgW - padL - padR;
   const innerH = svgH - padT - padB;
 
-  const maxVal = Math.max(...HISTORICAL_DATA.map((y) => Math.max(y.revenue, y.spending)));
-  const groupW = innerW / HISTORICAL_DATA.length;
+  if (chartData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[260px] text-muted-foreground text-sm">
+        {isAr ? "لا توجد بيانات مقارنة متاحة" : "No comparison data available"}
+      </div>
+    );
+  }
+
+  const maxVal = Math.max(...chartData.map((y) => Math.max(y.revenue, y.spending)));
+  const groupW = innerW / chartData.length;
   const barW = groupW * 0.28;
   const gap = groupW * 0.08;
 
@@ -329,7 +362,7 @@ function YearComparisonChart() {
           })}
 
           {/* Bars */}
-          {HISTORICAL_DATA.map((yr, i) => {
+          {chartData.map((yr, i) => {
             const cx = padL + i * groupW + groupW / 2;
             const revH = (yr.revenue / maxVal) * innerH;
             const expH = (yr.spending / maxVal) * innerH;
@@ -592,18 +625,24 @@ export default function BudgetPage() {
   const { symbol, fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
 
-  const [selectedYearStr, setSelectedYearStr] = useState<string>("2024/2025");
+  const [selectedYearStr, setSelectedYearStr] = useState<string>("");
 
   // ─── Convex queries ───────────────────────────────────────────────────────
   const convexFiscalYears = useQuery(api.budget.listFiscalYears);
   const _isLoading = convexFiscalYears === undefined;
 
-  // Find the selected fiscal year from Convex
-  const selectedFY = convexFiscalYears?.find((fy) => fy.year === selectedYearStr)
-    ?? convexFiscalYears?.[0]; // fallback to latest
+  // Sort newest first for dropdown
+  const sortedFYs = convexFiscalYears
+    ? [...convexFiscalYears].sort((a, b) => b.year.localeCompare(a.year))
+    : [];
 
-  // Update selectedYearStr if Convex data arrived and current selection doesn't exist
-  const yearOptions = convexFiscalYears?.map((fy) => fy.year) ?? [];
+  // Default to latest fiscal year
+  const effectiveYear = selectedYearStr || sortedFYs[0]?.year || "";
+
+  // Find the selected fiscal year from Convex
+  const selectedFY = sortedFYs.find((fy) => fy.year === effectiveYear);
+
+  const yearOptions = sortedFYs.map((fy) => fy.year);
 
   // Get budget breakdown for selected fiscal year
   const convexBreakdown = useQuery(
@@ -670,7 +709,7 @@ export default function BudgetPage() {
 
           <div className="flex items-center gap-3 shrink-0 flex-wrap">
             <span className="text-sm text-muted-foreground">{t.fiscalYear}</span>
-            <Select value={selectedYearStr} onValueChange={(v) => setSelectedYearStr(v)}>
+            <Select value={effectiveYear} onValueChange={(v) => setSelectedYearStr(v)}>
               <SelectTrigger className="w-36 text-sm">
                 <SelectValue />
               </SelectTrigger>

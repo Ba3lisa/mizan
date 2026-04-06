@@ -153,10 +153,13 @@ export const getDataOverview = query({
       const lastRefreshAt = logEntry
         ? (logEntry.completedAt ?? logEntry.startedAt)
         : null;
+      // If no pipeline log exists but data is present (loaded by reference data), treat as success
       const lastRefreshStatus =
         logEntry &&
         (logEntry.status === "success" || logEntry.status === "failed")
           ? logEntry.status
+          : records.length > 0
+          ? ("success" as const)
           : null;
 
       return {
