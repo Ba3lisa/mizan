@@ -32,7 +32,11 @@ async function fetchMemberPage(id: number): Promise<string | null> {
     const html = await response.text();
     // Skip empty/error pages
     if (html.length < 1000 || html.includes("Object moved")) return null;
-    return html.slice(0, 8000); // Trim for Claude
+    // The member data is deep in the HTML (after CSS/JS). Find the content area.
+    const contentStart = html.indexOf("ContentPlaceHolder1");
+    if (contentStart === -1) return null;
+    // Extract a window around the content area
+    return html.slice(Math.max(0, contentStart - 500), contentStart + 5000);
   } catch {
     return null;
   }
@@ -84,7 +88,12 @@ export const scrapeMemberBatch = internalAction({
       scraped++;
 
       const member = await parseMemberHtml(html);
-      if (!member || !member.nameAr) continue;
+      if (!member || !member.nameAr) {
+        console.warn(`[parliamentScraper] Failed to parse member id=${id}, member=${JSON.stringify(member)}`);
+        continue;
+      }
+      console.log(`[parliamentScraper] Parsed: ${member.nameEn} (${member.party})`);
+
 
       // Save to Convex
       await ctx.runMutation(internal.parliamentQueries.upsertMember, {
