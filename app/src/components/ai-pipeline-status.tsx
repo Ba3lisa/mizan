@@ -255,7 +255,7 @@ export function AiPipelineStatus() {
               <Bot size={14} className="text-primary opacity-70" />
             )}
             <span className="text-sm font-semibold">
-              {isAr ? "حالة خط أنابيب البيانات" : "AI Data Pipeline"}
+              {isAr ? "حالة تدفق البيانات (الذكاء الاصطناعي)" : "AI Data Pipeline"}
             </span>
 
             {/* Status badges */}
