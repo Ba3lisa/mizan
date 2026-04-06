@@ -23,6 +23,7 @@ export const SANAD_CONFIG: Record<
     weight: number;
   }
 > = {
+  0: { dot: "bg-teal-500", labelEn: "Consensus", labelAr: "إجماع", weight: 6 },
   1: { dot: "bg-emerald-500", labelEn: "Official Gov", labelAr: "حكومي رسمي", weight: 5 },
   2: { dot: "bg-blue-500", labelEn: "Intl Org", labelAr: "منظمة دولية", weight: 4 },
   3: { dot: "bg-amber-500", labelEn: "News", labelAr: "إعلام", weight: 3 },

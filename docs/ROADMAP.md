@@ -2,7 +2,7 @@
 
 Public roadmap for Mizan -- Egypt's government, made visible.
 
-Last updated: 2026-04-06
+Last updated: 2026-04-07
 
 ---
 
@@ -24,7 +24,7 @@ The foundation: a fully functional transparency platform covering all major bran
 - **Pipeline Health Monitoring** -- GitHub Actions workflow (`health-check.yml`) runs every 12 hours, creates issues if any data category has not refreshed in 48 hours
 - **Source Citations** -- Every data point on the platform links to its original source URL; no number exists without a citation
 
-## v1.1 -- In Progress
+## v1.1 -- Shipped
 
 Community verification infrastructure and open source readiness.
 
@@ -35,12 +35,24 @@ Community verification infrastructure and open source readiness.
 - **Open Source Project Infrastructure** -- Contributing guide, issue templates, code of conduct, and CI/CD pipeline for community contributions
 - **Agent-Driven Development Documentation** -- Full documentation of how AI agents write, review, and verify code and data in this project
 
-## v1.2 -- Planned
+## v1.2 -- Shipped
+
+Multi-source Sanad reference confidence system and governorate stats pipeline.
+
+- **Sanad (سند) System** -- 6-level reference confidence system (Consensus, Official Gov, Intl Org, News, Other, Derived) applied to every data point across the platform. Colored dots next to numbers indicate source trust level.
+- **Governorate Stats Pipeline** -- New `governorate_stats` pipeline category fetching population, area, density, and HDI from Wikipedia (CAPMAS-sourced). Parses wikitables and fuzzy-matches all 27 governorates.
+- **Multi-Source Display** -- When multiple sources report different values for the same indicator, all values are shown side-by-side with Sanad badges and source links. Weighted consensus detection (score ≥ 6) identifies when sources agree.
+- **Shared Sanad Components** -- `SanadBadge` (inline dot), `SanadValue` (3-mode: single/consensus/conflict), shared `sanad.ts` library with consensus scoring
+- **sanadLevel on All Tables** -- Required field on economicIndicators, debtRecords, fiscalYears, budgetItems, officials, elections, electionResults, taxBrackets, sovereignRatings, governorateStats, dataSources
+- **Homepage Live Stats** -- Replaced hardcoded stats with live Convex queries (total parliamentarians, governorates, constitution articles, external debt)
+- **Economy Multi-Source** -- economicIndicators supports multiple sources per indicator+date with `getAllLatestMultiSource` query
+
+## v1.3 -- Planned
 
 Personal relevance and economic context.
 
-- **/economy** -- Economic indicators dashboard tracking GDP growth, inflation (CPI), unemployment, EGP exchange rates, foreign reserves, Suez Canal revenue, tourism revenue, and diaspora remittances
 - **Multi-Model LLM Council** -- Expand the council beyond Claude to include OpenAI and Google models for more robust consensus on data verification
+- **LLM-Guided Sanad Scoring** -- Replace manual Sanad level assignment (the only opinionated part of Mizan) with automated LLM Council-based confidence scoring. The council will cross-reference sources, detect conflicts, and assign Sanad levels through multi-model consensus voting.
 - **UI Contribution Agent** -- Automated feasibility analysis for community-proposed UI changes, generating effort estimates and implementation plans
 
 ## v2.0 -- Future

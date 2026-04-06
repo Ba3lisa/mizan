@@ -77,10 +77,10 @@ export default function HomePage() {
   const homeStats = useQuery(api.government.getHomeStats);
 
   const liveStats = homeStats ? [
-    { value: homeStats.parliamentarians.value, ar: "عضو برلمان", en: "Parliamentarians", source: homeStats.parliamentarians.source, url: homeStats.parliamentarians.sourceUrl, sanadLevel: homeStats.parliamentarians.sanadLevel },
+    { value: homeStats.parliamentarians.value, ar: "إجمالي أعضاء البرلمان", en: "Total Parliamentarians", source: homeStats.parliamentarians.source, url: homeStats.parliamentarians.sourceUrl, sanadLevel: homeStats.parliamentarians.sanadLevel },
     { value: homeStats.governorates.value, ar: "محافظة", en: "Governorates", source: homeStats.governorates.source, url: homeStats.governorates.sourceUrl, sanadLevel: homeStats.governorates.sanadLevel },
     { value: homeStats.constitutionArticles.value, ar: "مادة دستورية", en: "Constitutional Articles", source: homeStats.constitutionArticles.source, url: homeStats.constitutionArticles.sourceUrl, sanadLevel: homeStats.constitutionArticles.sanadLevel },
-    ...(homeStats.externalDebt ? [{ value: homeStats.externalDebt.value / 1_000_000_000, ar: "مليار ديون خارجية", en: "B External Debt", source: homeStats.externalDebt.source, url: homeStats.externalDebt.sourceUrl, currencyUnit: "usd" as const, sanadLevel: homeStats.externalDebt.sanadLevel }] : []),
+    ...(homeStats.externalDebt ? [{ value: homeStats.externalDebt.value, ar: "مليار ديون خارجية", en: "B External Debt", source: homeStats.externalDebt.source, url: homeStats.externalDebt.sourceUrl, currencyUnit: "usd" as const, sanadLevel: homeStats.externalDebt.sanadLevel }] : []),
   ] : null;
 
   return (

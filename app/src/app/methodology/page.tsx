@@ -188,7 +188,7 @@ export default function MethodologyPage() {
               : "Every data point on Mizan carries a Sanad level indicating its source and confidence. When sources disagree, we show all values."}
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
             {[
               {
                 level: 1,
@@ -240,11 +240,21 @@ export default function MethodologyPage() {
                 dot: "bg-violet-500",
                 textColor: "text-violet-600 dark:text-violet-400",
               },
+              {
+                level: 0,
+                labelAr: "إجماع",
+                labelEn: "Consensus",
+                descAr: "مصادر متعددة تتفق على نفس القيمة — أعلى مستوى ثقة (مرجّح بوزن السند)",
+                descEn: "Multiple sources agree on the same value — highest confidence (weighted by Sanad level)",
+                color: "border-teal-500/30 bg-teal-500/5",
+                dot: "bg-teal-500",
+                textColor: "text-teal-600 dark:text-teal-400",
+              },
             ].map((lvl) => (
               <Card key={lvl.level} className={cn("border", lvl.color)}>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[0.6rem] font-mono text-muted-foreground/60">{lvl.level}</span>
+                    <span className="text-[0.6rem] font-mono text-muted-foreground/60">{lvl.level === 0 ? "✓" : lvl.level}</span>
                     <span className={cn("w-2 h-2 rounded-full", lvl.dot)} />
                     <span className={cn("text-xs font-bold", lvl.textColor)}>
                       {isAr ? lvl.labelAr : lvl.labelEn}
