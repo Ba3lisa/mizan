@@ -2,7 +2,6 @@
 import { internalAction, ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
-import { v } from "convex/values";
 
 const GITHUB_REPO = "Ba3lisa/mizan";
 const GITHUB_API = "https://api.github.com";

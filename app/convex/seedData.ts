@@ -1,13 +1,13 @@
-import { internalMutation } from "./_generated/server";
-import { v } from "convex/values";
+import { internalMutation, mutation } from "./_generated/server";
 import { Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 
 export const seed = internalMutation({
   args: {},
   handler: async (ctx) => {
     // ─── OFFICIALS ──────────────────────────────────────────────────────────────
 
-    const presidentId = await ctx.db.insert("officials", {
+    const _presidentId = await ctx.db.insert("officials", {
       nameAr: "عبد الفتاح السيسي",
       nameEn: "Abdel Fattah el-Sisi",
       titleAr: "رئيس جمهورية مصر العربية",
@@ -22,7 +22,7 @@ export const seed = internalMutation({
       sourceUrl: "https://www.presidency.eg",
     });
 
-    const pmId = await ctx.db.insert("officials", {
+    const _pmId = await ctx.db.insert("officials", {
       nameAr: "مصطفى مدبولي",
       nameEn: "Mostafa Madbouly",
       titleAr: "رئيس مجلس الوزراء",
@@ -38,113 +38,209 @@ export const seed = internalMutation({
     });
 
     // Cabinet ministers (2024)
+    // Index map:
+    //  0: Interior,  1: Finance,  2: Trade & Industry,  3: Health,
+    //  4: Education,  5: Higher Education,  6: Electricity,  7: Petroleum,
+    //  8: Transport,  9: Housing,  10: Tourism,  11: Youth & Sports,
+    //  12: Planning,  13: International Cooperation,  14: Communications,
+    //  15: Defence,  16: Foreign Affairs,  17: Justice,
+    //  18: Military Production,  19: Agriculture,  20: Culture,
+    //  21: Social Solidarity,  22: Water Resources,  23: Labour,
+    //  24: Endowments,  25: Local Development,  26: Investment
     const ministerData: Array<{
       nameAr: string;
       nameEn: string;
       titleAr: string;
       titleEn: string;
     }> = [
+      // 0
       {
         nameAr: "محمد سامي عبد العزيز",
         nameEn: "Mohamed Samy Abdel Aziz",
         titleAr: "وزير الداخلية",
         titleEn: "Minister of Interior",
       },
+      // 1
       {
         nameAr: "بدر عامر",
         nameEn: "Badr Amer",
         titleAr: "وزير المالية",
         titleEn: "Minister of Finance",
       },
+      // 2
       {
         nameAr: "بدر عبادي",
         nameEn: "Badr Abadi",
         titleAr: "وزير التجارة والصناعة",
         titleEn: "Minister of Trade and Industry",
       },
+      // 3
       {
         nameAr: "خالد عبد الغفار",
         nameEn: "Khaled Abdel-Ghaffar",
         titleAr: "وزير الصحة والسكان",
         titleEn: "Minister of Health and Population",
       },
+      // 4
       {
         nameAr: "أحمد عبدون",
         nameEn: "Ahmed Abdoun",
         titleAr: "وزير التعليم",
         titleEn: "Minister of Education",
       },
+      // 5
       {
         nameAr: "محمد أيمن عاشور",
         nameEn: "Mohamed Ayman Ashour",
         titleAr: "وزير التعليم العالي والبحث العلمي",
         titleEn: "Minister of Higher Education and Scientific Research",
       },
+      // 6
       {
         nameAr: "كريم بدوي",
         nameEn: "Karim Badawi",
         titleAr: "وزير الكهرباء والطاقة المتجددة",
         titleEn: "Minister of Electricity and Renewable Energy",
       },
+      // 7
       {
         nameAr: "طارق الملا",
         nameEn: "Tarek El-Molla",
         titleAr: "وزير البترول والثروة المعدنية",
         titleEn: "Minister of Petroleum and Mineral Resources",
       },
+      // 8
       {
         nameAr: "عصام الكروي",
         nameEn: "Essam El-Kuruwy",
         titleAr: "وزير النقل",
         titleEn: "Minister of Transport",
       },
+      // 9
       {
         nameAr: "شريف الشربيني",
         nameEn: "Sherif El-Sherbiny",
         titleAr: "وزير الإسكان والمرافق والمجتمعات العمرانية",
         titleEn: "Minister of Housing, Utilities and Urban Communities",
       },
+      // 10
       {
         nameAr: "أحمد عيسى",
         nameEn: "Ahmed Issa",
         titleAr: "وزير السياحة والآثار",
         titleEn: "Minister of Tourism and Antiquities",
       },
+      // 11
       {
         nameAr: "سيد فرج",
         nameEn: "Sayed Farag",
         titleAr: "وزير الشباب والرياضة",
         titleEn: "Minister of Youth and Sports",
       },
+      // 12
       {
         nameAr: "فايزة أبو النجا",
         nameEn: "Fayza Aboul Naga",
         titleAr: "وزيرة التخطيط والتنمية الاقتصادية",
         titleEn: "Minister of Planning and Economic Development",
       },
-      {
-        nameAr: "هالة زايد",
-        nameEn: "Hala Zayed",
-        titleAr: "وزيرة الصحة السابقة",
-        titleEn: "Former Minister of Health",
-      },
+      // 13
       {
         nameAr: "رانيا المشاط",
         nameEn: "Rania Al-Mashat",
         titleAr: "وزيرة التعاون الدولي",
         titleEn: "Minister of International Cooperation",
       },
+      // 14
       {
         nameAr: "عمرو طلعت",
         nameEn: "Amr Talaat",
         titleAr: "وزير الاتصالات وتكنولوجيا المعلومات",
         titleEn: "Minister of Communications and Information Technology",
       },
+      // 15
       {
-        nameAr: "محمود عصمت",
-        nameEn: "Mahmoud Esmat",
-        titleAr: "وزير الكهرباء والطاقة",
-        titleEn: "Minister of Electricity and Energy",
+        nameAr: "محمد زكي",
+        nameEn: "Mohamed Zaki",
+        titleAr: "وزير الدفاع والإنتاج الحربي",
+        titleEn: "Minister of Defence and Military Production",
+      },
+      // 16
+      {
+        nameAr: "بدر عبد العاطي",
+        nameEn: "Badr Abdelatty",
+        titleAr: "وزير الخارجية والهجرة",
+        titleEn: "Minister of Foreign Affairs and Emigration",
+      },
+      // 17
+      {
+        nameAr: "عدنان الفنجري",
+        nameEn: "Adnan El-Fangary",
+        titleAr: "وزير العدل",
+        titleEn: "Minister of Justice",
+      },
+      // 18
+      {
+        nameAr: "محمد أحمد مرسي",
+        nameEn: "Mohamed Ahmed Morsi",
+        titleAr: "وزير الإنتاج الحربي",
+        titleEn: "Minister of Military Production",
+      },
+      // 19
+      {
+        nameAr: "علاء فاروق",
+        nameEn: "Alaa Farouk",
+        titleAr: "وزير الزراعة واستصلاح الأراضي",
+        titleEn: "Minister of Agriculture and Land Reclamation",
+      },
+      // 20
+      {
+        nameAr: "أحمد فؤاد هنو",
+        nameEn: "Ahmed Fouad Hano",
+        titleAr: "وزير الثقافة",
+        titleEn: "Minister of Culture",
+      },
+      // 21
+      {
+        nameAr: "مايا مرسي",
+        nameEn: "Maya Morsi",
+        titleAr: "وزيرة التضامن الاجتماعي",
+        titleEn: "Minister of Social Solidarity",
+      },
+      // 22
+      {
+        nameAr: "هاني سويلم",
+        nameEn: "Hani Sewilam",
+        titleAr: "وزير الموارد المائية والري",
+        titleEn: "Minister of Water Resources and Irrigation",
+      },
+      // 23
+      {
+        nameAr: "أحمد سبوع",
+        nameEn: "Ahmed Sabour",
+        titleAr: "وزير العمل",
+        titleEn: "Minister of Labour",
+      },
+      // 24
+      {
+        nameAr: "أسامة الأزهري",
+        nameEn: "Osama El-Azhari",
+        titleAr: "وزير الأوقاف",
+        titleEn: "Minister of Endowments",
+      },
+      // 25
+      {
+        nameAr: "خالد صابر",
+        nameEn: "Khaled Saber",
+        titleAr: "وزير التنمية المحلية",
+        titleEn: "Minister of Local Development",
+      },
+      // 26
+      {
+        nameAr: "حسن الخطيب",
+        nameEn: "Hassan El-Khatib",
+        titleAr: "وزير الاستثمار والتجارة الخارجية",
+        titleEn: "Minister of Investment and Foreign Trade",
       },
     ];
 
@@ -169,7 +265,10 @@ export const seed = internalMutation({
       websiteUrl?: string;
       sortOrder: number;
       ministerIndex?: number;
+      employeeCount?: number;
+      sector?: "sovereignty" | "economic" | "social" | "infrastructure";
     }> = [
+      // ── Sovereignty ──────────────────────────────────────────────────────────
       {
         nameAr: "وزارة الداخلية",
         nameEn: "Ministry of Interior",
@@ -178,105 +277,64 @@ export const seed = internalMutation({
         websiteUrl: "https://www.moiegypt.gov.eg",
         sortOrder: 1,
         ministerIndex: 0,
+        employeeCount: 520000,
+        sector: "sovereignty",
       },
+      {
+        nameAr: "وزارة الدفاع والإنتاج الحربي",
+        nameEn: "Ministry of Defence and Military Production",
+        mandateEn: "Oversees the Egyptian Armed Forces and military manufacturing.",
+        mandateAr: "تشرف على القوات المسلحة المصرية والتصنيع العسكري.",
+        websiteUrl: "https://www.mod.gov.eg",
+        sortOrder: 2,
+        ministerIndex: 15,
+        employeeCount: 450000,
+        sector: "sovereignty",
+      },
+      {
+        nameAr: "وزارة الخارجية والهجرة",
+        nameEn: "Ministry of Foreign Affairs and Emigration",
+        mandateEn: "Manages Egypt's foreign policy, diplomacy, and diaspora affairs.",
+        mandateAr: "تدير السياسة الخارجية المصرية والدبلوماسية وشؤون المغتربين.",
+        websiteUrl: "https://www.mfa.gov.eg",
+        sortOrder: 3,
+        ministerIndex: 16,
+        employeeCount: 8200,
+        sector: "sovereignty",
+      },
+      {
+        nameAr: "وزارة العدل",
+        nameEn: "Ministry of Justice",
+        mandateEn: "Oversees the judicial system, courts, and legal affairs.",
+        mandateAr: "تشرف على الجهاز القضائي والمحاكم والشؤون القانونية.",
+        websiteUrl: "https://www.moj.gov.eg",
+        sortOrder: 4,
+        ministerIndex: 17,
+        employeeCount: 55000,
+        sector: "sovereignty",
+      },
+      {
+        nameAr: "وزارة الإنتاج الحربي",
+        nameEn: "Ministry of Military Production",
+        mandateEn: "Manages state military factories and defence industrial production.",
+        mandateAr: "تدير المصانع الحربية الحكومية والإنتاج الصناعي الدفاعي.",
+        websiteUrl: "https://www.momp.gov.eg",
+        sortOrder: 5,
+        ministerIndex: 18,
+        employeeCount: 40000,
+        sector: "sovereignty",
+      },
+      // ── Economic ─────────────────────────────────────────────────────────────
       {
         nameAr: "وزارة المالية",
         nameEn: "Ministry of Finance",
         mandateEn: "Manages state budget, taxation, and public debt.",
         mandateAr: "تدير الموازنة العامة للدولة والضرائب والدين العام.",
         websiteUrl: "https://www.mof.gov.eg",
-        sortOrder: 2,
-        ministerIndex: 1,
-      },
-      {
-        nameAr: "وزارة التجارة والصناعة",
-        nameEn: "Ministry of Trade and Industry",
-        mandateEn: "Oversees industrial development, trade policy, and exports.",
-        mandateAr: "تشرف على التنمية الصناعية وسياسة التجارة والصادرات.",
-        websiteUrl: "https://www.mti.gov.eg",
-        sortOrder: 3,
-        ministerIndex: 2,
-      },
-      {
-        nameAr: "وزارة الصحة والسكان",
-        nameEn: "Ministry of Health and Population",
-        mandateEn: "Provides public health services and manages healthcare policy.",
-        mandateAr: "تقدم خدمات الصحة العامة وتدير سياسة الرعاية الصحية.",
-        websiteUrl: "https://www.mohp.gov.eg",
-        sortOrder: 4,
-        ministerIndex: 3,
-      },
-      {
-        nameAr: "وزارة التربية والتعليم",
-        nameEn: "Ministry of Education",
-        mandateEn: "Manages pre-university education and curricula.",
-        mandateAr: "تدير التعليم قبل الجامعي والمناهج الدراسية.",
-        websiteUrl: "https://www.moe.gov.eg",
-        sortOrder: 5,
-        ministerIndex: 4,
-      },
-      {
-        nameAr: "وزارة التعليم العالي والبحث العلمي",
-        nameEn: "Ministry of Higher Education and Scientific Research",
-        mandateEn: "Oversees universities, research institutes, and scholarships.",
-        mandateAr: "تشرف على الجامعات ومعاهد البحث والمنح الدراسية.",
-        websiteUrl: "https://www.mohesr.gov.eg",
         sortOrder: 6,
-        ministerIndex: 5,
-      },
-      {
-        nameAr: "وزارة الكهرباء والطاقة المتجددة",
-        nameEn: "Ministry of Electricity and Renewable Energy",
-        mandateEn: "Manages electricity generation, distribution, and renewable energy projects.",
-        mandateAr: "تدير توليد الكهرباء وتوزيعها ومشاريع الطاقة المتجددة.",
-        websiteUrl: "https://www.moee.gov.eg",
-        sortOrder: 7,
-        ministerIndex: 6,
-      },
-      {
-        nameAr: "وزارة البترول والثروة المعدنية",
-        nameEn: "Ministry of Petroleum and Mineral Resources",
-        mandateEn: "Oversees oil and gas sector, exploration, and mineral resources.",
-        mandateAr: "تشرف على قطاع النفط والغاز والاستكشاف والموارد المعدنية.",
-        websiteUrl: "https://www.petroleum.gov.eg",
-        sortOrder: 8,
-        ministerIndex: 7,
-      },
-      {
-        nameAr: "وزارة النقل",
-        nameEn: "Ministry of Transport",
-        mandateEn: "Manages road, rail, aviation, and maritime transport infrastructure.",
-        mandateAr: "تدير البنية التحتية للنقل البري والسكك الحديدية والجوي والبحري.",
-        websiteUrl: "https://www.mot.gov.eg",
-        sortOrder: 9,
-        ministerIndex: 8,
-      },
-      {
-        nameAr: "وزارة الإسكان والمرافق والمجتمعات العمرانية",
-        nameEn: "Ministry of Housing, Utilities and Urban Communities",
-        mandateEn: "Responsible for housing policy, urban planning, water, and sanitation.",
-        mandateAr: "مسؤولة عن سياسة الإسكان والتخطيط العمراني والمياه والصرف الصحي.",
-        websiteUrl: "https://www.mhuc.gov.eg",
-        sortOrder: 10,
-        ministerIndex: 9,
-      },
-      {
-        nameAr: "وزارة السياحة والآثار",
-        nameEn: "Ministry of Tourism and Antiquities",
-        mandateEn: "Promotes tourism and protects Egypt's archaeological heritage.",
-        mandateAr: "تروج للسياحة وتحمي الموروث الأثري المصري.",
-        websiteUrl: "https://www.antiquities.gov.eg",
-        sortOrder: 11,
-        ministerIndex: 10,
-      },
-      {
-        nameAr: "وزارة الشباب والرياضة",
-        nameEn: "Ministry of Youth and Sports",
-        mandateEn: "Manages youth centers, sports facilities, and national sports policy.",
-        mandateAr: "تدير مراكز الشباب والمنشآت الرياضية وسياسة الرياضة الوطنية.",
-        websiteUrl: "https://www.moys.gov.eg",
-        sortOrder: 12,
-        ministerIndex: 11,
+        ministerIndex: 1,
+        employeeCount: 78000,
+        sector: "economic",
       },
       {
         nameAr: "وزارة التخطيط والتنمية الاقتصادية",
@@ -284,17 +342,32 @@ export const seed = internalMutation({
         mandateEn: "Formulates national development plans and economic policy.",
         mandateAr: "تضع خطط التنمية الوطنية والسياسة الاقتصادية.",
         websiteUrl: "https://www.mped.gov.eg",
-        sortOrder: 13,
+        sortOrder: 7,
         ministerIndex: 12,
+        employeeCount: 6000,
+        sector: "economic",
       },
       {
-        nameAr: "وزارة التعاون الدولي",
-        nameEn: "Ministry of International Cooperation",
-        mandateEn: "Manages foreign aid, development finance, and international partnerships.",
-        mandateAr: "تدير المساعدات الأجنبية وتمويل التنمية والشراكات الدولية.",
-        websiteUrl: "https://www.moic.gov.eg",
-        sortOrder: 14,
-        ministerIndex: 14,
+        nameAr: "وزارة التجارة والصناعة",
+        nameEn: "Ministry of Trade and Industry",
+        mandateEn: "Oversees industrial development, trade policy, and exports.",
+        mandateAr: "تشرف على التنمية الصناعية وسياسة التجارة والصادرات.",
+        websiteUrl: "https://www.mti.gov.eg",
+        sortOrder: 8,
+        ministerIndex: 2,
+        employeeCount: 35000,
+        sector: "economic",
+      },
+      {
+        nameAr: "وزارة الاستثمار والتجارة الخارجية",
+        nameEn: "Ministry of Investment and Foreign Trade",
+        mandateEn: "Promotes investment, manages free zones, and oversees foreign trade.",
+        mandateAr: "تعزز الاستثمار وتدير المناطق الحرة وتشرف على التجارة الخارجية.",
+        websiteUrl: "https://www.investment.gov.eg",
+        sortOrder: 9,
+        ministerIndex: 26,
+        employeeCount: 4500,
+        sector: "economic",
       },
       {
         nameAr: "وزارة الاتصالات وتكنولوجيا المعلومات",
@@ -302,8 +375,200 @@ export const seed = internalMutation({
         mandateEn: "Oversees telecoms, digital transformation, and ICT sector.",
         mandateAr: "تشرف على الاتصالات والتحول الرقمي وقطاع تكنولوجيا المعلومات.",
         websiteUrl: "https://www.mcit.gov.eg",
+        sortOrder: 10,
+        ministerIndex: 14,
+        employeeCount: 18000,
+        sector: "economic",
+      },
+      {
+        nameAr: "وزارة الزراعة واستصلاح الأراضي",
+        nameEn: "Ministry of Agriculture and Land Reclamation",
+        mandateEn: "Oversees agricultural policy, food security, and land reclamation.",
+        mandateAr: "تشرف على السياسة الزراعية والأمن الغذائي واستصلاح الأراضي.",
+        websiteUrl: "https://www.agri.gov.eg",
+        sortOrder: 11,
+        ministerIndex: 19,
+        employeeCount: 72000,
+        sector: "economic",
+      },
+      {
+        nameAr: "وزارة البترول والثروة المعدنية",
+        nameEn: "Ministry of Petroleum and Mineral Resources",
+        mandateEn: "Oversees oil and gas sector, exploration, and mineral resources.",
+        mandateAr: "تشرف على قطاع النفط والغاز والاستكشاف والموارد المعدنية.",
+        websiteUrl: "https://www.petroleum.gov.eg",
+        sortOrder: 12,
+        ministerIndex: 7,
+        employeeCount: 115000,
+        sector: "economic",
+      },
+      {
+        nameAr: "وزارة السياحة والآثار",
+        nameEn: "Ministry of Tourism and Antiquities",
+        mandateEn: "Promotes tourism and protects Egypt's archaeological heritage.",
+        mandateAr: "تروج للسياحة وتحمي الموروث الأثري المصري.",
+        websiteUrl: "https://www.antiquities.gov.eg",
+        sortOrder: 13,
+        ministerIndex: 10,
+        employeeCount: 28000,
+        sector: "economic",
+      },
+      // ── Social ───────────────────────────────────────────────────────────────
+      {
+        nameAr: "وزارة التربية والتعليم",
+        nameEn: "Ministry of Education",
+        mandateEn: "Manages pre-university education and curricula.",
+        mandateAr: "تدير التعليم قبل الجامعي والمناهج الدراسية.",
+        websiteUrl: "https://www.moe.gov.eg",
+        sortOrder: 14,
+        ministerIndex: 4,
+        employeeCount: 1100000,
+        sector: "social",
+      },
+      {
+        nameAr: "وزارة الصحة والسكان",
+        nameEn: "Ministry of Health and Population",
+        mandateEn: "Provides public health services and manages healthcare policy.",
+        mandateAr: "تقدم خدمات الصحة العامة وتدير سياسة الرعاية الصحية.",
+        websiteUrl: "https://www.mohp.gov.eg",
         sortOrder: 15,
-        ministerIndex: 15,
+        ministerIndex: 3,
+        employeeCount: 420000,
+        sector: "social",
+      },
+      {
+        nameAr: "وزارة التضامن الاجتماعي",
+        nameEn: "Ministry of Social Solidarity",
+        mandateEn: "Manages social protection programmes, cash transfers, and community development.",
+        mandateAr: "تدير برامج الحماية الاجتماعية والتحويلات النقدية والتنمية المجتمعية.",
+        websiteUrl: "https://www.moss.gov.eg",
+        sortOrder: 16,
+        ministerIndex: 21,
+        employeeCount: 32000,
+        sector: "social",
+      },
+      {
+        nameAr: "وزارة الثقافة",
+        nameEn: "Ministry of Culture",
+        mandateEn: "Manages cultural institutions, arts, and national heritage.",
+        mandateAr: "تدير المؤسسات الثقافية والفنون والتراث الوطني.",
+        websiteUrl: "https://www.moc.gov.eg",
+        sortOrder: 17,
+        ministerIndex: 20,
+        employeeCount: 62000,
+        sector: "social",
+      },
+      {
+        nameAr: "وزارة الشباب والرياضة",
+        nameEn: "Ministry of Youth and Sports",
+        mandateEn: "Manages youth centers, sports facilities, and national sports policy.",
+        mandateAr: "تدير مراكز الشباب والمنشآت الرياضية وسياسة الرياضة الوطنية.",
+        websiteUrl: "https://www.moys.gov.eg",
+        sortOrder: 18,
+        ministerIndex: 11,
+        employeeCount: 22000,
+        sector: "social",
+      },
+      {
+        nameAr: "وزارة التعليم العالي والبحث العلمي",
+        nameEn: "Ministry of Higher Education and Scientific Research",
+        mandateEn: "Oversees universities, research institutes, and scholarships.",
+        mandateAr: "تشرف على الجامعات ومعاهد البحث والمنح الدراسية.",
+        websiteUrl: "https://www.mohesr.gov.eg",
+        sortOrder: 19,
+        ministerIndex: 5,
+        employeeCount: 25000,
+        sector: "social",
+      },
+      {
+        nameAr: "وزارة الأوقاف",
+        nameEn: "Ministry of Endowments",
+        mandateEn: "Manages Islamic endowments, mosques, and religious affairs.",
+        mandateAr: "تدير الأوقاف الإسلامية والمساجد والشؤون الدينية.",
+        websiteUrl: "https://www.awqaf.gov.eg",
+        sortOrder: 20,
+        ministerIndex: 24,
+        employeeCount: 120000,
+        sector: "social",
+      },
+      {
+        nameAr: "وزارة العمل",
+        nameEn: "Ministry of Labour",
+        mandateEn: "Oversees labour law, employment services, and worker protection.",
+        mandateAr: "تشرف على قانون العمل وخدمات التوظيف وحماية العمال.",
+        websiteUrl: "https://www.mol.gov.eg",
+        sortOrder: 21,
+        ministerIndex: 23,
+        employeeCount: 15000,
+        sector: "social",
+      },
+      // ── Infrastructure ───────────────────────────────────────────────────────
+      {
+        nameAr: "وزارة الإسكان والمرافق والمجتمعات العمرانية",
+        nameEn: "Ministry of Housing, Utilities and Urban Communities",
+        mandateEn: "Responsible for housing policy, urban planning, water, and sanitation.",
+        mandateAr: "مسؤولة عن سياسة الإسكان والتخطيط العمراني والمياه والصرف الصحي.",
+        websiteUrl: "https://www.mhuc.gov.eg",
+        sortOrder: 22,
+        ministerIndex: 9,
+        employeeCount: 45000,
+        sector: "infrastructure",
+      },
+      {
+        nameAr: "وزارة النقل",
+        nameEn: "Ministry of Transport",
+        mandateEn: "Manages road, rail, aviation, and maritime transport infrastructure.",
+        mandateAr: "تدير البنية التحتية للنقل البري والسكك الحديدية والجوي والبحري.",
+        websiteUrl: "https://www.mot.gov.eg",
+        sortOrder: 23,
+        ministerIndex: 8,
+        employeeCount: 85000,
+        sector: "infrastructure",
+      },
+      {
+        nameAr: "وزارة الكهرباء والطاقة المتجددة",
+        nameEn: "Ministry of Electricity and Renewable Energy",
+        mandateEn: "Manages electricity generation, distribution, and renewable energy projects.",
+        mandateAr: "تدير توليد الكهرباء وتوزيعها ومشاريع الطاقة المتجددة.",
+        websiteUrl: "https://www.moee.gov.eg",
+        sortOrder: 24,
+        ministerIndex: 6,
+        employeeCount: 95000,
+        sector: "infrastructure",
+      },
+      {
+        nameAr: "وزارة الموارد المائية والري",
+        nameEn: "Ministry of Water Resources and Irrigation",
+        mandateEn: "Manages the Nile water, irrigation networks, and water policy.",
+        mandateAr: "تدير مياه النيل وشبكات الري والسياسة المائية.",
+        websiteUrl: "https://www.mwri.gov.eg",
+        sortOrder: 25,
+        ministerIndex: 22,
+        employeeCount: 38000,
+        sector: "infrastructure",
+      },
+      {
+        nameAr: "وزارة التنمية المحلية",
+        nameEn: "Ministry of Local Development",
+        mandateEn: "Oversees local governance, governorate administration, and community services.",
+        mandateAr: "تشرف على الحكم المحلي وإدارة المحافظات والخدمات المجتمعية.",
+        websiteUrl: "https://www.mold.gov.eg",
+        sortOrder: 26,
+        ministerIndex: 25,
+        employeeCount: 8000,
+        sector: "infrastructure",
+      },
+      // ── Economic (remaining) ─────────────────────────────────────────────────
+      {
+        nameAr: "وزارة التعاون الدولي",
+        nameEn: "Ministry of International Cooperation",
+        mandateEn: "Manages foreign aid, development finance, and international partnerships.",
+        mandateAr: "تدير المساعدات الأجنبية وتمويل التنمية والشراكات الدولية.",
+        websiteUrl: "https://www.moic.gov.eg",
+        sortOrder: 27,
+        ministerIndex: 13,
+        employeeCount: 4500,
+        sector: "economic",
       },
     ];
 
@@ -1203,7 +1468,7 @@ export const seed = internalMutation({
     });
 
     // Articles
-    const article1Id = await ctx.db.insert("constitutionArticles", {
+    const _article1Id = await ctx.db.insert("constitutionArticles", {
       articleNumber: 1,
       partId: part1,
       textAr: "جمهورية مصر العربية دولة ذات سيادة موحدة، نظامها جمهوري ديمقراطي، وتقوم على مبدأ المواطنة وسيادة القانون.",
@@ -1236,7 +1501,7 @@ export const seed = internalMutation({
       keywords: ["Christians", "Jews", "religious minorities", "personal status"],
     });
 
-    const article4Id = await ctx.db.insert("constitutionArticles", {
+    const _article4Id = await ctx.db.insert("constitutionArticles", {
       articleNumber: 4,
       partId: part1,
       textAr: "السيادة للشعب وحده يمارسها ويحميها ويصونها، وهو مصدر السلطات، ويحمي وحدة الوطن.",
@@ -1247,7 +1512,7 @@ export const seed = internalMutation({
       keywords: ["sovereignty", "people", "authority", "national unity"],
     });
 
-    const article5Id = await ctx.db.insert("constitutionArticles", {
+    const _article5Id = await ctx.db.insert("constitutionArticles", {
       articleNumber: 5,
       partId: part1,
       textAr: "يقوم النظام السياسي على أساس التعددية السياسية والحزبية، والتداول السلمي للسلطة، والفصل بين السلطات والتوازن بينها.",
@@ -1339,7 +1604,7 @@ export const seed = internalMutation({
       keywords: ["Senate", "parliament", "bicameral", "2019 amendment"],
     });
 
-    const article244Id = await ctx.db.insert("constitutionArticles", {
+    const _article244Id = await ctx.db.insert("constitutionArticles", {
       articleNumber: 244,
       partId: part6,
       textAr: "تعمل الدولة على تمثيل الشباب والمسيحيين وذوي الإعاقة والمصريين المقيمين في الخارج تمثيلاً مناسباً في أول مجلس للنواب.",
@@ -1351,7 +1616,7 @@ export const seed = internalMutation({
     });
 
     // Additional articles
-    const article18Id = await ctx.db.insert("constitutionArticles", {
+    const _article18Id = await ctx.db.insert("constitutionArticles", {
       articleNumber: 18,
       partId: part2,
       textAr: "لكل مواطن الحق في الصحة وفي الرعاية الصحية المتكاملة وفقاً لمعايير الجودة، وتكفل الدولة الحفاظ على مرافق الخدمات الصحية.",
@@ -1362,7 +1627,7 @@ export const seed = internalMutation({
       keywords: ["health", "healthcare", "citizens' rights", "public health"],
     });
 
-    const article19Id = await ctx.db.insert("constitutionArticles", {
+    const _article19Id = await ctx.db.insert("constitutionArticles", {
       articleNumber: 19,
       partId: part2,
       textAr: "التعليم حق لكل مواطن، هدفه بناء الشخصية المصرية، والحفاظ على الهوية الوطنية.",
@@ -1373,7 +1638,7 @@ export const seed = internalMutation({
       keywords: ["education", "right to education", "national identity", "citizens"],
     });
 
-    const article25Id = await ctx.db.insert("constitutionArticles", {
+    const _article25Id = await ctx.db.insert("constitutionArticles", {
       articleNumber: 25,
       partId: part2,
       textAr: "يحمي الاقتصاد الوطني التنافس الحر وتكافؤ الفرص، ويمنع الممارسات الاحتكارية.",
@@ -1384,7 +1649,7 @@ export const seed = internalMutation({
       keywords: ["economy", "competition", "monopoly", "equal opportunity"],
     });
 
-    const article27Id = await ctx.db.insert("constitutionArticles", {
+    const _article27Id = await ctx.db.insert("constitutionArticles", {
       articleNumber: 27,
       partId: part2,
       textAr: "يقوم النظام الاقتصادي على تحقيق التنمية المستدامة والعدالة الاجتماعية.",
@@ -1395,7 +1660,7 @@ export const seed = internalMutation({
       keywords: ["economy", "sustainable development", "social justice"],
     });
 
-    const article46Id = await ctx.db.insert("constitutionArticles", {
+    const _article46Id = await ctx.db.insert("constitutionArticles", {
       articleNumber: 46,
       partId: part3,
       textAr: "الملكية الخاصة مصونة، ولا يجوز فرض الحراسة عليها إلا في الأحوال المبيّنة في القانون وبحكم قضائي.",
@@ -3509,5 +3774,90 @@ export const seed = internalMutation({
         aiResearchReports: 2,
       },
     };
+  },
+});
+
+// Clear all data from all tables before re-seeding.
+export const clearAll = mutation({
+  args: {},
+  handler: async (ctx): Promise<{ status: string; deleted: number }> => {
+    const tables = [
+      "officials",
+      "ministries",
+      "governorates",
+      "parties",
+      "parliamentMembers",
+      "committees",
+      "committeeMemberships",
+      "constitutionParts",
+      "constitutionArticles",
+      "articleCrossReferences",
+      "fiscalYears",
+      "budgetItems",
+      "debtRecords",
+      "debtByCreditor",
+      "elections",
+      "electionResults",
+      "governorateElectionData",
+      "dataSources",
+      "dataChangeLog",
+      "dataLineage",
+      "aiResearchReports",
+      "dataRefreshLog",
+    ] as const;
+
+    let deleted = 0;
+    for (const table of tables) {
+      const docs = await ctx.db.query(table).collect();
+      for (const doc of docs) {
+        await ctx.db.delete(doc._id);
+        deleted++;
+      }
+    }
+    return { status: "cleared", deleted };
+  },
+});
+
+// Public wrapper so `npx convex run seedData:seedAll` works.
+// Clears existing data first, then re-seeds.
+export const seedAll = mutation({
+  args: {},
+  handler: async (ctx): Promise<{ status: string }> => {
+    // Clear all existing data first
+    const tables = [
+      "officials",
+      "ministries",
+      "governorates",
+      "parties",
+      "parliamentMembers",
+      "committees",
+      "committeeMemberships",
+      "constitutionParts",
+      "constitutionArticles",
+      "articleCrossReferences",
+      "fiscalYears",
+      "budgetItems",
+      "debtRecords",
+      "debtByCreditor",
+      "elections",
+      "electionResults",
+      "governorateElectionData",
+      "dataSources",
+      "dataChangeLog",
+      "dataLineage",
+      "aiResearchReports",
+      "dataRefreshLog",
+    ] as const;
+
+    for (const table of tables) {
+      const docs = await ctx.db.query(table).collect();
+      for (const doc of docs) {
+        await ctx.db.delete(doc._id);
+      }
+    }
+
+    // Now seed fresh data
+    await ctx.runMutation(internal.seedData.seed, {});
+    return { status: "cleared and reseeded" };
   },
 });

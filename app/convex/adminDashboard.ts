@@ -1,5 +1,4 @@
 import { query } from "./_generated/server";
-import { v } from "convex/values";
 
 // Source URLs keyed by category — used for display in the admin data management page.
 const SOURCE_URLS: Record<string, string> = {

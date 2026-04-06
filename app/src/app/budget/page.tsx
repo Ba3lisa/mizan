@@ -165,11 +165,6 @@ const SPENDING_COLOR = "#8B3535";
 const DEBT_SERVICE_COLOR = "#C94040";
 const DEFICIT_COLOR = "#C9A84C";
 
-function formatAmountCompact(amount: number): string {
-  if (amount >= 1000) return `${(amount / 1000).toFixed(1)}T`;
-  return `${amount}B`;
-}
-
 function BudgetSankey() {
   const { lang } = useLanguage();
   const { symbol, fromEGP, fmt } = useCurrency();
@@ -267,15 +262,11 @@ function BudgetSankey() {
   );
 }
 
-// Old BudgetBlock/BudgetColumns removed — replaced by BudgetSankey above
-const MAX_VIZ_HEIGHT = 700;
-
-
 // ─── Year Comparison Chart ────────────────────────────────────────────────────
 
 function YearComparisonChart() {
   const { lang } = useLanguage();
-  const { symbol, fromEGP, fmt } = useCurrency();
+  const { fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
 
   const svgW = 600;
@@ -585,7 +576,7 @@ function BreakdownTable({
 
 export default function BudgetPage() {
   const { t, lang, dir } = useLanguage();
-  const { symbol, fromEGP, fmt, toggleCurrency, currency } = useCurrency();
+  const { symbol, fromEGP, fmt } = useCurrency();
   const isAr = lang === "ar";
 
   const [selectedYear, setSelectedYear] = useState<FiscalYear>("2024-2025");

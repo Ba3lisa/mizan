@@ -2,7 +2,6 @@
 
 import { useState, useCallback } from "react";
 import { useLanguage } from "@/components/providers";
-import { useCurrency } from "@/components/providers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";

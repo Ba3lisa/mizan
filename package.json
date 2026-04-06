@@ -1,0 +1,26 @@
+{
+  "name": "mizan",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Egypt's government, made visible.",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Ba3lisa/mizan.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Ba3lisa/mizan/issues"
+  },
+  "homepage": "https://github.com/Ba3lisa/mizan#readme",
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0"
+  }
+}

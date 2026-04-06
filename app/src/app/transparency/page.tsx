@@ -1,13 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { Skeleton } from "boneyard-js/react";
 import { Bot, CheckCircle2, AlertTriangle, XCircle, Clock, ExternalLink, Activity, Database, Shield, RefreshCw, ChevronDown, ChevronRight } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
@@ -287,8 +287,12 @@ export default function TransparencyPage() {
   const convexActivity = useQuery(api.transparency.getRecentActivity, { limit: 10 });
   const convexCategoryHealth = useQuery(api.transparency.getCategoryHealth);
 
+  const isLoading = convexActivity === undefined || convexCategoryHealth === undefined;
+
   // ─── Map Convex data or fall back to demo data ────────────────────────────
-  const activeRuns: RefreshRun[] = convexActivity
+  const activeRuns: RefreshRun[] | null = isLoading
+    ? null
+    : convexActivity && (convexActivity as unknown as ConvexRefreshLog[]).length > 0
     ? (convexActivity as unknown as ConvexRefreshLog[]).map((log) => ({
         id: log._id,
         timestamp: new Date(log.startedAt).toISOString().replace("T", " ").slice(0, 16) + " UTC",
@@ -318,8 +322,10 @@ export default function TransparencyPage() {
     budget: 18, debt: 5, elections: 3,
   };
 
-  const activeCategoryHealth = convexCategoryHealth && convexCategoryHealth.length > 0
-    ? convexCategoryHealth.map((ch: ConvexCategoryHealth) => {
+  const activeCategoryHealth = isLoading
+    ? null
+    : convexCategoryHealth && (convexCategoryHealth as unknown as ConvexCategoryHealth[]).length > 0
+    ? (convexCategoryHealth as unknown as ConvexCategoryHealth[]).map((ch) => {
         const demo = categoryHealth.find(c => c.key === ch.category);
         return {
           key: ch.category,
@@ -360,32 +366,35 @@ export default function TransparencyPage() {
         </div>
 
         {/* Category Health */}
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
-          {activeCategoryHealth.map(cat => (
-            <Card key={cat.key} className="border-border/60">
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold">{isAr ? cat.ar : cat.en}</span>
-                  <StatusIcon status={cat.status} />
-                </div>
-                <p className="font-mono text-2xl font-bold">{cat.records}</p>
-                <p className="text-[0.625rem] text-muted-foreground">{isAr ? "سجل" : "records"}</p>
-                <p className="text-[0.625rem] text-muted-foreground mt-1">
-                  <Clock size={8} className="inline me-1" />
-                  {isAr ? cat.lastRefreshAr : cat.lastRefresh}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <Skeleton name="transparency-health" loading={isLoading}>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-10">
+            {activeCategoryHealth?.map(cat => (
+              <Card key={cat.key} className="border-border/60">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold">{isAr ? cat.ar : cat.en}</span>
+                    <StatusIcon status={cat.status} />
+                  </div>
+                  <p className="font-mono text-2xl font-bold">{cat.records}</p>
+                  <p className="text-[0.625rem] text-muted-foreground">{isAr ? "سجل" : "records"}</p>
+                  <p className="text-[0.625rem] text-muted-foreground mt-1">
+                    <Clock size={8} className="inline me-1" />
+                    {isAr ? cat.lastRefreshAr : cat.lastRefresh}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </Skeleton>
 
         <Separator className="mb-8" />
 
         {/* Activity Feed */}
         <h2 className="text-sm font-bold mb-6">{isAr ? "سجل النشاط" : "Activity Feed"}</h2>
 
+        <Skeleton name="transparency-activity-feed" loading={isLoading}>
         <div className="space-y-4">
-          {activeRuns.map(run => (
+          {activeRuns?.map(run => (
             <Card key={run.id} className={cn(
               "border-border/60",
               run.status === "failed" && "border-red-500/30"
@@ -442,6 +451,7 @@ export default function TransparencyPage() {
             </Card>
           ))}
         </div>
+        </Skeleton>
 
         {/* ── Data Registry — Every number on the site ── */}
         <Separator className="my-8" />

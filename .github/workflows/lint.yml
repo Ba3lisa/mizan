@@ -18,8 +18,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      - run: npm ci
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+      - run: npm ci --legacy-peer-deps
         working-directory: app
       - name: ESLint
         run: npx eslint --max-warnings 0 .

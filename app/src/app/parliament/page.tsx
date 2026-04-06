@@ -1,13 +1,13 @@
 "use client";
 
 import { useState, useMemo, useRef, Fragment } from "react";
+import { Skeleton } from "boneyard-js/react";
 import { Search, X, ChevronDown, ChevronUp } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import {
   useReactTable,
   getCoreRowModel,
-  getFilteredRowModel,
   getSortedRowModel,
   flexRender,
   type ColumnDef,
@@ -200,19 +200,28 @@ function generateMembers(): Member[] {
 
 const allMembers = generateMembers();
 
+// Assign members to committees by cycling through allMembers
+function assignMembers(start: number, count: number): string[] {
+  const ids: string[] = [];
+  for (let i = 0; i < count; i++) {
+    ids.push(allMembers[(start + i) % allMembers.length].id);
+  }
+  return ids;
+}
+
 const committees: Committee[] = [
-  { id: "c1", nameAr: "لجنة الخطة والموازنة", nameEn: "Planning & Budget Committee", type: "standing", memberCount: 31, memberIds: allMembers.slice(0, 5).map(m => m.id) },
-  { id: "c2", nameAr: "لجنة الشؤون الدستورية والتشريعية", nameEn: "Constitutional & Legislative Affairs", type: "standing", memberCount: 27, memberIds: allMembers.slice(5, 9).map(m => m.id) },
-  { id: "c3", nameAr: "لجنة الشؤون الخارجية", nameEn: "Foreign Affairs Committee", type: "standing", memberCount: 23, memberIds: allMembers.slice(2, 6).map(m => m.id) },
-  { id: "c4", nameAr: "لجنة الدفاع والأمن القومي", nameEn: "Defense & National Security", type: "standing", memberCount: 19, memberIds: allMembers.slice(8, 12).map(m => m.id) },
-  { id: "c5", nameAr: "لجنة الشؤون الاقتصادية", nameEn: "Economic Affairs Committee", type: "standing", memberCount: 29, memberIds: allMembers.slice(1, 6).map(m => m.id) },
-  { id: "c6", nameAr: "لجنة الصحة والسكان", nameEn: "Health & Population Committee", type: "standing", memberCount: 25, memberIds: allMembers.slice(3, 8).map(m => m.id) },
-  { id: "c7", nameAr: "لجنة التعليم والبحث العلمي", nameEn: "Education & Scientific Research", type: "standing", memberCount: 28, memberIds: allMembers.slice(0, 4).map(m => m.id) },
-  { id: "c8", nameAr: "لجنة حقوق الإنسان", nameEn: "Human Rights Committee", type: "standing", memberCount: 21, memberIds: allMembers.slice(6, 10).map(m => m.id) },
-  { id: "c9", nameAr: "لجنة المرأة والطفل", nameEn: "Women & Child Committee", type: "special", memberCount: 17, memberIds: allMembers.slice(2, 6).map(m => m.id) },
-  { id: "c10", nameAr: "لجنة الإسكان والمرافق", nameEn: "Housing & Utilities Committee", type: "standing", memberCount: 24, memberIds: allMembers.slice(4, 8).map(m => m.id) },
-  { id: "c11", nameAr: "لجنة الاتصالات وتكنولوجيا المعلومات", nameEn: "Communications & IT Committee", type: "standing", memberCount: 20, memberIds: allMembers.slice(5, 9).map(m => m.id) },
-  { id: "c12", nameAr: "لجنة مشتركة للشؤون المالية", nameEn: "Joint Financial Affairs Committee", type: "joint", memberCount: 15, memberIds: allMembers.slice(0, 3).map(m => m.id) },
+  { id: "c1", nameAr: "لجنة الخطة والموازنة", nameEn: "Planning & Budget Committee", type: "standing", memberCount: 31, memberIds: assignMembers(0, 31) },
+  { id: "c2", nameAr: "لجنة الشؤون الدستورية والتشريعية", nameEn: "Constitutional & Legislative Affairs", type: "standing", memberCount: 27, memberIds: assignMembers(5, 27) },
+  { id: "c3", nameAr: "لجنة الشؤون الخارجية", nameEn: "Foreign Affairs Committee", type: "standing", memberCount: 23, memberIds: assignMembers(10, 23) },
+  { id: "c4", nameAr: "لجنة الدفاع والأمن القومي", nameEn: "Defense & National Security", type: "standing", memberCount: 19, memberIds: assignMembers(15, 19) },
+  { id: "c5", nameAr: "لجنة الشؤون الاقتصادية", nameEn: "Economic Affairs Committee", type: "standing", memberCount: 29, memberIds: assignMembers(3, 29) },
+  { id: "c6", nameAr: "لجنة الصحة والسكان", nameEn: "Health & Population Committee", type: "standing", memberCount: 25, memberIds: assignMembers(8, 25) },
+  { id: "c7", nameAr: "لجنة التعليم والبحث العلمي", nameEn: "Education & Scientific Research", type: "standing", memberCount: 28, memberIds: assignMembers(12, 28) },
+  { id: "c8", nameAr: "لجنة حقوق الإنسان", nameEn: "Human Rights Committee", type: "standing", memberCount: 21, memberIds: assignMembers(18, 21) },
+  { id: "c9", nameAr: "لجنة المرأة والطفل", nameEn: "Women & Child Committee", type: "special", memberCount: 17, memberIds: assignMembers(22, 17) },
+  { id: "c10", nameAr: "لجنة الإسكان والمرافق", nameEn: "Housing & Utilities Committee", type: "standing", memberCount: 24, memberIds: assignMembers(2, 24) },
+  { id: "c11", nameAr: "لجنة الاتصالات وتكنولوجيا المعلومات", nameEn: "Communications & IT Committee", type: "standing", memberCount: 20, memberIds: assignMembers(7, 20) },
+  { id: "c12", nameAr: "لجنة مشتركة للشؤون المالية", nameEn: "Joint Financial Affairs Committee", type: "joint", memberCount: 15, memberIds: assignMembers(0, 15) },
 ];
 
 // ─── Interactive Hemicycle ────────────────────────────────────────────────────
@@ -857,6 +866,7 @@ function CommitteesTab() {
   const { lang } = useLanguage();
   const isAr = lang === "ar";
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [showAllMembers, setShowAllMembers] = useState<Record<string, boolean>>({});
 
   const typeLabels: Record<Committee["type"], { ar: string; en: string; variant: "default" | "secondary" | "outline" }> = {
     standing: { ar: "دائمة", en: "Standing", variant: "default" },
@@ -891,13 +901,19 @@ function CommitteesTab() {
               {isExpanded ? <ChevronUp size={16} className="text-muted-foreground flex-shrink-0" /> : <ChevronDown size={16} className="text-muted-foreground flex-shrink-0" />}
             </button>
 
-            {isExpanded && (
+            {isExpanded && (() => {
+              const isShowingAll = showAllMembers[committee.id] ?? false;
+              const PREVIEW_COUNT = 8;
+              const visibleMembers = isShowingAll ? committeeMembers : committeeMembers.slice(0, PREVIEW_COUNT);
+              const hiddenCount = committeeMembers.length - PREVIEW_COUNT;
+
+              return (
               <div className="px-5 pb-4 border-t border-border bg-muted/10">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-3 mb-2">
-                  {isAr ? "أعضاء اللجنة (عينة)" : "Committee Members (sample)"}
+                  {isAr ? `أعضاء اللجنة (${committeeMembers.length})` : `Committee Members (${committeeMembers.length})`}
                 </p>
                 <div className="flex flex-wrap gap-2">
-                  {committeeMembers.map((m) => {
+                  {visibleMembers.map((m) => {
                     const party = parties.find(p => p.id === m.partyId);
                     return (
                       <div key={m.id} className="flex items-center gap-1.5 bg-background border border-border rounded-lg px-2.5 py-1.5">
@@ -909,14 +925,26 @@ function CommitteesTab() {
                       </div>
                     );
                   })}
-                  {committee.memberCount > committeeMembers.length && (
-                    <span className="text-xs text-muted-foreground px-2.5 py-1.5">
-                      +{committee.memberCount - committeeMembers.length} {isAr ? "آخرون" : "more"}
-                    </span>
+                  {!isShowingAll && hiddenCount > 0 && (
+                    <button
+                      onClick={() => setShowAllMembers(prev => ({ ...prev, [committee.id]: true }))}
+                      className="text-xs text-primary hover:underline px-2.5 py-1.5 border border-primary/20 rounded-lg hover:bg-primary/5 transition-colors"
+                    >
+                      +{hiddenCount} {isAr ? "عرض الكل" : "show all"}
+                    </button>
+                  )}
+                  {isShowingAll && hiddenCount > 0 && (
+                    <button
+                      onClick={() => setShowAllMembers(prev => ({ ...prev, [committee.id]: false }))}
+                      className="text-xs text-muted-foreground hover:underline px-2.5 py-1.5"
+                    >
+                      {isAr ? "عرض أقل" : "show less"}
+                    </button>
                   )}
                 </div>
               </div>
-            )}
+              );
+            })()}
           </div>
         );
       })}
@@ -938,6 +966,8 @@ export default function ParliamentPage() {
   const liveHouseStats = useQuery(api.parliament.getParliamentStats, { chamber: "house" });
   const liveSenateStats = useQuery(api.parliament.getParliamentStats, { chamber: "senate" });
   const liveHouseCommittees = useQuery(api.parliament.listCommittees, { chamber: "house" });
+
+  const isLoading = liveParties === undefined || liveHouseStats === undefined || liveSenateStats === undefined || liveHouseCommittees === undefined;
 
   // Stats — use fallback totals (596/300) since we haven't seeded all members yet
   const fallbackHouse = parties.reduce((s, p) => s + p.houseSeats, 0);
@@ -984,6 +1014,7 @@ export default function ParliamentPage() {
           </TabsList>
 
           {/* Stats bar */}
+          <Skeleton name="parliament-stats-bar" loading={isLoading}>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-t border-b border-border mb-6">
             <div>
               <p className="text-xs text-muted-foreground mb-1">{t.totalSeats}</p>
@@ -1004,6 +1035,7 @@ export default function ParliamentPage() {
               </p>
             </div>
           </div>
+          </Skeleton>
 
           {/* Sub-tabs */}
           <Tabs value={subTab} onValueChange={setSubTab}>

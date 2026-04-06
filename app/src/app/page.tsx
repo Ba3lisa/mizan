@@ -4,7 +4,7 @@ import Link from "next/link";
 import {
   Building2, Users, BookOpen, BarChart3, TrendingDown, Landmark,
   ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
-  LineChart, CheckSquare, MapPin, Calculator, Shield, Bot, BookMarked,
+  LineChart, CheckSquare, MapPin, Calculator, Bot, BookMarked,
 } from "lucide-react";
 import { useLanguage } from "@/components/providers";
 import { Button } from "@/components/ui/button";

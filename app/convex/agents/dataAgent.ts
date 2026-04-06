@@ -9,7 +9,6 @@
 import { internalAction, ActionCtx } from "../_generated/server";
 import { internal, api } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
-import { v } from "convex/values";
 import {
   parseWorldBankResponse,
   validateDebtRecord,
@@ -314,7 +313,7 @@ ${pageText || "(page content unavailable)"}`;
 // ─── PARLIAMENT REFRESH ───────────────────────────────────────────────────────
 
 async function refreshParliamentData(
-  ctx: ActionCtx
+  _ctx: ActionCtx
 ): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
   // Parliament data changes rarely; log a no-op for now and return 0.
   // When a data source becomes available, implement fetch + Claude parse here.
