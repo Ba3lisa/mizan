@@ -34,9 +34,13 @@ interface SeatDot {
 
 function InteractiveHemicycle({ chamber, parties }: { chamber: "house" | "senate"; parties: Party[] }) {
   const [hoveredSeat, setHoveredSeat] = useState<{ idx: number; x: number; y: number } | null>(null);
+  const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
   const [hoveredParty, setHoveredParty] = useState<string | null>(null);
   const { lang } = useLanguage();
   const isAr = lang === "ar";
+
+  // Fetch actual members for seat-to-name mapping
+  const members = useQuery(api.parliament.listMembers, { chamber, isCurrent: true });
 
   const seats = useMemo<SeatDot[]>(() => {
     const arr: SeatDot[] = [];
@@ -48,6 +52,37 @@ function InteractiveHemicycle({ chamber, parties }: { chamber: "house" | "senate
     });
     return arr;
   }, [chamber, parties]);
+
+  // Map seat index to member info (same order as seats array: grouped by party)
+  const seatMemberMap = useMemo(() => {
+    if (!members) return new Map<number, { nameAr: string; nameEn: string; govAr?: string; govEn?: string; sourceUrl?: string }>();
+    const byParty: Record<string, typeof members> = {};
+    for (const m of members) {
+      const key = m.partyId ?? "independent";
+      if (!byParty[key]) byParty[key] = [];
+      byParty[key].push(m);
+    }
+    const map = new Map<number, { nameAr: string; nameEn: string; govAr?: string; govEn?: string; sourceUrl?: string }>();
+    let idx = 0;
+    for (const p of parties) {
+      const count = chamber === "house" ? p.houseSeats : p.senateSeats;
+      const pm = p.id === "independent" ? (byParty["independent"] ?? []) : (byParty[p.id] ?? []);
+      for (let i = 0; i < count; i++) {
+        const m = pm[i];
+        if (m?.official && !m.official.nameEn.includes("Member ")) {
+          map.set(idx, {
+            nameAr: m.official.nameAr,
+            nameEn: m.official.nameEn,
+            govAr: m.governorate?.nameAr,
+            govEn: m.governorate?.nameEn,
+            sourceUrl: m.official.sourceUrl,
+          });
+        }
+        idx++;
+      }
+    }
+    return map;
+  }, [members, parties, chamber]);
 
   const width = 600;
   const height = 310;
@@ -135,6 +170,7 @@ function InteractiveHemicycle({ chamber, parties }: { chamber: "house" | "senate
                 strokeWidth={1}
                 className="transition-all duration-100 cursor-pointer"
                 onMouseEnter={() => setHoveredSeat({ idx: pos.index, x: pos.x, y: pos.y })}
+                onClick={() => setSelectedSeat(selectedSeat === pos.index ? null : pos.index)}
               />
             );
           })}
@@ -142,21 +178,70 @@ function InteractiveHemicycle({ chamber, parties }: { chamber: "house" | "senate
           <rect x={cx - 20} y={cy - 8} width={40} height={8} rx={2} fill="currentColor" className="text-border" />
         </svg>
 
-        {/* Hover tooltip */}
-        {hoveredSeat !== null && hoveredPartyData && (
-          <div
-            className="absolute z-20 bg-popover border border-border rounded-lg shadow-xl px-3 py-2 pointer-events-none text-xs max-w-[200px]"
-            style={{
-              left: `${((hoveredSeat.x - 100) / 400) * 100}%`,
-              top: `${((hoveredSeat.y - 80) / 240) * 100}%`,
-              transform: "translate(-50%, calc(-100% - 12px))",
-            }}
-          >
-            <p className="font-semibold text-foreground">{isAr ? hoveredPartyData.nameAr : hoveredPartyData.nameEn}</p>
-            <p className="text-muted-foreground">{chamber === "house" ? hoveredPartyData.houseSeats : hoveredPartyData.senateSeats} {isAr ? "\u0645\u0642\u0639\u062f" : "seats"}</p>
-          </div>
-        )}
+        {/* Hover tooltip -- shows member name if available, otherwise party */}
+        {hoveredSeat !== null && hoveredPartyData && (() => {
+          const memberInfo = seatMemberMap.get(hoveredSeat.idx);
+          return (
+            <div
+              className="absolute z-20 bg-popover border border-border rounded-lg shadow-xl px-3 py-2 pointer-events-none text-xs max-w-[240px]"
+              style={{
+                left: `${((hoveredSeat.x - 100) / 400) * 100}%`,
+                top: `${((hoveredSeat.y - 80) / 240) * 100}%`,
+                transform: "translate(-50%, calc(-100% - 12px))",
+              }}
+            >
+              {memberInfo ? (
+                <>
+                  <p className="font-semibold text-foreground">{isAr ? memberInfo.nameAr : memberInfo.nameEn}</p>
+                  <p className="text-muted-foreground">{isAr ? hoveredPartyData.nameAr : hoveredPartyData.nameEn}</p>
+                  {(memberInfo.govAr || memberInfo.govEn) && (
+                    <p className="text-muted-foreground/70">{isAr ? memberInfo.govAr : memberInfo.govEn}</p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="font-semibold text-foreground">{isAr ? hoveredPartyData.nameAr : hoveredPartyData.nameEn}</p>
+                  <p className="text-muted-foreground">{chamber === "house" ? hoveredPartyData.houseSeats : hoveredPartyData.senateSeats} {isAr ? "\u0645\u0642\u0639\u062f" : "seats"}</p>
+                </>
+              )}
+            </div>
+          );
+        })()}
       </div>
+
+      {/* Selected member profile panel */}
+      {selectedSeat !== null && (() => {
+        const seat = seats[selectedSeat];
+        const memberInfo = seatMemberMap.get(selectedSeat);
+        const partyData = seat ? parties.find(p => p.id === seat.partyId) : null;
+        if (!seat) return null;
+        return (
+          <div className="rounded-lg border border-border bg-card p-4 flex items-start gap-4">
+            <div className="w-3 h-3 rounded-full mt-1 shrink-0" style={{ background: seat.color }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-base font-bold text-foreground">
+                {memberInfo
+                  ? (isAr ? memberInfo.nameAr : memberInfo.nameEn)
+                  : (isAr ? "عضو غير محدد" : "Unidentified member")}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {partyData ? (isAr ? partyData.nameAr : partyData.nameEn) : (isAr ? "مستقل" : "Independent")}
+              </p>
+              {memberInfo?.govAr && (
+                <p className="text-xs text-muted-foreground/70 mt-1">{isAr ? memberInfo.govAr : memberInfo.govEn}</p>
+              )}
+              {memberInfo?.sourceUrl && (
+                <a href={memberInfo.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline mt-1 inline-block">
+                  parliament.gov.eg
+                </a>
+              )}
+            </div>
+            <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => setSelectedSeat(null)}>
+              <X size={14} />
+            </Button>
+          </div>
+        );
+      })()}
 
       {/* Party legend */}
       <div className="flex flex-wrap gap-x-4 gap-y-2">
