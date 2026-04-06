@@ -2,6 +2,52 @@ import { query } from "./_generated/server";
 import { v } from "convex/values";
 import { Doc } from "./_generated/dataModel";
 
+/** Live stats for the homepage — no hardcoded numbers. */
+export const getHomeStats = query({
+  args: {},
+  handler: async (ctx) => {
+    // Parliament members count
+    const houseMembers = await ctx.db
+      .query("parliamentMembers")
+      .withIndex("by_chamber_and_isCurrent", (q) =>
+        q.eq("chamber", "house").eq("isCurrent", true)
+      )
+      .collect();
+    const senateMembers = await ctx.db
+      .query("parliamentMembers")
+      .withIndex("by_chamber_and_isCurrent", (q) =>
+        q.eq("chamber", "senate").eq("isCurrent", true)
+      )
+      .collect();
+    const parliamentarians = houseMembers.length + senateMembers.length;
+
+    // Governorate count
+    const governorates = await ctx.db.query("governorates").collect();
+
+    // Constitution articles count
+    const articles = await ctx.db.query("constitutionArticles").collect();
+
+    // Latest external debt
+    const latestDebt = await ctx.db
+      .query("debtRecords")
+      .withIndex("by_date")
+      .order("desc")
+      .first();
+
+    return {
+      parliamentarians: { value: parliamentarians, source: "parliament.gov.eg", sourceUrl: "https://www.parliament.gov.eg", sanadLevel: 1 },
+      governorates: { value: governorates.length, source: "capmas.gov.eg", sourceUrl: "https://www.capmas.gov.eg", sanadLevel: 1 },
+      constitutionArticles: { value: articles.length, source: "presidency.eg", sourceUrl: "https://www.presidency.eg", sanadLevel: 1 },
+      externalDebt: latestDebt ? {
+        value: latestDebt.totalExternalDebt ?? 0,
+        source: "worldbank.org",
+        sourceUrl: latestDebt.sourceUrl ?? "https://data.worldbank.org",
+        sanadLevel: latestDebt.sanadLevel ?? 2,
+      } : null,
+    };
+  },
+});
+
 
 export const listMinistriesSorted = query({
   args: {},

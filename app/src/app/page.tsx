@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useQuery } from "convex/react";
+import { api } from "../../convex/_generated/api";
 import {
   Building2, Users, BookOpen, BarChart3, TrendingDown, Landmark,
   ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
@@ -10,10 +12,11 @@ import { useLanguage, useCurrency } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { AiPipelineStatus } from "@/components/ai-pipeline-status";
+import { SanadBadge } from "@/components/sanad-badge";
 
-function Stat({ value, label, source, sourceUrl, currencyUnit, symbol, fromUSD, fromEGP, fmtNum }: {
+function Stat({ value, label, source, sourceUrl, currencyUnit, sanadLevel, symbol, fromUSD, fromEGP, fmtNum }: {
   value: number; label: string; source: string; sourceUrl: string;
-  currencyUnit?: "usd" | "egp";
+  currencyUnit?: "usd" | "egp"; sanadLevel?: number;
   symbol: string; fromUSD: (v: number) => number; fromEGP: (v: number) => number;
   fmtNum: (v: number, opts?: { decimals?: number }) => string;
 }) {
@@ -27,8 +30,9 @@ function Stat({ value, label, source, sourceUrl, currencyUnit, symbol, fromUSD, 
   }
   return (
     <div className="text-center py-5">
-      <div className="font-mono text-3xl md:text-4xl font-bold tracking-tighter tabular-nums text-foreground" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
+      <div className="font-mono text-3xl md:text-4xl font-bold tracking-tighter tabular-nums text-foreground inline-flex items-center gap-2 justify-center" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
         {display}
+        {sanadLevel && <SanadBadge sanadLevel={sanadLevel} sourceUrl={sourceUrl} />}
       </div>
       <p className="text-[0.65rem] text-muted-foreground mt-1.5 uppercase tracking-widest font-medium">{label}</p>
       <a href={sourceUrl} target="_blank" rel="noopener noreferrer"
@@ -54,12 +58,7 @@ const features = [
   { icon: BookMarked, href: "/methodology", ar: "المنهجية", en: "Methodology", descAr: "كيف نجمع البيانات · مصادر رسمية", descEn: "How we gather data · Official sources" },
 ];
 
-const stats: Array<{ value: number; ar: string; en: string; source: string; url: string; currencyUnit?: "usd" | "egp"; suffix?: { ar: string; en: string } }> = [
-  { value: 596, ar: "عضو برلمان", en: "Parliamentarians", source: "parliament.gov.eg", url: "https://www.parliament.gov.eg" },
-  { value: 27, ar: "محافظة", en: "Governorates", source: "capmas.gov.eg", url: "https://www.capmas.gov.eg" },
-  { value: 247, ar: "مادة دستورية", en: "Constitutional Articles", source: "presidency.eg", url: "https://www.presidency.eg" },
-  { value: 155.2, ar: "مليار ديون خارجية", en: "B External Debt", source: "cbe.org.eg", url: "https://www.cbe.org.eg", currencyUnit: "usd" },
-];
+// Stats are now fetched live via getHomeStats query — see below in HomePage component
 
 const sources = [
   { ar: "مجلس النواب — قائمة الأعضاء", en: "Parliament — Members List", url: "https://www.parliament.gov.eg/en/MPs", domain: "parliament.gov.eg/en/MPs" },
@@ -75,6 +74,14 @@ export default function HomePage() {
   const { symbol, fromUSD, fromEGP, fmt: fmtNum } = useCurrency();
   const isAr = lang === "ar";
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
+  const homeStats = useQuery(api.government.getHomeStats);
+
+  const liveStats = homeStats ? [
+    { value: homeStats.parliamentarians.value, ar: "عضو برلمان", en: "Parliamentarians", source: homeStats.parliamentarians.source, url: homeStats.parliamentarians.sourceUrl, sanadLevel: homeStats.parliamentarians.sanadLevel },
+    { value: homeStats.governorates.value, ar: "محافظة", en: "Governorates", source: homeStats.governorates.source, url: homeStats.governorates.sourceUrl, sanadLevel: homeStats.governorates.sanadLevel },
+    { value: homeStats.constitutionArticles.value, ar: "مادة دستورية", en: "Constitutional Articles", source: homeStats.constitutionArticles.source, url: homeStats.constitutionArticles.sourceUrl, sanadLevel: homeStats.constitutionArticles.sanadLevel },
+    ...(homeStats.externalDebt ? [{ value: homeStats.externalDebt.value / 1_000_000_000, ar: "مليار ديون خارجية", en: "B External Debt", source: homeStats.externalDebt.source, url: homeStats.externalDebt.sourceUrl, currencyUnit: "usd" as const, sanadLevel: homeStats.externalDebt.sanadLevel }] : []),
+  ] : null;
 
   return (
     <div className="page-content" dir={dir}>
@@ -124,16 +131,25 @@ export default function HomePage() {
       {/* ════════ AI PIPELINE STATUS ════════ */}
       <AiPipelineStatus />
 
-      {/* ════════ STATS ════════ */}
+      {/* ════════ STATS (live from Convex) ════════ */}
       <section className="container-page">
         <div className="border border-border rounded-xl bg-card/50">
           <div className="grid grid-cols-2 md:grid-cols-4 [&>*:not(:first-child)]:border-s [&>*:not(:first-child)]:border-border">
-            {stats.map((s) => (
+            {liveStats ? liveStats.map((s) => (
               <Stat key={s.source} value={s.value}
                 label={isAr ? s.ar : s.en} source={s.source} sourceUrl={s.url}
-                currencyUnit={s.currencyUnit} symbol={symbol} fromUSD={fromUSD} fromEGP={fromEGP} fmtNum={fmtNum}
+                currencyUnit={s.currencyUnit} sanadLevel={s.sanadLevel}
+                symbol={symbol} fromUSD={fromUSD} fromEGP={fromEGP} fmtNum={fmtNum}
               />
-            ))}
+            )) : (
+              /* Skeleton while loading */
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="text-center py-5">
+                  <div className="h-10 w-20 mx-auto bg-muted/20 animate-pulse rounded mb-2" />
+                  <div className="h-3 w-28 mx-auto bg-muted/10 animate-pulse rounded" />
+                </div>
+              ))
+            )}
           </div>
         </div>
       </section>
