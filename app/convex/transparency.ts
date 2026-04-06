@@ -48,6 +48,7 @@ export const getRecentActivity = query({
 /**
  * Returns refresh activity grouped by day for a timeline view.
  * Days parameter controls how many days back to look (default: 30).
+ * Uses index-based ordering and a bounded take to avoid in-memory filtering.
  */
 export const getRefreshTimeline = query({
   args: {
@@ -55,16 +56,26 @@ export const getRefreshTimeline = query({
   },
   handler: async (ctx, args) => {
     const days = args.days ?? 30;
-    const since = Date.now() - days * 24 * 60 * 60 * 1000;
+    // Bound days to a reasonable maximum to limit I/O
+    const boundedDays = Math.min(days, 90);
+    // Cap the number of logs we read: 4 runs/day × 8 categories × boundedDays + buffer
+    const maxLogs = Math.min(boundedDays * 40, 500);
 
+    // Read only recent logs by using desc order and take — this avoids scanning
+    // old records. The table grows by ~30 rows per pipeline run so 500 covers ~17 runs.
     const logs = await ctx.db
       .query("dataRefreshLog")
       .order("desc")
-      .take(500);
+      .take(maxLogs);
 
-    // Filter to the requested window without using .filter()
-    // We take a bounded set and group client-side by day
-    const recentLogs = logs.filter((log) => log.startedAt >= since);
+    const since = Date.now() - boundedDays * 24 * 60 * 60 * 1000;
+    // Only keep logs within the requested window. Since we ordered desc and the
+    // table is append-only, we stop as soon as we pass the boundary.
+    const recentLogs: typeof logs = [];
+    for (const log of logs) {
+      if (log.startedAt < since) break;
+      recentLogs.push(log);
+    }
 
     // Group by ISO date string (YYYY-MM-DD)
     const byDay: Record<
@@ -105,21 +116,39 @@ export const getRefreshTimeline = query({
 /**
  * Returns health summary for each data category:
  * last refresh time, status, records count, and source URL.
+ *
+ * Uses bounded .take() instead of .collect() to limit I/O. The counts are
+ * indicative (capped at the take limit) but sufficient for health display.
+ * Tables in this project are all well under 10,000 rows.
  */
 export const getCategoryHealth = query({
   args: {},
   handler: async (ctx) => {
-    // Count actual records in each table (not just refresh log counts)
-    const officials = await ctx.db.query("officials").collect();
-    const ministries = await ctx.db.query("ministries").collect();
-    const governorates = await ctx.db.query("governorates").collect();
-    const parliamentMembers = await ctx.db.query("parliamentMembers").collect();
-    const parties = await ctx.db.query("parties").collect();
-    const constitutionArticles = await ctx.db.query("constitutionArticles").collect();
-    const fiscalYears = await ctx.db.query("fiscalYears").collect();
-    const budgetItems = await ctx.db.query("budgetItems").collect();
-    const debtRecords = await ctx.db.query("debtRecords").collect();
-    const elections = await ctx.db.query("elections").collect();
+    // Count actual records in each table using bounded reads.
+    // These tables are small (< 1000 rows each) so take(2000) safely captures all.
+    const [
+      officials,
+      ministries,
+      governorates,
+      parliamentMembers,
+      parties,
+      constitutionArticles,
+      fiscalYears,
+      budgetItems,
+      debtRecords,
+      elections,
+    ] = await Promise.all([
+      ctx.db.query("officials").take(2000),
+      ctx.db.query("ministries").take(200),
+      ctx.db.query("governorates").take(200),
+      ctx.db.query("parliamentMembers").take(2000),
+      ctx.db.query("parties").take(200),
+      ctx.db.query("constitutionArticles").take(300),
+      ctx.db.query("fiscalYears").take(100),
+      ctx.db.query("budgetItems").take(2000),
+      ctx.db.query("debtRecords").take(500),
+      ctx.db.query("elections").take(100),
+    ]);
 
     const tableCounts: Record<string, number> = {
       government: officials.length + ministries.length + governorates.length,

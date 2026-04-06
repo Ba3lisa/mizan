@@ -71,13 +71,8 @@ interface ConvexDataSource {
   category: string;
 }
 
-interface DataCategoryOverview {
-  tableName: string;
-  recordCount: number;
-  lastRefreshAt: number | null;
-  lastRefreshStatus: "success" | "failed" | null;
-  sourceUrl: string;
-}
+// Shape returned by counts.getTableCounts
+type TableCounts = Record<string, number>;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -91,7 +86,7 @@ const CATEGORY_LABELS: Record<string, { ar: string; en: string }> = {
   economy: { ar: "الاقتصاد", en: "Economy" },
 };
 
-// Table → category mapping for getDataOverview enrichment
+// Table → category mapping used to group per-table counts under each category
 const TABLE_TO_CATEGORY: Record<string, string> = {
   officials: "government",
   ministries: "government",
@@ -550,7 +545,7 @@ function DataSourcesCard({ isAr, sources, isLoading }: SourcesCardProps) {
 interface CategoryDetailsCardProps {
   isAr: boolean;
   categoryHealth: ConvexCategoryHealth[] | null;
-  dataOverview: Record<string, DataCategoryOverview> | null;
+  tableCounts: TableCounts | null;
   sources: ConvexDataSource[] | null;
   isLoading: boolean;
 }
@@ -558,7 +553,7 @@ interface CategoryDetailsCardProps {
 function CategoryDetailsCard({
   isAr,
   categoryHealth,
-  dataOverview,
+  tableCounts,
   sources,
   isLoading,
 }: CategoryDetailsCardProps) {
@@ -641,15 +636,15 @@ function CategoryDetailsCard({
 
                   {isOpen && (
                     <div className="px-4 pb-4 pt-2 bg-muted/20 border-t border-border/40 space-y-4">
-                      {/* Stats grid */}
-                      {dataOverview && relatedTables.length > 0 && (
+                      {/* Stats grid — uses lightweight tableCounts, not getDataOverview */}
+                      {tableCounts && relatedTables.length > 0 && (
                         <div>
                           <p className="text-[0.625rem] uppercase font-semibold text-muted-foreground tracking-wider mb-2">
                             {isAr ? "إحصائيات الجداول" : "Table Stats"}
                           </p>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {relatedTables.map((tbl) => {
-                              const ov = dataOverview[tbl];
+                              const count = tableCounts[tbl];
                               return (
                                 <div
                                   key={tbl}
@@ -661,19 +656,8 @@ function CategoryDetailsCard({
                                       : (TABLE_LABEL_EN[tbl] ?? tbl)}
                                   </p>
                                   <p className="font-mono text-sm font-bold">
-                                    {ov ? ov.recordCount.toLocaleString() : "—"}
+                                    {count !== undefined ? count.toLocaleString() : "—"}
                                   </p>
-                                  {ov?.sourceUrl && (
-                                    <a
-                                      href={ov.sourceUrl}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="text-[0.55rem] text-primary/60 hover:text-primary inline-flex items-center gap-0.5 mt-0.5"
-                                    >
-                                      <ExternalLink size={8} />
-                                      {isAr ? "المصدر" : "source"}
-                                    </a>
-                                  )}
                                 </div>
                               );
                             })}
@@ -738,87 +722,36 @@ function CategoryDetailsCard({
 
 function ConfidenceLevels({ isAr }: { isAr: boolean }) {
   const levels = [
-    {
-      key: "official_government",
-      level: 1,
-      labelAr: "حكومي رسمي",
-      labelEn: "Official Government",
-      descAr: "مباشر من مصادر حكومية رسمية (.gov.eg)",
-      descEn: "Direct from gov.eg sources (CAPMAS, ministries)",
-      color: "border-emerald-500/30 bg-emerald-500/5",
-      dot: "bg-emerald-500",
-      textColor: "text-emerald-600 dark:text-emerald-400",
-    },
-    {
-      key: "international_org",
-      level: 2,
-      labelAr: "منظمة دولية",
-      labelEn: "International Org",
-      descAr: "البنك الدولي، صندوق النقد الدولي، الأمم المتحدة",
-      descEn: "World Bank, IMF, UNDP",
-      color: "border-blue-500/30 bg-blue-500/5",
-      dot: "bg-blue-500",
-      textColor: "text-blue-600 dark:text-blue-400",
-    },
-    {
-      key: "news_media",
-      level: 3,
-      labelAr: "إعلام",
-      labelEn: "News & Media",
-      descAr: "الأهرام، الهيئة العامة للاستعلامات، إيجيبت توداي",
-      descEn: "Ahram Online, SIS, EgyptToday",
-      color: "border-amber-500/30 bg-amber-500/5",
-      dot: "bg-amber-500",
-      textColor: "text-amber-600 dark:text-amber-400",
-    },
-    {
-      key: "other",
-      level: 4,
-      labelAr: "مصادر أخرى",
-      labelEn: "Other Sources",
-      descAr: "ويكيبيديا، مصادر مجتمعية",
-      descEn: "Wikipedia, community-submitted",
-      color: "border-border bg-muted/30",
-      dot: "bg-muted-foreground",
-      textColor: "text-muted-foreground",
-    },
-    {
-      key: "derived",
-      level: 5,
-      labelAr: "محسوب",
-      labelEn: "Derived/Calculated",
-      descAr: "محسوب من بيانات أخرى",
-      descEn: "Computed from other data",
-      color: "border-violet-500/30 bg-violet-500/5",
-      dot: "bg-violet-500",
-      textColor: "text-violet-600 dark:text-violet-400",
-    },
+    { key: "consensus", level: "✓", labelAr: "إجماع", labelEn: "Consensus", descAr: "مصادر متعددة تتفق — أعلى مستوى ثقة", descEn: "Multiple sources agree — highest confidence", dot: "bg-teal-500", textColor: "text-teal-600 dark:text-teal-400" },
+    { key: "official_government", level: "1", labelAr: "حكومي رسمي", labelEn: "Official Government", descAr: "مباشر من مصادر حكومية رسمية (.gov.eg)", descEn: "Direct from gov.eg sources (CAPMAS, ministries)", dot: "bg-emerald-500", textColor: "text-emerald-600 dark:text-emerald-400" },
+    { key: "international_org", level: "2", labelAr: "منظمة دولية", labelEn: "International Org", descAr: "البنك الدولي، صندوق النقد الدولي، الأمم المتحدة", descEn: "World Bank, IMF, UNDP", dot: "bg-blue-500", textColor: "text-blue-600 dark:text-blue-400" },
+    { key: "news_media", level: "3", labelAr: "إعلام", labelEn: "News & Media", descAr: "الأهرام، الهيئة العامة للاستعلامات، إيجيبت توداي", descEn: "Ahram Online, SIS, EgyptToday", dot: "bg-amber-500", textColor: "text-amber-600 dark:text-amber-400" },
+    { key: "other", level: "4", labelAr: "مصادر أخرى", labelEn: "Other Sources", descAr: "ويكيبيديا، مصادر مجتمعية", descEn: "Wikipedia, community-submitted", dot: "bg-muted-foreground", textColor: "text-muted-foreground" },
+    { key: "derived", level: "5", labelAr: "محسوب", labelEn: "Derived/Calculated", descAr: "محسوب من بيانات أخرى", descEn: "Computed from other data", dot: "bg-violet-500", textColor: "text-violet-600 dark:text-violet-400" },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div className="space-y-1.5">
+      <p className="text-[0.65rem] text-muted-foreground/70 mb-3 max-w-2xl">
+        {isAr
+          ? "النقاط الملونة بجانب الأرقام في الموقع تشير إلى مستوى السند — مدى ثقتنا في المصدر. تصنيف المستويات هو الجزء الوحيد في ميزان الذي يتضمن رأياً بشرياً. نخطط لجعل هذا التصنيف يعتمد على الذكاء الاصطناعي مستقبلاً."
+          : "The colored dots next to numbers throughout the app indicate the Sanad level — how much we trust the source. This ranking is the only opinionated part of Mizan. We plan to make this LLM-guided in the future."}
+      </p>
       {levels.map((lvl) => (
         <div
           key={lvl.key}
-          className={cn(
-            "rounded-lg border px-4 py-3 flex items-center gap-3",
-            lvl.color
-          )}
+          className="flex items-center gap-3 rounded-lg border border-border/40 bg-card/40 px-4 py-2.5"
         >
-          <span className="text-[0.6rem] font-mono text-muted-foreground/60">
+          <span className="text-[0.65rem] font-mono text-muted-foreground/60 w-4 text-center shrink-0">
             {lvl.level}
           </span>
-          <span
-            className={cn("w-2.5 h-2.5 rounded-full shrink-0", lvl.dot)}
-          />
-          <div>
-            <p className={cn("text-xs font-bold", lvl.textColor)}>
-              {isAr ? lvl.labelAr : lvl.labelEn}
-            </p>
-            <p className="text-[0.65rem] text-muted-foreground">
-              {isAr ? lvl.descAr : lvl.descEn}
-            </p>
-          </div>
+          <span className={cn("w-2 h-2 rounded-full shrink-0", lvl.dot)} />
+          <span className={cn("text-xs font-bold w-32 shrink-0", lvl.textColor)}>
+            {isAr ? lvl.labelAr : lvl.labelEn}
+          </span>
+          <span className="text-[0.65rem] text-muted-foreground">
+            {isAr ? lvl.descAr : lvl.descEn}
+          </span>
         </div>
       ))}
     </div>
@@ -1039,19 +972,21 @@ export default function TransparencyPage() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
-  // Convex queries
+  // Convex queries — getDataOverview removed (was reading 12 full tables on
+  // every dataChangeLog write during pipeline runs). Replaced with getTableCounts
+  // which reads the same tables but does so in a single deduplicated subscription.
   const convexActivity = useQuery(api.transparency.getRecentActivity, {
     limit: 10,
   });
   const convexCategoryHealth = useQuery(api.transparency.getCategoryHealth);
   const convexSources = useQuery(api.sources.getAll);
-  const convexDataOverview = useQuery(api.adminDashboard.getDataOverview);
+  const convexTableCounts = useQuery(api.counts.getTableCounts);
 
   const isLoading =
     convexActivity === undefined ||
     convexCategoryHealth === undefined ||
     convexSources === undefined ||
-    convexDataOverview === undefined;
+    convexTableCounts === undefined;
 
   const activityLogs = isLoading
     ? null
@@ -1065,9 +1000,9 @@ export default function TransparencyPage() {
     ? null
     : (convexSources as unknown as ConvexDataSource[]);
 
-  const dataOverview = isLoading
+  const tableCounts = isLoading
     ? null
-    : (convexDataOverview as unknown as Record<string, DataCategoryOverview>);
+    : (convexTableCounts as unknown as TableCounts);
 
   return (
     <div className="page-content" dir={dir}>
@@ -1120,7 +1055,7 @@ export default function TransparencyPage() {
           <CategoryDetailsCard
             isAr={isAr}
             categoryHealth={categoryHealth}
-            dataOverview={dataOverview}
+            tableCounts={tableCounts}
             sources={sources}
             isLoading={isLoading}
           />

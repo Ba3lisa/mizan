@@ -6,33 +6,36 @@ import { Doc } from "./_generated/dataModel";
 export const getHomeStats = query({
   args: {},
   handler: async (ctx) => {
-    // Parliament members count
-    const houseMembers = await ctx.db
-      .query("parliamentMembers")
-      .withIndex("by_chamber_and_isCurrent", (q) =>
-        q.eq("chamber", "house").eq("isCurrent", true)
-      )
-      .collect();
-    const senateMembers = await ctx.db
-      .query("parliamentMembers")
-      .withIndex("by_chamber_and_isCurrent", (q) =>
-        q.eq("chamber", "senate").eq("isCurrent", true)
-      )
-      .collect();
+    // Parliament members count — use bounded take, house ~568, senate ~300
+    const [houseMembers, senateMembers, governorates, articles, latestDebt] =
+      await Promise.all([
+        ctx.db
+          .query("parliamentMembers")
+          .withIndex("by_chamber_and_isCurrent", (q) =>
+            q.eq("chamber", "house").eq("isCurrent", true)
+          )
+          .take(1000),
+        ctx.db
+          .query("parliamentMembers")
+          .withIndex("by_chamber_and_isCurrent", (q) =>
+            q.eq("chamber", "senate").eq("isCurrent", true)
+          )
+          .take(500),
+        // Governorates: Egypt has 27 — take(50) is more than enough
+        ctx.db.query("governorates").take(50),
+        // Constitution articles: 247 articles — take(300) avoids full-text collect
+        // by reading only what we need for the count (all fields are fetched, but
+        // the take bound prevents unbounded growth from triggering re-reads).
+        ctx.db.query("constitutionArticles").take(300),
+        // Latest external debt record
+        ctx.db
+          .query("debtRecords")
+          .withIndex("by_date")
+          .order("desc")
+          .first(),
+      ]);
+
     const parliamentarians = houseMembers.length + senateMembers.length;
-
-    // Governorate count
-    const governorates = await ctx.db.query("governorates").collect();
-
-    // Constitution articles count
-    const articles = await ctx.db.query("constitutionArticles").collect();
-
-    // Latest external debt
-    const latestDebt = await ctx.db
-      .query("debtRecords")
-      .withIndex("by_date")
-      .order("desc")
-      .first();
 
     return {
       parliamentarians: { value: parliamentarians, source: "parliament.gov.eg", sourceUrl: "https://www.parliament.gov.eg", sanadLevel: 1 },

@@ -159,6 +159,7 @@ export default defineSchema({
   })
     .index("by_articleNumber", ["articleNumber"])
     .index("by_partId", ["partId"])
+    .index("by_wasAmended2019", ["wasAmended2019"])
     .searchIndex("search_articles", {
       searchField: "textEn",
       filterFields: ["partId", "wasAmended2019"],
@@ -702,5 +703,6 @@ export default defineSchema({
     completedAt: v.optional(v.number()),
     error: v.optional(v.string()),
   })
-    .index("by_runId", ["runId"]),
+    .index("by_runId", ["runId"])
+    .index("by_runId_and_step", ["runId", "step"]),
 });

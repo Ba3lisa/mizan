@@ -24,6 +24,7 @@ import type * as budget from "../budget.js";
 import type * as constitution from "../constitution.js";
 import type * as constitutionQueries from "../constitutionQueries.js";
 import type * as council from "../council.js";
+import type * as counts from "../counts.js";
 import type * as crons from "../crons.js";
 import type * as data_referenceRecords from "../data/referenceRecords.js";
 import type * as dataRefresh from "../dataRefresh.js";
@@ -77,6 +78,7 @@ declare const fullApi: ApiFromModules<{
   constitution: typeof constitution;
   constitutionQueries: typeof constitutionQueries;
   council: typeof council;
+  counts: typeof counts;
   crons: typeof crons;
   "data/referenceRecords": typeof data_referenceRecords;
   dataRefresh: typeof dataRefresh;

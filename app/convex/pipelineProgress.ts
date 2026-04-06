@@ -73,12 +73,13 @@ export const updateStep = internalMutation({
     error: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db
+    const doc = await ctx.db
       .query("pipelineProgress")
-      .withIndex("by_runId", (q) => q.eq("runId", args.runId))
-      .collect();
+      .withIndex("by_runId_and_step", (q) =>
+        q.eq("runId", args.runId).eq("step", args.step)
+      )
+      .unique();
 
-    const doc = existing.find((d) => d.step === args.step);
     if (!doc) {
       console.warn(
         `[pipelineProgress] No entry found for runId=${args.runId}, step=${args.step}`
