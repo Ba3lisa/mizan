@@ -185,6 +185,41 @@ const DEBT_BURDEN: IndicatorMeta[] = [
   },
 ];
 
+const IMF_FORECASTS: IndicatorMeta[] = [
+  {
+    key: "imf_gdp_growth_forecast",
+    nameAr: "نمو الناتج المحلي (IMF)",
+    nameEn: "GDP Growth Forecast",
+    sourceEn: "IMF WEO",
+    sourceAr: "صندوق النقد الدولي",
+    sourceUrl: "https://www.imf.org/external/datamapper/profile/EGY",
+  },
+  {
+    key: "imf_inflation_forecast",
+    nameAr: "توقعات التضخم (IMF)",
+    nameEn: "Inflation Forecast",
+    sourceEn: "IMF WEO",
+    sourceAr: "صندوق النقد الدولي",
+    sourceUrl: "https://www.imf.org/external/datamapper/profile/EGY",
+  },
+  {
+    key: "imf_current_account_forecast",
+    nameAr: "الحساب الجاري (IMF)",
+    nameEn: "Current Account Forecast (% GDP)",
+    sourceEn: "IMF WEO",
+    sourceAr: "صندوق النقد الدولي",
+    sourceUrl: "https://www.imf.org/external/datamapper/profile/EGY",
+  },
+  {
+    key: "imf_gov_debt_gdp",
+    nameAr: "الدين الحكومي / الناتج (IMF)",
+    nameEn: "Gov Debt / GDP Forecast",
+    sourceEn: "IMF WEO",
+    sourceAr: "صندوق النقد الدولي",
+    sourceUrl: "https://www.imf.org/external/datamapper/profile/EGY",
+  },
+];
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatValue(value: number, unit: string): string {
@@ -590,24 +625,7 @@ export default function EconomyPage() {
             </p>
           </div>
 
-          {/* Currency toggle */}
-          <button
-            onClick={toggleCurrency}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md border border-border/60 bg-card/60 hover:border-primary/40 transition-all text-xs font-mono text-muted-foreground hover:text-foreground"
-          >
-            <span
-              className={currency === "EGP" ? "text-foreground font-bold" : ""}
-            >
-              EGP
-            </span>
-            <span className="text-muted-foreground/40">/</span>
-            <span
-              className={currency === "USD" ? "text-foreground font-bold" : ""}
-            >
-              USD
-            </span>
-            <span className="text-muted-foreground/40 ms-1">{symbol}</span>
-          </button>
+          {/* Currency toggle removed -- use the global one in the header */}
         </div>
 
         {/* ── AI Narrative ───────────────────────────────────────────────── */}
@@ -710,6 +728,21 @@ export default function EconomyPage() {
           </div>
         </Skeleton>
 
+        {/* ── IMF Forecasts ────────────────────────────────────────────────── */}
+        <SectionHeader en="IMF Forecasts (through 2030)" ar="توقعات صندوق النقد الدولي (حتى 2030)" isAr={isAr} />
+        <Skeleton name="economy-imf" loading={isLoading}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-2">
+            {IMF_FORECASTS.map((meta) => (
+              <IndicatorCardWithTimeline
+                key={meta.key}
+                meta={meta}
+                record={getRecord(meta.key)}
+                isAr={isAr}
+              />
+            ))}
+          </div>
+        </Skeleton>
+
         {/* ── Sources footer ──────────────────────────────────────────────── */}
         <div className="mt-8 pt-6 border-t border-border flex flex-wrap gap-4 text-[0.625rem] text-muted-foreground">
           {[
@@ -729,6 +762,10 @@ export default function EconomyPage() {
             {
               label: "Egyptian Exchange",
               url: "https://www.egx.com.eg",
+            },
+            {
+              label: "IMF DataMapper",
+              url: "https://www.imf.org/external/datamapper/profile/EGY",
             },
           ].map((s) => (
             <a
