@@ -1,5 +1,23 @@
-import { query, mutation, internalMutation } from "./_generated/server";
+import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
+
+// ─── INTERNAL QUERIES (used by poll agent) ───────────────────────────────────
+
+/** Returns question text + category for ALL historical polls, for dedup. */
+export const getPollHistory = internalQuery({
+  args: {},
+  handler: async (ctx) => {
+    const polls = await ctx.db
+      .query("polls")
+      .withIndex("by_createdAt")
+      .order("desc")
+      .collect();
+    return polls.map((p) => ({
+      questionEn: p.questionEn,
+      category: p.category,
+    }));
+  },
+});
 
 // ─── PUBLIC QUERIES ──────────────────────────────────────────────────────────
 

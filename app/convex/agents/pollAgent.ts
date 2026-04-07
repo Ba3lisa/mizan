@@ -57,26 +57,24 @@ ${homeStats.domesticDebt ? `- Domestic Debt: ${homeStats.domesticDebt.value}B EG
   // Get recent economic indicators
   try {
     const economyData = await ctx.runQuery(api.economy.getAllLatest);
-    if (economyData && Array.isArray(economyData)) {
-      const indicators = economyData
-        .slice(0, 10)
-        .map((i: { indicator: string; value: number; unit: string }) =>
-          `- ${i.indicator}: ${i.value} ${i.unit}`
-        )
+    if (economyData && typeof economyData === "object") {
+      const entries = Object.entries(economyData as Record<string, { indicator: string; value: number; unit: string }>)
+        .slice(0, 15)
+        .map(([key, ind]) => `- ${key}: ${ind.value} ${ind.unit}`)
         .join("\n");
-      sections.push(`ECONOMIC INDICATORS:\n${indicators}`);
+      sections.push(`ECONOMIC INDICATORS:\n${entries}`);
     }
   } catch {
     // Economy data not available
   }
 
-  // Get recent polls to avoid duplicates
-  const recentPolls = await ctx.runQuery(api.polls.getRecentPolls);
-  if (recentPolls.length > 0) {
-    const recentQuestions = recentPolls
-      .map((p) => `- "${p.questionEn}"`)
+  // Get ALL historical polls to avoid repeats
+  const pollHistory = await ctx.runQuery(internal.polls.getPollHistory);
+  if (pollHistory.length > 0) {
+    const historyList = pollHistory
+      .map((p: { questionEn: string; category: string }) => `- [${p.category}] "${p.questionEn}"`)
       .join("\n");
-    sections.push(`RECENT POLLS (avoid similar topics):\n${recentQuestions}`);
+    sections.push(`ALL PREVIOUS POLLS (you MUST NOT repeat any of these topics or rephrase them — generate something completely new):\n${historyList}`);
   }
 
   // Available app pages for linking data nuggets
@@ -168,6 +166,7 @@ RULES:
 8. NEVER ask about specific politicians by name
 9. Focus on policy, priorities, and citizen experience
 10. dataNuggets MUST use real numbers from the provided data — never invent statistics
+11. NEVER repeat a previous poll — check the full history and pick a completely different topic and angle
 
 QUESTION TYPES (rotate and mix these):
 A. DATA-CONTRAST questions: Surface a surprising data point and ask for reaction
@@ -197,11 +196,14 @@ export const generateDailyPoll = internalAction({
 CURRENT PLATFORM DATA:
 ${dataContext}
 
+CRITICAL DEDUP RULE: Review the "ALL PREVIOUS POLLS" list carefully. Your new poll MUST be about a DIFFERENT topic, angle, and category if possible. Do NOT rephrase, reword, or ask a variation of any previous question. If a previous poll asked about debt sustainability, do NOT ask about debt in any form. Pick a completely fresh angle from the data.
+
 Generate a poll that:
-1. Is relevant to the data above and uses real numbers
-2. Includes 2-3 dataNuggets with actual values from the data to help voters decide
-3. Is thought-provoking — surface interesting contrasts, tradeoffs, or surprising facts
-4. Would make an Egyptian citizen stop and think before answering
+1. Is on a COMPLETELY DIFFERENT topic from all previous polls listed above
+2. Is relevant to the data above and uses real numbers
+3. Includes 2-3 dataNuggets with actual values from the data to help voters decide
+4. Is thought-provoking — surface interesting contrasts, tradeoffs, or surprising facts
+5. Would make an Egyptian citizen stop and think before answering
 
 Remember: 3-4 options for most questions, 2 options for simple agree/disagree, max 5 options.
 The dataNuggets should use REAL values from the platform data — never make up numbers.`;

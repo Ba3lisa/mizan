@@ -565,11 +565,11 @@ export default function InvestPage() {
                     const rate = convexRec?.value ?? asset.defaultReturn;
                     const tipTexts = ASSET_TOOLTIPS[asset.key];
                     return (
-                      <div key={asset.key} className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <div key={asset.key} className="space-y-1.5">
+                        <div className="flex items-start justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: asset.color }} />
-                            <span className="text-[0.7rem] text-foreground truncate">
+                            <span className="text-[0.75rem] font-medium text-foreground">
                               {isAr ? asset.nameAr : asset.nameEn}
                             </span>
                             {tipTexts && (
@@ -582,14 +582,13 @@ export default function InvestPage() {
                               />
                             )}
                           </div>
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            <span className="text-[0.55rem] text-muted-foreground/60 font-mono" title={isAr ? "العائد المتوقع" : "Expected return"}>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[0.6rem] text-muted-foreground/60 font-mono">
                               {isAr ? "عائد" : "ret"} {rate.toFixed(1)}%
                             </span>
                             <Badge
-                              className="text-[0.55rem] h-4 px-1.5 font-mono"
+                              className="text-[0.6rem] h-4 px-1.5 font-mono"
                               style={{ background: `${asset.color}22`, color: asset.color, border: `1px solid ${asset.color}44` }}
-                              title={isAr ? "نسبة التوزيع" : "Allocation %"}
                             >
                               {pct}%
                             </Badge>
@@ -603,8 +602,21 @@ export default function InvestPage() {
                           step={5}
                           value={pct}
                           onChange={(e) => handleAllocationChange(asset.key, parseInt(e.target.value))}
-                          className="w-full h-1.5 cursor-pointer accent-current"
-                          style={{ color: asset.color }}
+                          className="w-full h-1.5 cursor-pointer rounded-full appearance-none bg-muted [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-track]:bg-muted [&::-moz-range-track]:rounded-full [&::-moz-range-track]:h-1.5"
+                          style={{} as React.CSSProperties}
+                          ref={(el) => {
+                            if (!el) return;
+                            const s = el.style;
+                            s.setProperty("--thumb-color", asset.color);
+                            // Inline style for webkit thumb since Tailwind can't do dynamic colors
+                            const sheet = document.createElement("style");
+                            sheet.textContent = `input[data-asset="${asset.key}"]::-webkit-slider-thumb { background: ${asset.color} !important; } input[data-asset="${asset.key}"]::-moz-range-thumb { background: ${asset.color} !important; }`;
+                            if (!document.querySelector(`style[data-slider="${asset.key}"]`)) {
+                              sheet.setAttribute("data-slider", asset.key);
+                              document.head.appendChild(sheet);
+                            }
+                          }}
+                          data-asset={asset.key}
                         />
                       </div>
                     );

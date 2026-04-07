@@ -388,16 +388,21 @@ function HeroCard({ meta, record, isAr, index }: HeroCardProps) {
   const values: number[] = timelineRecords ? timelineRecords.map((r) => r.value) : [];
   const isLoading = timelineRecords === undefined;
 
+  // Find value from previous year (not just previous data point)
+  const currentYear = record?.year ?? new Date().getFullYear().toString();
+  const prevYearStr = String(parseInt(currentYear) - 1);
+  const prevYearRecord = timelineRecords?.find((r) => r.year === prevYearStr);
+  const latestValue = values.length > 0 ? values[values.length - 1] : null;
+  const prevYearValue = prevYearRecord?.value ?? (values.length >= 2 ? values[values.length - 2] : null);
+
   const trend: "up" | "down" =
-    values.length >= 2
-      ? values[values.length - 1] >= values[values.length - 2]
-        ? "up"
-        : "down"
+    latestValue !== null && prevYearValue !== null
+      ? latestValue >= prevYearValue ? "up" : "down"
       : "up";
 
   const yoyChange =
-    values.length >= 2
-      ? values[values.length - 1] - values[values.length - 2]
+    latestValue !== null && prevYearValue !== null
+      ? latestValue - prevYearValue
       : null;
 
   const TrendIcon = trend === "up" ? TrendingUp : TrendingDown;
