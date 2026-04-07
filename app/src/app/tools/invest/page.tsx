@@ -858,7 +858,7 @@ export default function InvestPage() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                   {isAr ? "مستوى المخاطرة" : "Risk Level"}
                 </p>
-                <div>
+                <div dir="ltr">
                   <div className="h-3 rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 relative">
                     <div
                       className="absolute top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-white border-2 border-foreground shadow-lg transition-all duration-500"
