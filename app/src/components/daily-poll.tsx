@@ -162,11 +162,9 @@ export function DailyPoll() {
         {!isCollapsed && (
           <div className="p-4">
             {/* Data nuggets — key numbers to inform the vote */}
-            {/* @ts-expect-error dataNuggets may exist on extended poll schema */}
             {poll.dataNuggets && poll.dataNuggets.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-3">
-                {/* @ts-expect-error dataNuggets may exist on extended poll schema */}
-                {poll.dataNuggets.map((nugget: { labelAr: string; labelEn: string; value: string; linkPath?: string }, idx: number) => (
+                    {poll.dataNuggets.map((nugget: { labelAr: string; labelEn: string; value: string; linkPath?: string }, idx: number) => (
                   <Link
                     key={idx}
                     href={nugget.linkPath || "/"}
@@ -312,7 +310,7 @@ function PollOption({
           )}
 
           {/* Label */}
-          <span className={`text-xs font-medium truncate ${isSelected && hasVoted ? "text-primary" : ""}`}>
+          <span className={`text-xs font-medium ${isSelected && hasVoted ? "text-primary" : ""}`}>
             {isAr ? labelAr : labelEn}
           </span>
         </div>

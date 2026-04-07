@@ -25,6 +25,7 @@ export const getActivePoll = query({
       category: poll.category,
       contextAr: poll.contextAr,
       contextEn: poll.contextEn,
+      dataNuggets: poll.dataNuggets,
       totalVotes: poll.totalVotes,
       expiresAt: poll.expiresAt,
       createdAt: poll.createdAt,
