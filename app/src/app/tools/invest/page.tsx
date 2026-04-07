@@ -23,7 +23,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { TrendingUp, AlertTriangle, Info } from "lucide-react";
+import { TrendingUp, AlertTriangle, Info, BookOpen, ChevronDown } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,6 +41,7 @@ interface YearProjection {
   year: number;
   total: number;
   real: number;
+  usdTotal: number;
   byAsset: Record<string, number>;
 }
 
@@ -59,7 +60,7 @@ const ASSETS: AssetClass[] = [
   { key: "realEstate", nameEn: "Egyptian Real Estate", nameAr: "العقارات المصرية", color: "#2EC4B6", defaultReturn: 15, volatility: 12, convexKey: "egypt_real_estate_return" },
   { key: "cds", nameEn: "Bank CDs", nameAr: "شهادات بنكية", color: "#6C8EEF", defaultReturn: 19, volatility: 2, convexKey: "cbe_cd_rate" },
   { key: "tbills", nameEn: "Treasury Bills", nameAr: "أذون خزانة", color: "#3FC380", defaultReturn: 22.5, volatility: 3, convexKey: "egypt_tbill_rate" },
-  { key: "gold", nameEn: "Gold (EGP)", nameAr: "الذهب", color: "#F59E0B", defaultReturn: 20, volatility: 18, convexKey: "gold_price_egp" },
+  { key: "gold", nameEn: "Gold (EGP)", nameAr: "الذهب", color: "#F59E0B", defaultReturn: 20, volatility: 18, convexKey: "gold_annual_return" },
   { key: "sp500", nameEn: "S&P 500 (USD)", nameAr: "S&P 500", color: "#8B5CF6", defaultReturn: 10, volatility: 15, convexKey: "sp500_annual_return" },
   { key: "msciEm", nameEn: "MSCI EM", nameAr: "الأسواق الناشئة", color: "#EC4899", defaultReturn: 7.5, volatility: 20, convexKey: "msci_em_return" },
 ];
@@ -88,6 +89,38 @@ const PRESETS: Record<string, Preset> = {
 const DEFAULT_INFLATION = 25;
 const DEFAULT_HORIZON = 10;
 const DEFAULT_CAPITAL_INDEX = 4; // 1M
+const DEFAULT_DEPRECIATION = 7;
+
+const ASSET_TOOLTIPS: Record<string, { en: string; ar: string }> = {
+  egx30: {
+    en: "Egyptian stock market index. High returns but volatile. Best for long-term (5+ years).",
+    ar: "مؤشر البورصة المصرية. عوائد عالية لكن متقلب. الأفضل للمدى الطويل.",
+  },
+  realEstate: {
+    en: "Egyptian property appreciation. Illiquid — hard to sell quickly. Good inflation hedge.",
+    ar: "ارتفاع قيمة العقارات. غير سائل — صعب البيع بسرعة. حماية جيدة من التضخم.",
+  },
+  cds: {
+    en: "Fixed-rate certificates from Egyptian banks (Banque Misr, NBE). Guaranteed returns, very safe.",
+    ar: "شهادات ادخار ثابتة من البنوك. عوائد مضمونة وآمنة جداً.",
+  },
+  tbills: {
+    en: "Egyptian government treasury bills. Very safe, slightly higher yield than CDs, shorter terms.",
+    ar: "أذون خزانة حكومية. آمنة جداً، عائد أعلى قليلاً من الشهادات.",
+  },
+  gold: {
+    en: "Price in EGP includes both global gold movement and EGP depreciation. Good crisis hedge.",
+    ar: "السعر بالجنيه يشمل حركة الذهب العالمية وانخفاض الجنيه. حماية جيدة في الأزمات.",
+  },
+  sp500: {
+    en: "US stock market. Returns in USD — benefits from EGP depreciation but has currency risk if EGP strengthens.",
+    ar: "السوق الأمريكي. العوائد بالدولار — يستفيد من انخفاض الجنيه.",
+  },
+  msciEm: {
+    en: "Emerging markets index (includes Egypt, India, Brazil, etc.). Diversified but volatile.",
+    ar: "مؤشر الأسواق الناشئة. متنوع لكن متقلب.",
+  },
+};
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -107,7 +140,9 @@ function projectPortfolio(
   horizon: number,
   allocation: AllocationMap,
   returns: Record<string, number>,
-  inflation: number
+  inflation: number,
+  exchangeRate: number,
+  depreciationPct: number
 ): YearProjection[] {
   const result: YearProjection[] = [];
   const assetValues: Record<string, number> = {};
@@ -120,7 +155,8 @@ function projectPortfolio(
     const byAsset = { ...assetValues };
     const total = Object.values(byAsset).reduce((s, v) => s + v, 0);
     const real = total / Math.pow(1 + inflation / 100, year);
-    result.push({ year, total, real, byAsset });
+    const usdTotal = total / (exchangeRate * Math.pow(1 + depreciationPct / 100, year));
+    result.push({ year, total, real, usdTotal, byAsset });
 
     for (const key of Object.keys(assetValues)) {
       const rate = returns[key] ?? 0;
@@ -139,6 +175,19 @@ function calcWeightedVolatility(allocation: AllocationMap): number {
     total += pct;
   }
   return total > 0 ? weighted / total : 0;
+}
+
+// ─── Input Tooltip ────────────────────────────────────────────────────────────
+
+function InputTooltip({ text }: { text: string }) {
+  return (
+    <div className="group relative inline-flex">
+      <Info size={12} className="text-muted-foreground/40 cursor-help" />
+      <div className="absolute bottom-full start-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-lg bg-popover border border-border shadow-lg text-[0.65rem] text-muted-foreground leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
+        {text}
+      </div>
+    </div>
+  );
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -229,6 +278,9 @@ export default function InvestPage() {
     return { ...PRESETS.balanced.allocation };
   });
   const [activePreset, setActivePreset] = useState<string>("balanced");
+  const [depreciationPct, setDepreciationPct] = useState(DEFAULT_DEPRECIATION);
+  const [showUsd, setShowUsd] = useState(false);
+  const [showMethodology, setShowMethodology] = useState(false);
 
   const capital = CAPITAL_STEPS[capitalIdx] ?? 1_000_000;
 
@@ -236,8 +288,10 @@ export default function InvestPage() {
   const effectiveReturns = useMemo<Record<string, number>>(() => {
     const r: Record<string, number> = {};
     for (const asset of ASSETS) {
-      const convexRecord = convexDefaults?.[asset.convexKey];
-      r[asset.key] = convexRecord?.value ?? asset.defaultReturn;
+      const convexRecord = asset.convexKey ? convexDefaults?.[asset.convexKey] : undefined;
+      // Guard: values >100 are prices not rates (e.g., gold_price_egp = 4850)
+      const convexValue = convexRecord?.value;
+      r[asset.key] = (convexValue !== undefined && convexValue <= 100) ? convexValue : asset.defaultReturn;
     }
     return r;
   }, [convexDefaults]);
@@ -246,10 +300,14 @@ export default function InvestPage() {
     return convexDefaults?.["inflation"]?.value ?? DEFAULT_INFLATION;
   }, [convexDefaults]);
 
+  const exchangeRate = useMemo(() => {
+    return convexDefaults?.["exchange_rate"]?.value ?? 50;
+  }, [convexDefaults]);
+
   // Projection data
   const projections = useMemo(() => {
-    return projectPortfolio(capital, horizon, allocation, effectiveReturns, inflation);
-  }, [capital, horizon, allocation, effectiveReturns, inflation]);
+    return projectPortfolio(capital, horizon, allocation, effectiveReturns, inflation, exchangeRate, depreciationPct);
+  }, [capital, horizon, allocation, effectiveReturns, inflation, exchangeRate, depreciationPct]);
 
   // Asset race data (100% each asset)
   const raceData = useMemo(() => {
@@ -269,6 +327,7 @@ export default function InvestPage() {
   const isValid = Math.abs(totalAllocation - 100) < 0.5;
   const finalValue = projections[projections.length - 1]?.total ?? capital;
   const finalReal = projections[projections.length - 1]?.real ?? capital;
+  const finalUsd = projections[projections.length - 1]?.usdTotal ?? capital / exchangeRate;
   const riskScore = calcWeightedVolatility(allocation);
   const cashFinalValue = capital / Math.pow(1 + inflation / 100, horizon);
 
@@ -276,7 +335,9 @@ export default function InvestPage() {
   const stackedData = projections.map((p) => {
     const point: Record<string, number> = { year: p.year };
     for (const asset of ASSETS) {
-      point[asset.key] = Math.round(p.byAsset[asset.key] ?? 0);
+      const egpVal = p.byAsset[asset.key] ?? 0;
+      const usdDivisor = exchangeRate * Math.pow(1 + depreciationPct / 100, p.year);
+      point[asset.key] = Math.round(showUsd ? egpVal / usdDivisor : egpVal);
     }
     point.real = Math.round(p.real);
     return point;
@@ -327,9 +388,12 @@ export default function InvestPage() {
             {/* Capital */}
             <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
               <CardContent className="p-5 space-y-4">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                  {isAr ? "رأس المال" : "Capital"}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                    {isAr ? "رأس المال" : "Capital"}
+                  </p>
+                  <InputTooltip text={isAr ? "إجمالي المبلغ المتاح للاستثمار بالجنيه المصري." : "Your total available investment amount in Egyptian Pounds."} />
+                </div>
                 <div className="text-center">
                   <p className="text-2xl font-black text-foreground font-mono" dir="ltr">
                     {fmtNumber(capital)}
@@ -375,9 +439,12 @@ export default function InvestPage() {
             <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
               <CardContent className="p-5 space-y-3">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                    {isAr ? "المدى الزمني" : "Time Horizon"}
-                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                      {isAr ? "المدى الزمني" : "Time Horizon"}
+                    </p>
+                    <InputTooltip text={isAr ? "المدة المخططة للاستثمار. فترات أطول تقلل المخاطر عادة." : "How long you plan to keep your investment. Longer horizons generally reduce risk."} />
+                  </div>
                   <Badge variant="secondary" className="font-mono text-xs">
                     {horizon} {isAr ? "سنة" : "yr"}
                   </Badge>
@@ -445,6 +512,7 @@ export default function InvestPage() {
                     const pct = allocation[asset.key] ?? 0;
                     const convexRec = convexDefaults?.[asset.convexKey];
                     const rate = convexRec?.value ?? asset.defaultReturn;
+                    const tipTexts = ASSET_TOOLTIPS[asset.key];
                     return (
                       <div key={asset.key} className="space-y-1">
                         <div className="flex items-center justify-between">
@@ -453,6 +521,9 @@ export default function InvestPage() {
                             <span className="text-[0.7rem] text-foreground truncate">
                               {isAr ? asset.nameAr : asset.nameEn}
                             </span>
+                            {tipTexts && (
+                              <InputTooltip text={isAr ? tipTexts.ar : tipTexts.en} />
+                            )}
                             {convexRec && (
                               <SanadBadge
                                 sanadLevel={convexRec.sanadLevel}
@@ -524,6 +595,36 @@ export default function InvestPage() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* EGP Depreciation */}
+            <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
+              <CardContent className="p-5 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                      {isAr ? "انخفاض الجنيه / سنة" : "EGP Depreciation / yr"}
+                    </p>
+                    <InputTooltip text={isAr ? "مقدار انخفاض الجنيه أمام الدولار سنوياً. تاريخياً: ~7-15% منذ 2022." : "How much EGP loses against USD annually. Historical: ~7-15%/year since 2022."} />
+                  </div>
+                  <Badge variant="secondary" className="font-mono text-xs">
+                    {depreciationPct}%
+                  </Badge>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={15}
+                  step={1}
+                  value={depreciationPct}
+                  onChange={(e) => setDepreciationPct(parseInt(e.target.value))}
+                  className="w-full accent-[#C9A84C] cursor-pointer"
+                />
+                <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono" dir="ltr">
+                  <span>0%</span>
+                  <span>15%</span>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* ─── Results Columns (3 cols) ───────────────────────────────── */}
@@ -537,26 +638,43 @@ export default function InvestPage() {
             >
               <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-card/80 to-card/60 backdrop-blur-sm overflow-hidden">
                 <CardContent className="p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-1">
-                        {isAr ? "القيمة المتوقعة" : "Projected Value"}
-                      </p>
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                          {isAr ? "القيمة المتوقعة" : "Projected Value"}
+                        </p>
+                        <button
+                          onClick={() => setShowUsd((v) => !v)}
+                          className="text-[0.6rem] font-semibold px-2 py-0.5 rounded-full border border-border hover:border-primary/50 text-muted-foreground hover:text-primary transition-colors"
+                        >
+                          {showUsd ? (isAr ? "عرض بالجنيه" : "Show in EGP") : (isAr ? "عرض بالدولار" : "Show in USD")}
+                        </button>
+                      </div>
                       <motion.p
-                        key={finalValue}
+                        key={`${finalValue}-${showUsd}`}
                         initial={{ opacity: 0.5, y: 4 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3 }}
                         className="text-3xl sm:text-4xl font-black text-primary font-mono" dir="ltr"
                       >
-                        {fmtCompact(finalValue)}{" "}
-                        <span className="text-lg text-muted-foreground">{symbol}</span>
+                        {showUsd ? `$${fmtCompact(finalUsd)}` : `${fmtCompact(finalValue)} EGP`}
                       </motion.p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {isAr
-                          ? `بعد ${horizon} سنة — من أصل ${fmtCompact(capital)} ${symbol}`
-                          : `in ${horizon} years — from ${fmtCompact(capital)} ${symbol}`}
+                          ? `بعد ${horizon} سنة — من أصل ${fmtCompact(capital)} جنيه`
+                          : `in ${horizon} years — from ${fmtCompact(capital)} EGP`}
                       </p>
+                      {!showUsd && (
+                        <p className="text-xs text-muted-foreground/70 mt-0.5 font-mono" dir="ltr">
+                          ≈ ${fmtCompact(finalUsd)} USD
+                        </p>
+                      )}
+                      {showUsd && (
+                        <p className="text-xs text-muted-foreground/70 mt-0.5 font-mono" dir="ltr">
+                          ≈ {fmtCompact(finalValue)} EGP
+                        </p>
+                      )}
                     </div>
                     <div className="sm:text-end">
                       <div className="flex items-center gap-1.5 mb-1 sm:justify-end">
@@ -567,7 +685,7 @@ export default function InvestPage() {
                       </div>
                       <p className="text-xl font-bold text-foreground font-mono" dir="ltr">
                         {fmtCompact(finalReal)}{" "}
-                        <span className="text-sm text-muted-foreground">{symbol}</span>
+                        <span className="text-sm text-muted-foreground">EGP</span>
                       </p>
                       <div className="flex items-center gap-1 mt-1 sm:justify-end">
                         <TrendingUp size={12} className="text-green-400" />
@@ -584,9 +702,12 @@ export default function InvestPage() {
             {/* Stacked Area Chart */}
             <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
               <CardContent className="p-5">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
-                  {isAr ? "نمو المحفظة عبر الزمن" : "Portfolio Growth Over Time"}
-                </p>
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                    {isAr ? "نمو المحفظة عبر الزمن" : "Portfolio Growth Over Time"}
+                    {showUsd && <span className="ms-2 text-primary">· USD</span>}
+                  </p>
+                </div>
                 <div dir="ltr">
                   <ResponsiveContainer width="100%" height={380}>
                     <AreaChart data={stackedData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
@@ -607,7 +728,7 @@ export default function InvestPage() {
                       />
                       <YAxis
                         tick={{ fontSize: 10, fill: "#888" }}
-                        tickFormatter={(v: number) => fmtCompact(v)}
+                        tickFormatter={(v: number) => showUsd ? `$${fmtCompact(v)}` : fmtCompact(v)}
                         stroke="rgba(255,255,255,0.1)"
                         width={60}
                       />
@@ -747,8 +868,13 @@ export default function InvestPage() {
                             {pct > 0 ? fmtCompact(finalAssetValue) : "—"}
                           </p>
                           <p className="text-[0.6rem] text-muted-foreground">
-                            {symbol} / {horizon}{isAr ? "ي" : "y"}
+                            EGP / {horizon}{isAr ? "ي" : "y"}
                           </p>
+                          {pct > 0 && (
+                            <p className="text-[0.58rem] text-muted-foreground/60 font-mono" dir="ltr">
+                              ≈ ${fmtCompact(finalAssetValue / (exchangeRate * Math.pow(1 + depreciationPct / 100, horizon)))} USD
+                            </p>
+                          )}
                           <Separator className="my-2" />
                           <div className="flex justify-between text-[0.6rem]">
                             <span className="text-muted-foreground">{isAr ? "التوزيع" : "Alloc."}</span>
@@ -798,6 +924,25 @@ export default function InvestPage() {
               </CardContent>
             </Card>
 
+            {/* Currency Warning */}
+            <Card className="border-blue-500/30 bg-blue-500/5">
+              <CardContent className="p-5">
+                <div className="flex items-start gap-3">
+                  <Info size={16} className="text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-foreground mb-1">
+                      {isAr ? "ملاحظة العملة" : "Currency Note"}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {isAr
+                        ? "عوائد S&P 500 وMSCI EM هي بالدولار الأمريكي أصلاً. عند تحويلها للجنيه، قد تبدو أعلى بسبب انخفاض الجنيه، لكن قوتك الشرائية الفعلية بالدولار قد تختلف."
+                        : "S&P 500 and MSCI returns are in USD. When converted to EGP, they may appear higher due to EGP depreciation, but your actual purchasing power in USD terms may differ."}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Disclaimer */}
             <div className="flex items-start gap-2 p-3 rounded-lg bg-muted/30 border border-border/40">
               <Info size={12} className="text-muted-foreground flex-shrink-0 mt-0.5" />
@@ -806,6 +951,97 @@ export default function InvestPage() {
                   ? "هذه المحاكاة للأغراض التعليمية فقط. الأداء السابق لا يضمن الأداء المستقبلي. معدلات العائد المستخدمة هي متوسطات تاريخية. استشر مستشارًا ماليًا قبل اتخاذ قرارات الاستثمار."
                   : "This simulation is for educational purposes only. Past performance does not guarantee future results. Return rates are historical averages. Consult a financial advisor before making investment decisions."}
               </p>
+            </div>
+
+            {/* Methodology Section */}
+            <div className="mt-10 border-t border-border pt-8">
+              <button
+                onClick={() => setShowMethodology((v) => !v)}
+                className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors group"
+              >
+                <BookOpen size={14} />
+                <span>{isAr ? "المنهجية والافتراضات" : "Methodology & Assumptions"}</span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform duration-200 ${showMethodology ? "rotate-180" : ""}`}
+                />
+              </button>
+
+              {showMethodology && (
+                <div className="mt-4 space-y-5 text-xs text-muted-foreground leading-relaxed">
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "صيغة الحساب" : "Projection Formula"}
+                    </h4>
+                    <p className="font-mono text-[0.7rem] bg-muted/30 p-2 rounded">FV = PV × (1 + r)^n</p>
+                    <p className="mt-1">{isAr ? "المحفظة = Σ(التوزيع × رأس المال × (1 + العائد)^سنة)" : "Portfolio = Σ(allocation_i × capital × (1 + return_i)^year)"}</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "تعديل التضخم" : "Inflation Adjustment"}
+                    </h4>
+                    <p className="font-mono text-[0.7rem] bg-muted/30 p-2 rounded">Real value = Nominal / (1 + inflation)^year</p>
+                    <p className="mt-1">{isAr ? "باستخدام أحدث بيانات CPI من CAPMAS / البنك الدولي." : "Using latest CPI data from CAPMAS / World Bank."}</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "مؤشر المخاطر" : "Risk Score"}
+                    </h4>
+                    <p>{isAr ? "متوسط مرجح للتقلب التاريخي (الانحراف المعياري للعوائد السنوية)." : "Weighted average of historical volatility (standard deviation of annual returns)."}</p>
+                    <p className="mt-1">{isAr ? "المقياس: 0% (شهادات فقط) إلى 100% (أسهم فقط)." : "Scale: 0% (all CDs) to 100% (all stocks)."}</p>
+                    <p className="mt-1 font-mono text-[0.65rem] bg-muted/30 p-2 rounded leading-loose">
+                      CDs 2% · T-bills 3% · Real Estate 12% · S&P 500 15% · Gold 18% · MSCI EM 20% · EGX 30 25%
+                    </p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "ملاحظات العملة" : "Currency Considerations"}
+                    </h4>
+                    <p>{isAr ? "عوائد S&P 500 وMSCI EM هي بالدولار أصلاً. الذهب مسعّر بالدولار عالمياً." : "S&P 500 and MSCI EM returns are originally in USD. Gold is priced in USD globally."}</p>
+                    <p className="mt-1">{isAr ? "العوائد المحسوبة بالجنيه لهذه الأصول تشمل أثر انخفاض الجنيه." : "EGP-denominated returns for these assets include the effect of EGP depreciation."}</p>
+                    <p className="mt-1">{isAr ? "الشهادات البنكية وأذون الخزانة أدوات جنيه بحتة — لا تستفيد من تحركات العملة." : "Bank CDs and T-bills are pure EGP instruments — their returns do not benefit from currency movement."}</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "مصادر معدلات العائد" : "Return Rate Sources"}
+                    </h4>
+                    <ul className="space-y-1 list-disc list-inside">
+                      <li>{isAr ? "EGX 30: البورصة المصرية (egx.com.eg) — عوائد المؤشر التاريخية" : "EGX 30: Egyptian Exchange (egx.com.eg) — historical index returns"}</li>
+                      <li>{isAr ? "العقارات: تقديرات السوق من عقارماب وبيانات CAPMAS" : "Real Estate: Market estimates from Aqarmap and CAPMAS housing data"}</li>
+                      <li>{isAr ? "الشهادات البنكية: سعر الفائدة البنكية للبنك المركزي المصري" : "Bank CDs: Central Bank of Egypt overnight deposit rate"}</li>
+                      <li>{isAr ? "أذون الخزانة: نتائج مزاد أذون 91 يوم لدى البنك المركزي" : "T-bills: CBE 91-day T-bill auction results"}</li>
+                      <li>{isAr ? "الذهب: سعر الذهب الدولي × سعر صرف الدولار/الجنيه" : "Gold: International gold price × USD/EGP exchange rate"}</li>
+                      <li>{isAr ? "S&P 500: إجمالي العائد التاريخي (FRED)" : "S&P 500: Historical S&P 500 total return (FRED)"}</li>
+                      <li>{isAr ? "MSCI EM: مؤشر MSCI للأسواق الناشئة (MSCI.com)" : "MSCI EM: MSCI Emerging Markets Index (MSCI.com)"}</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "الافتراضات الرئيسية" : "Key Assumptions"}
+                    </h4>
+                    <ul className="space-y-1 list-disc list-inside">
+                      <li>{isAr ? "العوائد مركّبة سنوياً، وليس شهرياً." : "Returns are compounded annually, not monthly."}</li>
+                      <li>{isAr ? "لا تشمل تكاليف المعاملات أو الضرائب أو الرسوم." : "No transaction costs, taxes, or fees included."}</li>
+                      <li>{isAr ? "الأداء السابق لا يضمن الأداء المستقبلي." : "Past performance does not guarantee future results."}</li>
+                      <li>{isAr ? "لا يوجد إعادة توازن — يبقى التوزيع الأولي ثابتاً." : "No rebalancing — initial allocation stays fixed."}</li>
+                      <li>{isAr ? "عوائد العقارات اسمية (قبل التضخم)." : "Real estate returns are nominal (before inflation)."}</li>
+                    </ul>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-muted/30 border border-border/40">
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "إخلاء المسؤولية" : "Disclaimer"}
+                    </h4>
+                    <p>{isAr ? "هذا المحاكي للأغراض التعليمية فقط ولا يعتبر نصيحة استثمارية. العوائد الفعلية قد تختلف. استشر مستشاراً مالياً مرخصاً قبل اتخاذ قرارات استثمارية." : "This simulator is for educational purposes only. It does not constitute investment advice. Actual returns will vary. Consult a licensed financial advisor before making investment decisions."}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <DataSourceFooter category="economy" />

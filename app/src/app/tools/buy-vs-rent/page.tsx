@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DataSourceFooter } from "@/components/data-source";
 import { SanadBadge } from "@/components/sanad-badge";
-import { Scale, TrendingUp, Home, Receipt } from "lucide-react";
+import { Scale, TrendingUp, Home, Receipt, BookOpen, ChevronDown, Info } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   ResponsiveContainer,
@@ -32,6 +32,7 @@ interface YearDataPoint {
   year: number;
   buyCost: number;
   rentCost: number;
+  buyUSD: number;
 }
 
 interface CalcParams {
@@ -43,6 +44,8 @@ interface CalcParams {
   annualRentIncreasePct: number;
   propertyAppreciationPct: number;
   investmentReturnPct: number;
+  depreciationPct: number;
+  exchangeRate: number;
 }
 
 interface CalcResult {
@@ -50,6 +53,7 @@ interface CalcResult {
   breakeven: number | null;
   totalBuyCost: number;
   totalRentCost: number;
+  totalBuyUSD: number;
   monthlyMortgage: number;
   monthlyInterest: number;
   monthlyPrincipal: number;
@@ -79,6 +83,8 @@ function calculateBuyVsRent(params: CalcParams): CalcResult {
     annualRentIncreasePct,
     propertyAppreciationPct,
     investmentReturnPct,
+    depreciationPct,
+    exchangeRate,
   } = params;
 
   const downPayment = propertyPrice * (downPaymentPct / 100);
@@ -111,7 +117,7 @@ function calculateBuyVsRent(params: CalcParams): CalcResult {
   for (let yr = 0; yr <= 30; yr++) {
     if (yr === 0) {
       // Year 0: initial state
-      chartData.push({ year: 0, buyCost: 0, rentCost: 0 });
+      chartData.push({ year: 0, buyCost: 0, rentCost: 0, buyUSD: 0 });
       continue;
     }
 
@@ -144,6 +150,15 @@ function calculateBuyVsRent(params: CalcParams): CalcResult {
     const equity = propertyValueAtYear - remainingLoanBalance;
     const buyNetCost = cumulativeBuyCost - equity;
 
+    // USD-adjusted buy cost: convert EGP net cost to USD at projected exchange rate
+    // As EGP depreciates, each EGP is worth fewer USD
+    const projectedRateAtYear =
+      exchangeRate > 0
+        ? exchangeRate * Math.pow(1 + depreciationPct / 100, yr)
+        : 1;
+    const buyNetCostUSD =
+      exchangeRate > 0 ? buyNetCost / projectedRateAtYear : 0;
+
     // --- RENT path ---
     // Rent for this year (increasing annually)
     const rentThisYear = monthlyRent * 12 * Math.pow(1 + annualRentIncreasePct / 100, yr - 1);
@@ -158,6 +173,7 @@ function calculateBuyVsRent(params: CalcParams): CalcResult {
       year: yr,
       buyCost: Math.round(buyNetCost),
       rentCost: Math.round(rentNetCost),
+      buyUSD: Math.round(buyNetCostUSD),
     });
 
     if (breakeven === null && buyNetCost < rentNetCost) {
@@ -172,6 +188,7 @@ function calculateBuyVsRent(params: CalcParams): CalcResult {
     breakeven,
     totalBuyCost: finalData?.buyCost ?? 0,
     totalRentCost: finalData?.rentCost ?? 0,
+    totalBuyUSD: finalData?.buyUSD ?? 0,
     monthlyMortgage: Math.round(monthlyMortgage),
     monthlyInterest: Math.round(monthlyInterest),
     monthlyPrincipal: Math.round(monthlyPrincipal),
@@ -188,7 +205,7 @@ function fmtCompact(n: number): string {
   return n.toFixed(0);
 }
 
-// ─── Slider Row ───────────────────────────────────────────────────────────────
+// ─── Slider Row with Tooltip ──────────────────────────────────────────────────
 
 function SliderRow({
   label,
@@ -198,6 +215,7 @@ function SliderRow({
   step,
   displayValue,
   onChange,
+  tooltip,
 }: {
   label: string;
   value: number;
@@ -206,14 +224,23 @@ function SliderRow({
   step: number;
   displayValue: string;
   onChange: (v: number) => void;
+  tooltip?: string;
 }) {
   return (
     <div className="mb-5">
-      <div className="flex justify-between mb-1.5">
+      <div className="flex items-center gap-1.5 mb-1.5">
         <label className="text-xs font-medium text-muted-foreground">
           {label}
         </label>
-        <span className="font-mono text-sm font-bold text-foreground">
+        {tooltip && (
+          <div className="group relative">
+            <Info size={12} className="text-muted-foreground/40 cursor-help" />
+            <div className="absolute bottom-full start-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-lg bg-popover border border-border shadow-lg text-[0.65rem] text-muted-foreground leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
+              {tooltip}
+            </div>
+          </div>
+        )}
+        <span className="ms-auto font-mono text-sm font-bold text-foreground">
           {displayValue}
         </span>
       </div>
@@ -269,7 +296,10 @@ function CustomTooltip({
           />
           <span className="text-muted-foreground">{p.name}:</span>
           <span className="font-mono font-bold">
-            {symbol} {fmt(fromEGP(p.value), { compact: true })}
+            {/* USD line values are already in USD, don't run fromEGP on them */}
+            {p.name.includes("USD") || p.name.includes("دولار")
+              ? `$ ${fmtCompact(p.value)}`
+              : `${symbol} ${fmt(fromEGP(p.value), { compact: true })}`}
           </span>
         </div>
       ))}
@@ -295,6 +325,8 @@ export default function BuyVsRentPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  const [showMethodology, setShowMethodology] = useState(false);
+
   // ─── Inputs ────────────────────────────────────────────────────────────────
   const [propertyPrice, setPropertyPrice] = useState(2_000_000);
   const [downPaymentPct, setDownPaymentPct] = useState(20);
@@ -303,6 +335,7 @@ export default function BuyVsRentPage() {
   const [annualRentIncrease, setAnnualRentIncrease] = useState(10);
   const [propertyAppreciation, setPropertyAppreciation] = useState(12);
   const [investmentReturn, setInvestmentReturn] = useState(18);
+  const [depreciationPct, setDepreciationPct] = useState(7);
 
   // Mortgage rate comes from Convex, user can override
   const convexMortgageRate = mortgageData?.value;
@@ -313,6 +346,9 @@ export default function BuyVsRentPage() {
       setMortgageRatePct(convexMortgageRate);
     }
   }, [convexMortgageRate]);
+
+  // Exchange rate from Convex
+  const exchangeRate = investmentData?.exchange_rate?.value ?? 0;
 
   // ─── Calculations ───────────────────────────────────────────────────────────
   const result = useMemo<CalcResult>(
@@ -326,6 +362,8 @@ export default function BuyVsRentPage() {
         annualRentIncreasePct: annualRentIncrease,
         propertyAppreciationPct: propertyAppreciation,
         investmentReturnPct: investmentReturn,
+        depreciationPct,
+        exchangeRate,
       }),
     [
       propertyPrice,
@@ -336,6 +374,8 @@ export default function BuyVsRentPage() {
       annualRentIncrease,
       propertyAppreciation,
       investmentReturn,
+      depreciationPct,
+      exchangeRate,
     ]
   );
 
@@ -364,26 +404,34 @@ export default function BuyVsRentPage() {
     {
       label: isAr ? "إجمالي تكلفة الشراء" : "Total Buy Cost",
       value: result.totalBuyCost,
+      usdValue: result.totalBuyUSD,
       icon: <Home size={14} className="text-[#E5484D]" />,
       color: "#E5484D",
+      showUSD: true,
     },
     {
       label: isAr ? "إجمالي تكلفة الإيجار" : "Total Rent Cost",
       value: result.totalRentCost,
+      usdValue: null,
       icon: <Receipt size={14} className="text-[#C9A84C]" />,
       color: "#C9A84C",
+      showUSD: false,
     },
     {
       label: isAr ? "الفرق بعد ٣٠ سنة" : "Difference (30yr)",
       value: savings,
+      usdValue: null,
       icon: <TrendingUp size={14} className="text-[#3FC380]" />,
       color: "#3FC380",
+      showUSD: false,
     },
     {
       label: isAr ? "القسط الشهري" : "Monthly Payment",
       value: result.monthlyMortgage,
+      usdValue: null,
       icon: <Scale size={14} className="text-[#6C8EEF]" />,
       color: "#6C8EEF",
+      showUSD: false,
     },
   ];
 
@@ -423,6 +471,11 @@ export default function BuyVsRentPage() {
                   step={100_000}
                   displayValue={`${symbol} ${fmt(fromEGP(propertyPrice), { compact: true })}`}
                   onChange={setPropertyPrice}
+                  tooltip={
+                    isAr
+                      ? "متوسط سعر الشقة في القاهرة: 2-4 مليون جنيه. تحقق من عقارماب لأسعار منطقتك."
+                      : "Average apartment price in Cairo: 2-4M EGP. Check Aqarmap or PropertyFinder for current prices in your area."
+                  }
                 />
 
                 <SliderRow
@@ -433,11 +486,16 @@ export default function BuyVsRentPage() {
                   step={5}
                   displayValue={`${downPaymentPct}%`}
                   onChange={setDownPaymentPct}
+                  tooltip={
+                    isAr
+                      ? "البنوك المصرية تطلب عادة 15-30% مقدم. مقدم أعلى = قسط شهري أقل."
+                      : "Egyptian banks typically require 15-30% down payment. Higher down payment = lower monthly mortgage."
+                  }
                 />
 
                 {/* Mortgage Rate — from Convex with SanadBadge */}
                 <div className="mb-5">
-                  <div className="flex justify-between items-center mb-1.5">
+                  <div className="flex items-center gap-1.5 mb-1.5">
                     <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                       {isAr ? "معدل فائدة القرض" : "Mortgage Rate"}
                       {mortgageData && (
@@ -450,7 +508,15 @@ export default function BuyVsRentPage() {
                         />
                       )}
                     </label>
-                    <span className="font-mono text-sm font-bold text-foreground">
+                    <div className="group relative">
+                      <Info size={12} className="text-muted-foreground/40 cursor-help" />
+                      <div className="absolute bottom-full start-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-lg bg-popover border border-border shadow-lg text-[0.65rem] text-muted-foreground leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
+                        {isAr
+                          ? "معدل البنك المركزي الحالي. أسعار البنوك الفعلية قد تختلف."
+                          : "Current CBE benchmark rate. Actual bank rates may vary. Check with your bank for the latest rate."}
+                      </div>
+                    </div>
+                    <span className="ms-auto font-mono text-sm font-bold text-foreground">
                       {mortgageRatePct.toFixed(1)}%
                     </span>
                   </div>
@@ -467,9 +533,19 @@ export default function BuyVsRentPage() {
 
                 {/* Mortgage Term — radio buttons */}
                 <div className="mb-5">
-                  <label className="text-xs font-medium text-muted-foreground block mb-2">
-                    {isAr ? "مدة القرض" : "Mortgage Term"}
-                  </label>
+                  <div className="flex items-center gap-1.5 mb-2">
+                    <label className="text-xs font-medium text-muted-foreground">
+                      {isAr ? "مدة القرض" : "Mortgage Term"}
+                    </label>
+                    <div className="group relative">
+                      <Info size={12} className="text-muted-foreground/40 cursor-help" />
+                      <div className="absolute bottom-full start-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-lg bg-popover border border-border shadow-lg text-[0.65rem] text-muted-foreground leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
+                        {isAr
+                          ? "فترة أطول = قسط أقل لكن فوائد إجمالية أكثر."
+                          : "Longer term = lower monthly payment but more total interest paid."}
+                      </div>
+                    </div>
+                  </div>
                   <div className="flex gap-2" dir="ltr">
                     {[10, 15, 20, 25].map((yr) => (
                       <button
@@ -503,6 +579,11 @@ export default function BuyVsRentPage() {
                   step={500}
                   displayValue={`${symbol} ${fmt(fromEGP(monthlyRent))}`}
                   onChange={setMonthlyRent}
+                  tooltip={
+                    isAr
+                      ? "إيجار عقار مماثل. تحقق من أوليكس أو عقارماب للأسعار المقارنة."
+                      : "What you would pay to rent a similar property. Check OLX or Aqarmap for comparable rents."
+                  }
                 />
 
                 <SliderRow
@@ -513,6 +594,11 @@ export default function BuyVsRentPage() {
                   step={1}
                   displayValue={`${annualRentIncrease}%`}
                   onChange={setAnnualRentIncrease}
+                  tooltip={
+                    isAr
+                      ? "الإيجارات في مصر تزيد عادة 8-15% سنوياً."
+                      : "Egyptian rents typically increase 8-15% annually. New rent law allows up to 15%."
+                  }
                 />
 
                 <SliderRow
@@ -523,6 +609,11 @@ export default function BuyVsRentPage() {
                   step={1}
                   displayValue={`${propertyAppreciation}%`}
                   onChange={setPropertyAppreciation}
+                  tooltip={
+                    isAr
+                      ? "العقارات المصرية ارتفعت ~12-20% سنوياً مؤخراً (قبل التضخم)."
+                      : "Egyptian real estate appreciated ~12-20% annually in recent years (nominal, before inflation)."
+                  }
                 />
 
                 <SliderRow
@@ -533,6 +624,11 @@ export default function BuyVsRentPage() {
                   step={1}
                   displayValue={`${investmentReturn}%`}
                   onChange={setInvestmentReturn}
+                  tooltip={
+                    isAr
+                      ? "لو استأجرت، المقدم يُستثمر. أذون الخزانة ~22%، الشهادات ~19%."
+                      : "If renting, your down payment is invested instead. T-bills yield ~22%, CDs ~19%."
+                  }
                 />
 
                 {investmentData?.egx30_annual_return && (
@@ -547,6 +643,49 @@ export default function BuyVsRentPage() {
                       sourceUrl={investmentData.egx30_annual_return.sourceUrl}
                       sourceNameEn="Egyptian Exchange"
                     />
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* ─── Currency Risk Inputs ──────────────────────────────────── */}
+            <Card className="border-amber-500/20 bg-amber-500/5 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <p className="text-xs font-semibold text-amber-400 uppercase tracking-widest mb-5">
+                  {isAr ? "مخاطر العملة" : "Currency Risk"}
+                </p>
+
+                <SliderRow
+                  label={isAr ? "انخفاض الجنيه سنوياً" : "Expected EGP Depreciation %/year"}
+                  value={depreciationPct}
+                  min={0}
+                  max={15}
+                  step={0.5}
+                  displayValue={`${depreciationPct}%`}
+                  onChange={setDepreciationPct}
+                  tooltip={
+                    isAr
+                      ? "انخفض الجنيه ~50% مقابل الدولار في السنوات الأخيرة. هذا يؤثر على القيمة الحقيقية بالدولار."
+                      : "The EGP depreciated ~50% vs USD in recent years. This affects the real USD value of your investment."
+                  }
+                />
+
+                {exchangeRate > 0 && (
+                  <p className="text-[0.625rem] text-muted-foreground mt-1">
+                    {isAr ? "السعر الحالي: " : "Current rate: "}
+                    <span className="text-amber-400 font-mono">
+                      1 USD = {exchangeRate.toFixed(0)} EGP
+                    </span>
+                    {investmentData?.exchange_rate && (
+                      <>
+                        {" "}
+                        <SanadBadge
+                          sanadLevel={investmentData.exchange_rate.sanadLevel}
+                          sourceUrl={investmentData.exchange_rate.sourceUrl}
+                          sourceNameEn="Central Bank of Egypt"
+                        />
+                      </>
+                    )}
                   </p>
                 )}
               </CardContent>
@@ -667,6 +806,24 @@ export default function BuyVsRentPage() {
                             stopOpacity={0.02}
                           />
                         </linearGradient>
+                        <linearGradient
+                          id="buyUSDGradient"
+                          x1="0"
+                          y1="0"
+                          x2="0"
+                          y2="1"
+                        >
+                          <stop
+                            offset="5%"
+                            stopColor="#6C8EEF"
+                            stopOpacity={0.25}
+                          />
+                          <stop
+                            offset="95%"
+                            stopColor="#6C8EEF"
+                            stopOpacity={0.02}
+                          />
+                        </linearGradient>
                       </defs>
                       <CartesianGrid
                         strokeDasharray="3 3"
@@ -739,15 +896,29 @@ export default function BuyVsRentPage() {
                         dot={false}
                         activeDot={{ r: 4, fill: "#C9A84C" }}
                       />
+                      {exchangeRate > 0 && (
+                        <Area
+                          type="monotone"
+                          dataKey="buyUSD"
+                          name={isAr ? "شراء (دولار)" : "Buy (USD)"}
+                          stroke="#6C8EEF"
+                          strokeWidth={1.5}
+                          strokeDasharray="5 3"
+                          fill="url(#buyUSDGradient)"
+                          animationDuration={1500}
+                          dot={false}
+                          activeDot={{ r: 3, fill: "#6C8EEF" }}
+                        />
+                      )}
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
                 {/* Legend */}
-                <div className="flex items-center gap-5 mt-3 justify-center" dir="ltr">
+                <div className="flex items-center gap-5 mt-3 justify-center flex-wrap" dir="ltr">
                   <div className="flex items-center gap-1.5">
                     <span className="w-3 h-0.5 bg-[#E5484D] inline-block rounded" />
                     <span className="text-[0.65rem] text-muted-foreground">
-                      {isAr ? "شراء" : "Buy"}
+                      {isAr ? "شراء (EGP)" : "Buy (EGP)"}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -756,6 +927,14 @@ export default function BuyVsRentPage() {
                       {isAr ? "إيجار" : "Rent"}
                     </span>
                   </div>
+                  {exchangeRate > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 inline-block" style={{ borderTop: "1.5px dashed #6C8EEF" }} />
+                      <span className="text-[0.65rem] text-muted-foreground">
+                        {isAr ? "شراء (USD)" : "Buy (USD)"}
+                      </span>
+                    </div>
+                  )}
                   {result.breakeven !== null && (
                     <div className="flex items-center gap-1.5">
                       <span className="w-3 h-0.5 bg-[#3FC380] inline-block rounded border-dashed" />
@@ -877,12 +1056,33 @@ export default function BuyVsRentPage() {
                         <p className="text-[0.6rem] text-muted-foreground mt-0.5">
                           {card.value.toLocaleString()} EGP
                         </p>
+                        {card.showUSD && card.usdValue !== null && exchangeRate > 0 && (
+                          <p className="text-[0.6rem] text-[#6C8EEF] mt-0.5 font-mono">
+                            ≈ $ {fmtCompact(card.usdValue)} USD
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   </motion.div>
                 ))}
               </div>
             </div>
+
+            {/* Currency Risk Warning */}
+            {exchangeRate > 0 && (
+              <Card className="border-amber-500/20 bg-amber-500/5">
+                <CardContent className="p-4">
+                  <p className="text-xs font-semibold text-amber-400 mb-1">
+                    {isAr ? "تنبيه: تأثير سعر الصرف" : "Currency Risk Warning"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {isAr
+                      ? `بافتراض انخفاض الجنيه ${depreciationPct}% سنوياً، القيمة الحقيقية بالدولار تختلف بشكل كبير عن القيمة بالجنيه.`
+                      : `Assuming ${depreciationPct}% annual EGP depreciation, USD-equivalent values differ significantly from EGP values.`}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Assumptions disclosure */}
             <Card className="border-border/40 bg-card/30">
@@ -921,6 +1121,120 @@ export default function BuyVsRentPage() {
                 </div>
               </CardContent>
             </Card>
+
+            {/* ─── Methodology Section ──────────────────────────────────── */}
+            <div className="mt-10 border-t border-border pt-8">
+              <button
+                onClick={() => setShowMethodology(!showMethodology)}
+                className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <BookOpen size={14} />
+                {isAr ? "المنهجية والافتراضات" : "Methodology & Assumptions"}
+                <ChevronDown
+                  size={12}
+                  className={showMethodology ? "rotate-180 transition-transform" : "transition-transform"}
+                />
+              </button>
+
+              {showMethodology && (
+                <div className="mt-4 space-y-4 text-xs text-muted-foreground leading-relaxed">
+                  {/* Mortgage Formula */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "صيغة القسط الشهري" : "Monthly Payment Formula"}
+                    </h4>
+                    <p className="font-mono bg-muted/40 rounded px-2 py-1 text-[0.65rem]">
+                      M = P × [r(1+r)^n] / [(1+r)^n - 1]
+                    </p>
+                    <p className="mt-1">
+                      {isAr
+                        ? "حيث P = قيمة القرض، r = معدل الفائدة الشهري، n = عدد الأقساط"
+                        : "Where P = loan amount, r = monthly interest rate, n = number of payments"}
+                    </p>
+                  </div>
+
+                  {/* Buy Cost */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "صافي تكلفة الشراء" : "Net Buy Cost"}
+                    </h4>
+                    <p>
+                      {isAr
+                        ? "= المقدم + إجمالي الأقساط + الصيانة (1% سنوياً) - حقوق الملكية المتراكمة - ارتفاع قيمة العقار"
+                        : "= Down payment + Total mortgage payments + Maintenance (1%/yr) - Equity built - Property appreciation"}
+                    </p>
+                  </div>
+
+                  {/* Rent Cost */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "صافي تكلفة الإيجار" : "Net Rent Cost"}
+                    </h4>
+                    <p>
+                      {isAr
+                        ? "= إجمالي الإيجار (بزيادة سنوية) - عوائد استثمار المقدم"
+                        : "= Cumulative rent (with annual increases) - Returns from investing the down payment"}
+                    </p>
+                  </div>
+
+                  {/* USD Adjustment */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "التعديل بالدولار" : "USD Adjustment"}
+                    </h4>
+                    <p>
+                      {isAr
+                        ? "= تكلفة الشراء (EGP) ÷ (سعر الصرف الحالي × (1 + نسبة الانخفاض)^السنة)"
+                        : "= Buy net cost (EGP) ÷ (current exchange rate × (1 + depreciation rate)^year)"}
+                    </p>
+                  </div>
+
+                  {/* Assumptions */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "الافتراضات" : "Assumptions"}
+                    </h4>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>
+                        {isAr
+                          ? "الصيانة والتأمين = 1% من قيمة العقار سنوياً"
+                          : "Maintenance + insurance = 1% of property value per year"}
+                      </li>
+                      <li>
+                        {isAr
+                          ? "لا تشمل ضرائب العقار (معفاة للوحدات السكنية تحت حد معين)"
+                          : "Property taxes excluded (exempt for residential units under threshold)"}
+                      </li>
+                      <li>
+                        {isAr
+                          ? "تكاليف الإغلاق غير مشمولة (عادة 3-5%)"
+                          : "Closing costs not included (typically 3-5%)"}
+                      </li>
+                      <li>
+                        {isAr ? "الأفق الزمني: 30 سنة" : "Time horizon: 30 years"}
+                      </li>
+                      <li>
+                        {isAr
+                          ? "القيم بالجنيه المصري ما لم يُذكر غير ذلك"
+                          : "Values in EGP unless otherwise noted"}
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Limitations */}
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1">
+                      {isAr ? "القيود" : "Limitations"}
+                    </h4>
+                    <p>
+                      {isAr
+                        ? "هذه الحاسبة تقديرية ولا تعتبر نصيحة مالية. الأسعار الفعلية قد تختلف بناءً على الموقع والحالة الاقتصادية. استشر متخصصاً مالياً قبل اتخاذ قرارات كبيرة."
+                        : "This calculator is for estimation only and does not constitute financial advice. Actual rates vary by location and economic conditions. Consult a financial professional before making major decisions."}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <Separator />
             <DataSourceFooter category="economy" />
