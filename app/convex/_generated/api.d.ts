@@ -53,6 +53,7 @@ import type * as seedData from "../seedData.js";
 import type * as sources from "../sources.js";
 import type * as taxData from "../taxData.js";
 import type * as testFetch from "../testFetch.js";
+import type * as tools from "../tools.js";
 import type * as transparency from "../transparency.js";
 
 import type {
@@ -107,6 +108,7 @@ declare const fullApi: ApiFromModules<{
   sources: typeof sources;
   taxData: typeof taxData;
   testFetch: typeof testFetch;
+  tools: typeof tools;
   transparency: typeof transparency;
 }>;
 

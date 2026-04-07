@@ -56,6 +56,15 @@ export const getAllLatest = query({
       "imf_inflation_forecast",
       "imf_current_account_forecast",
       "imf_gov_debt_gdp",
+      // Investment tool indicators
+      "egx30_annual_return",
+      "egypt_real_estate_return",
+      "cbe_cd_rate",
+      "egypt_tbill_rate",
+      "gold_price_egp",
+      "sp500_annual_return",
+      "msci_em_return",
+      "egypt_mortgage_rate",
     ] as const;
 
     const result: Record<string, {
@@ -122,6 +131,15 @@ export const getAllLatestMultiSource = query({
       "imf_inflation_forecast",
       "imf_current_account_forecast",
       "imf_gov_debt_gdp",
+      // Investment tool indicators
+      "egx30_annual_return",
+      "egypt_real_estate_return",
+      "cbe_cd_rate",
+      "egypt_tbill_rate",
+      "gold_price_egp",
+      "sp500_annual_return",
+      "msci_em_return",
+      "egypt_mortgage_rate",
     ] as const;
 
     type IndicatorRecord = Doc<"economicIndicators">;

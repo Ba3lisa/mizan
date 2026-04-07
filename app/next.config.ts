@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [],
   },
+  async redirects() {
+    return [
+      { source: "/budget/your-share", destination: "/tools/tax-calculator", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

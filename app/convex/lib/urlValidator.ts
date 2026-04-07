@@ -21,6 +21,12 @@ const TRUSTED_DOMAINS: Array<RegExp> = [
   /^countryeconomy\.com$/,
   /\.exchangerate-api\.com$/,
   /\.tradingeconomics\.com$/,
+  /\.egx\.com\.eg$/,
+  /\.aqarmap\.com\.eg$/,
+  /\.alphavantage\.co$/,
+  /\.stlouisfed\.org$/,
+  /\.banquemisr\.com$/,
+  /\.nbe\.com\.eg$/,
 ];
 
 /**
