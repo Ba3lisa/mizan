@@ -46,12 +46,28 @@ const STEP_NAMES_AR: Record<string, string> = {
   budget: "الموازنة",
   debt: "الدين",
   economy: "الاقتصاد",
+  governorate_stats: "إحصائيات المحافظات",
   constitution: "الدستور",
   github_issues: "مشكلات GitHub",
   narrative: "التحليل الاقتصادي",
   llm_export: "تصدير الذكاء الاصطناعي",
   cleanup: "التنظيف",
   reference_data: "البيانات المرجعية",
+};
+
+const STEP_NAMES_EN: Record<string, string> = {
+  government: "Government",
+  parliament: "Parliament",
+  budget: "Budget",
+  debt: "Debt",
+  economy: "Economy",
+  governorate_stats: "Governorate Stats",
+  constitution: "Constitution",
+  github_issues: "GitHub Issues",
+  narrative: "Economic Analysis",
+  llm_export: "AI Export",
+  cleanup: "Cleanup",
+  reference_data: "Reference Data",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -144,7 +160,7 @@ function useCountdown(lastCompletedAt: number | null, steps: PipelineStep[]): { 
 // ─── Pipeline Step Row ────────────────────────────────────────────────────────
 
 function StepRow({ step, isAr }: { step: PipelineStep; isAr: boolean }) {
-  const name = isAr ? (STEP_NAMES_AR[step.step] ?? step.step) : step.step;
+  const name = isAr ? (STEP_NAMES_AR[step.step] ?? step.step) : (STEP_NAMES_EN[step.step] ?? step.step);
   const message = isAr ? (step.messageAr || step.message) : (step.message || "--");
   const elapsed = formatElapsed(step.startedAt, step.completedAt);
 

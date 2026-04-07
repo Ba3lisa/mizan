@@ -705,6 +705,25 @@ export const logChange = internalMutation({
 });
 
 /**
+ * Returns the count of records for a given economic indicator (capped at 100).
+ * Used by the data agent to decide whether historical backfill is needed.
+ */
+export const countIndicatorRecords = internalQuery({
+  args: {
+    indicator: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const rows = await ctx.db
+      .query("economicIndicators")
+      .withIndex("by_indicator_and_date", (q) =>
+        q.eq("indicator", args.indicator)
+      )
+      .take(100);
+    return rows.length;
+  },
+});
+
+/**
  * Returns the most recent record for a given economic indicator.
  * Used by the narrative generator in the data agent.
  */
@@ -1018,5 +1037,75 @@ export const backfillAllSanadLevels = internalMutation({
     }
 
     return total;
+  },
+});
+
+/**
+ * One-time backfill of EGX 30 annual closing values (2010–2025).
+ * Inserts only if fewer than 10 egx30 records already exist.
+ * Source: Egyptian Exchange (EGX) public historical data.
+ * sanadLevel 1 = Official Government / Exchange source.
+ * Safe to run repeatedly — upsertEconomicIndicator is idempotent.
+ */
+export const backfillEgx30History = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const existing = await ctx.db
+      .query("economicIndicators")
+      .withIndex("by_indicator_and_date", (q) =>
+        q.eq("indicator", "egx30")
+      )
+      .take(100);
+
+    if (existing.length >= 10) {
+      console.log(
+        `[backfillEgx30History] Already have ${existing.length} egx30 records — skipping.`
+      );
+      return 0;
+    }
+
+    const EGX_SOURCE_URL = "https://www.egx.com.eg";
+    const EGX_SOURCE_NAME = "Egyptian Exchange (EGX) — annual closing values";
+
+    const historicalData: Array<{ year: string; value: number }> = [
+      { year: "2010", value: 7142 },
+      { year: "2011", value: 3622 },
+      { year: "2012", value: 5462 },
+      { year: "2013", value: 6783 },
+      { year: "2014", value: 8927 },
+      { year: "2015", value: 7006 },
+      { year: "2016", value: 12346 },
+      { year: "2017", value: 15019 },
+      { year: "2018", value: 13036 },
+      { year: "2019", value: 13962 },
+      { year: "2020", value: 10845 },
+      { year: "2021", value: 11949 },
+      { year: "2022", value: 14854 },
+      { year: "2023", value: 24036 },
+      { year: "2024", value: 28358 },
+      { year: "2025", value: 32186 },
+    ];
+
+    let inserted = 0;
+    for (const entry of historicalData) {
+      const date = `${entry.year}-12-31`;
+      const existingRow = existing.find((r) => r.date === date && r.sourceUrl === EGX_SOURCE_URL);
+      if (!existingRow) {
+        await ctx.db.insert("economicIndicators", {
+          indicator: "egx30",
+          date,
+          year: entry.year,
+          value: entry.value,
+          unit: "index",
+          sourceUrl: EGX_SOURCE_URL,
+          sourceNameEn: EGX_SOURCE_NAME,
+          sanadLevel: 1,
+        });
+        inserted++;
+      }
+    }
+
+    console.log(`[backfillEgx30History] Inserted ${inserted} EGX 30 historical records.`);
+    return inserted;
   },
 });

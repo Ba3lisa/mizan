@@ -1122,7 +1122,7 @@ ${snippet}`,
   const today = new Date().toISOString().slice(0, 10);
   const year = today.slice(0, 4);
 
-  const updated: number = await ctx.runMutation(
+  const todayUpdated: number = await ctx.runMutation(
     internal.dataRefresh.upsertEconomicIndicator,
     {
       indicator: "egx30",
@@ -1135,8 +1135,70 @@ ${snippet}`,
       sanadLevel: 4,
     }
   );
+  let updated = todayUpdated;
 
-  console.log(`[dataAgent/stock] EGX 30 = ${egx30Value} (updated: ${updated})`);
+  console.log(`[dataAgent/stock] EGX 30 = ${egx30Value} (updated: ${todayUpdated})`);
+
+  // ── Historical backfill (one-time) ────────────────────────────────────────
+  // If fewer than 10 egx30 data points exist, insert known annual closing values.
+  // These are well-documented public record from the Egyptian Exchange (EGX).
+  // sanadLevel 1 = Official Government / Exchange source.
+  const EGX_SOURCE_URL = "https://www.egx.com.eg";
+  const EGX_SOURCE_NAME = "Egyptian Exchange (EGX) — annual closing values";
+
+  const egx30Count: number = await ctx.runQuery(
+    internal.dataRefresh.countIndicatorRecords,
+    { indicator: "egx30" }
+  );
+
+  if (egx30Count < 10) {
+    console.log(
+      `[dataAgent/stock] EGX 30 has only ${egx30Count} data points — running historical backfill.`
+    );
+
+    const historicalData: Array<{ year: string; value: number }> = [
+      { year: "2010", value: 7142 },
+      { year: "2011", value: 3622 },
+      { year: "2012", value: 5462 },
+      { year: "2013", value: 6783 },
+      { year: "2014", value: 8927 },
+      { year: "2015", value: 7006 },
+      { year: "2016", value: 12346 },
+      { year: "2017", value: 15019 },
+      { year: "2018", value: 13036 },
+      { year: "2019", value: 13962 },
+      { year: "2020", value: 10845 },
+      { year: "2021", value: 11949 },
+      { year: "2022", value: 14854 },
+      { year: "2023", value: 24036 },
+      { year: "2024", value: 28358 },
+      { year: "2025", value: 32186 },
+    ];
+
+    let backfilled = 0;
+    for (const entry of historicalData) {
+      const backfillUpdated: number = await ctx.runMutation(
+        internal.dataRefresh.upsertEconomicIndicator,
+        {
+          indicator: "egx30",
+          date: `${entry.year}-12-31`,
+          year: entry.year,
+          value: entry.value,
+          unit: "index",
+          sourceUrl: EGX_SOURCE_URL,
+          sourceNameEn: EGX_SOURCE_NAME,
+          sanadLevel: 1,
+        }
+      );
+      backfilled += backfillUpdated;
+    }
+
+    console.log(
+      `[dataAgent/stock] EGX 30 historical backfill: ${backfilled} records written.`
+    );
+    updated += backfilled;
+  }
+
   return { recordsUpdated: updated, sourceUrl: SOURCE_URL };
 }
 

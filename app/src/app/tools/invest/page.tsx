@@ -24,18 +24,31 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { AlertTriangle, Info, BookOpen, ChevronDown } from "lucide-react";
+import { AlertTriangle, Info, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface AssetClass {
+interface Asset {
+  key: string;
+  nameEn: string;
+  nameAr: string;
+  convexKey: string;
+  defaultReturn: number;
+  volatility: number;
+}
+
+interface AssetGroup {
   key: string;
   nameEn: string;
   nameAr: string;
   color: string;
-  defaultReturn: number;
-  volatility: number;
-  convexKey: string;
+  assets: Asset[];
+}
+
+// Flat asset with group metadata (used in projection math and charts)
+interface FlatAsset extends Asset {
+  groupColor: string;
+  groupKey: string;
 }
 
 interface YearProjection {
@@ -56,15 +69,76 @@ type AllocationMap = Record<string, number>;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-const ASSETS: AssetClass[] = [
-  { key: "egx30", nameEn: "EGX 30 Stocks", nameAr: "أسهم البورصة المصرية", color: "#C9A84C", defaultReturn: 18.5, volatility: 25, convexKey: "egx30_annual_return" },
-  { key: "realEstate", nameEn: "Egyptian Real Estate", nameAr: "العقارات المصرية", color: "#2EC4B6", defaultReturn: 15, volatility: 12, convexKey: "egypt_real_estate_return" },
-  { key: "cds", nameEn: "Bank CDs", nameAr: "شهادات بنكية", color: "#6C8EEF", defaultReturn: 19, volatility: 2, convexKey: "cbe_cd_rate" },
-  { key: "tbills", nameEn: "Treasury Bills", nameAr: "أذون خزانة", color: "#3FC380", defaultReturn: 22.5, volatility: 3, convexKey: "egypt_tbill_rate" },
-  { key: "gold", nameEn: "Gold (EGP)", nameAr: "الذهب", color: "#F59E0B", defaultReturn: 20, volatility: 18, convexKey: "gold_annual_return" },
-  { key: "sp500", nameEn: "S&P 500 (USD)", nameAr: "S&P 500", color: "#8B5CF6", defaultReturn: 10, volatility: 15, convexKey: "sp500_annual_return" },
-  { key: "msciEm", nameEn: "MSCI EM", nameAr: "الأسواق الناشئة", color: "#EC4899", defaultReturn: 7.5, volatility: 20, convexKey: "msci_em_return" },
+const ASSET_GROUPS: AssetGroup[] = [
+  {
+    key: "egyptian_stocks",
+    nameEn: "Egyptian Stocks",
+    nameAr: "الأسهم المصرية",
+    color: "#C9A84C",
+    assets: [
+      { key: "egx30", nameEn: "EGX 30 Index", nameAr: "مؤشر البورصة EGX 30", convexKey: "egx30_annual_return", defaultReturn: 18.5, volatility: 25 },
+    ],
+  },
+  {
+    key: "bank_cds",
+    nameEn: "Bank Certificates",
+    nameAr: "شهادات بنكية",
+    color: "#6C8EEF",
+    assets: [
+      { key: "banque_misr_1yr", nameEn: "Banque Misr 1yr", nameAr: "بنك مصر — سنة", convexKey: "banque_misr_cd_1yr", defaultReturn: 16, volatility: 1 },
+      { key: "banque_misr_3yr", nameEn: "Banque Misr 3yr", nameAr: "بنك مصر — ٣ سنوات", convexKey: "banque_misr_cd_3yr", defaultReturn: 16, volatility: 1 },
+      { key: "nbe_1yr", nameEn: "NBE 1yr", nameAr: "البنك الأهلي — سنة", convexKey: "nbe_cd_1yr", defaultReturn: 16, volatility: 1 },
+      { key: "nbe_3yr", nameEn: "NBE 3yr Platinum", nameAr: "البنك الأهلي — بلاتينوم ٣ سنوات", convexKey: "nbe_cd_3yr", defaultReturn: 16, volatility: 1 },
+      { key: "cib_1yr", nameEn: "CIB 1yr", nameAr: "CIB — سنة", convexKey: "cib_cd_1yr", defaultReturn: 14, volatility: 1 },
+      { key: "cib_floating", nameEn: "CIB Floating", nameAr: "CIB — عائد متغير", convexKey: "cib_cd_floating", defaultReturn: 17, volatility: 2 },
+    ],
+  },
+  {
+    key: "gov_fixed_income",
+    nameEn: "Government Fixed Income",
+    nameAr: "دخل ثابت حكومي",
+    color: "#3FC380",
+    assets: [
+      { key: "tbills", nameEn: "Treasury Bills (91-day)", nameAr: "أذون خزانة", convexKey: "egypt_tbill_rate", defaultReturn: 25.7, volatility: 3 },
+      { key: "cert_1yr", nameEn: "Savings Cert 1yr", nameAr: "شهادة ادخار — سنة", convexKey: "egypt_savings_cert_1yr", defaultReturn: 16, volatility: 1 },
+      { key: "cert_3yr", nameEn: "Savings Cert 3yr", nameAr: "شهادة ادخار — ٣ سنوات", convexKey: "egypt_savings_cert_3yr", defaultReturn: 16, volatility: 1 },
+      { key: "cert_5yr", nameEn: "Savings Cert 5yr", nameAr: "شهادة ادخار — ٥ سنوات", convexKey: "egypt_savings_cert_5yr", defaultReturn: 14, volatility: 1 },
+    ],
+  },
+  {
+    key: "real_estate",
+    nameEn: "Real Estate",
+    nameAr: "العقارات",
+    color: "#2EC4B6",
+    assets: [
+      { key: "realEstate", nameEn: "Egyptian Real Estate", nameAr: "العقارات المصرية", convexKey: "egypt_real_estate_return", defaultReturn: 15, volatility: 12 },
+    ],
+  },
+  {
+    key: "gold",
+    nameEn: "Gold",
+    nameAr: "الذهب",
+    color: "#F59E0B",
+    assets: [
+      { key: "gold", nameEn: "Gold (EGP)", nameAr: "الذهب بالجنيه", convexKey: "gold_annual_return", defaultReturn: 20, volatility: 18 },
+    ],
+  },
+  {
+    key: "international",
+    nameEn: "International",
+    nameAr: "أسواق دولية",
+    color: "#8B5CF6",
+    assets: [
+      { key: "sp500", nameEn: "S&P 500 (USD)", nameAr: "S&P 500", convexKey: "sp500_annual_return", defaultReturn: 10, volatility: 15 },
+      { key: "msciEm", nameEn: "MSCI Emerging Markets", nameAr: "الأسواق الناشئة", convexKey: "msci_em_return", defaultReturn: 7.5, volatility: 20 },
+    ],
+  },
 ];
+
+// Flat list of all assets (for projection math and charts)
+const ALL_ASSETS: FlatAsset[] = ASSET_GROUPS.flatMap((g) =>
+  g.assets.map((a) => ({ ...a, groupColor: g.color, groupKey: g.key }))
+);
 
 const CAPITAL_STEPS = [50_000, 100_000, 250_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000, 25_000_000, 50_000_000];
 const QUICK_CAPITALS = [100_000, 500_000, 1_000_000, 5_000_000];
@@ -73,17 +147,27 @@ const PRESETS: Record<string, Preset> = {
   conservative: {
     nameEn: "Conservative",
     nameAr: "آمن",
-    allocation: { cds: 50, tbills: 25, gold: 15, realEstate: 10, egx30: 0, sp500: 0, msciEm: 0 },
+    allocation: { banque_misr_3yr: 25, nbe_3yr: 25, cert_3yr: 15, tbills: 15, gold: 10, realEstate: 10 },
   },
   balanced: {
     nameEn: "Balanced",
     nameAr: "متوازن",
-    allocation: { egx30: 25, realEstate: 25, cds: 20, gold: 15, tbills: 10, sp500: 5, msciEm: 0 },
+    allocation: { egx30: 20, realEstate: 20, banque_misr_1yr: 10, nbe_1yr: 10, tbills: 10, gold: 15, cert_1yr: 10, sp500: 5 },
   },
   aggressive: {
     nameEn: "Aggressive",
     nameAr: "مغامر",
-    allocation: { egx30: 40, realEstate: 20, sp500: 15, gold: 10, msciEm: 10, tbills: 5, cds: 0 },
+    allocation: { egx30: 35, realEstate: 20, sp500: 15, gold: 10, msciEm: 10, tbills: 5, banque_misr_1yr: 5 },
+  },
+  fixedIncome: {
+    nameEn: "Fixed Income",
+    nameAr: "دخل ثابت",
+    allocation: { banque_misr_3yr: 15, nbe_3yr: 15, cib_1yr: 10, cert_3yr: 20, cert_5yr: 15, tbills: 25 },
+  },
+  egyptianGrowth: {
+    nameEn: "Egyptian Growth",
+    nameAr: "نمو مصري",
+    allocation: { egx30: 40, realEstate: 25, gold: 20, banque_misr_1yr: 15 },
   },
 };
 
@@ -101,13 +185,45 @@ const ASSET_TOOLTIPS: Record<string, { en: string; ar: string }> = {
     en: "Egyptian property appreciation. Illiquid — hard to sell quickly. Good inflation hedge.",
     ar: "ارتفاع قيمة العقارات. غير سائل — صعب البيع بسرعة. حماية جيدة من التضخم.",
   },
-  cds: {
-    en: "Fixed-rate certificates from Egyptian banks (Banque Misr, NBE). Guaranteed returns, very safe.",
-    ar: "شهادات ادخار ثابتة من البنوك. عوائد مضمونة وآمنة جداً.",
+  banque_misr_1yr: {
+    en: "Fixed-rate certificate from Banque Misr. Guaranteed returns for 1 year. Very safe.",
+    ar: "شهادة ادخار ثابتة من بنك مصر. عائد مضمون لمدة سنة. آمنة جداً.",
+  },
+  banque_misr_3yr: {
+    en: "Fixed-rate certificate from Banque Misr. Guaranteed returns for 3 years. Very safe.",
+    ar: "شهادة ادخار ثابتة من بنك مصر. عائد مضمون لمدة ٣ سنوات. آمنة جداً.",
+  },
+  nbe_1yr: {
+    en: "Fixed-rate certificate from National Bank of Egypt. Guaranteed returns for 1 year. Very safe.",
+    ar: "شهادة ادخار ثابتة من البنك الأهلي. عائد مضمون لمدة سنة. آمنة جداً.",
+  },
+  nbe_3yr: {
+    en: "Platinum certificate from National Bank of Egypt. Guaranteed returns for 3 years. Very safe.",
+    ar: "شهادة بلاتينوم من البنك الأهلي. عائد مضمون لمدة ٣ سنوات. آمنة جداً.",
+  },
+  cib_1yr: {
+    en: "Fixed-rate certificate from CIB. Guaranteed returns for 1 year. Very safe.",
+    ar: "شهادة ادخار ثابتة من CIB. عائد مضمون لمدة سنة. آمنة جداً.",
+  },
+  cib_floating: {
+    en: "Floating-rate certificate from CIB. Rate adjusts with market. Slightly higher risk than fixed.",
+    ar: "شهادة بعائد متغير من CIB. العائد يتغير مع السوق. مخاطر أعلى قليلاً من الثابتة.",
   },
   tbills: {
     en: "Egyptian government treasury bills. Very safe, slightly higher yield than CDs, shorter terms.",
     ar: "أذون خزانة حكومية. آمنة جداً، عائد أعلى قليلاً من الشهادات.",
+  },
+  cert_1yr: {
+    en: "Government savings certificate. Backed by Egyptian government. 1 year commitment.",
+    ar: "شهادة ادخار حكومية. مضمونة من الحكومة المصرية. التزام لمدة سنة.",
+  },
+  cert_3yr: {
+    en: "Government savings certificate. Backed by Egyptian government. 3 year commitment.",
+    ar: "شهادة ادخار حكومية. مضمونة من الحكومة المصرية. التزام لمدة ٣ سنوات.",
+  },
+  cert_5yr: {
+    en: "Government savings certificate. Backed by Egyptian government. 5 year commitment.",
+    ar: "شهادة ادخار حكومية. مضمونة من الحكومة المصرية. التزام لمدة ٥ سنوات.",
   },
   gold: {
     en: "Price in EGP includes both global gold movement and EGP depreciation. Good crisis hedge.",
@@ -170,7 +286,7 @@ function projectPortfolio(
 function calcWeightedVolatility(allocation: AllocationMap): number {
   let weighted = 0;
   let total = 0;
-  for (const asset of ASSETS) {
+  for (const asset of ALL_ASSETS) {
     const pct = allocation[asset.key] ?? 0;
     weighted += pct * asset.volatility;
     total += pct;
@@ -306,8 +422,8 @@ export default function InvestPage() {
   const [horizon, setHorizon] = useState(DEFAULT_HORIZON);
   const [allocation, setAllocation] = useState<AllocationMap>(() => {
     const m: AllocationMap = {};
-    for (const a of ASSETS) m[a.key] = 0;
-    return { ...PRESETS.balanced.allocation };
+    for (const a of ALL_ASSETS) m[a.key] = 0;
+    return { ...m, ...PRESETS.balanced.allocation };
   });
   const [activePreset, setActivePreset] = useState<string>("balanced");
   const [depreciationPct, setDepreciationPct] = useState(DEFAULT_DEPRECIATION);
@@ -315,10 +431,10 @@ export default function InvestPage() {
 
   const capital = CAPITAL_STEPS[capitalIdx] ?? 1_000_000;
 
-  // Build effective returns: prefer Convex, fallback to ASSETS defaults
+  // Build effective returns: prefer Convex, fallback to ALL_ASSETS defaults
   const effectiveReturns = useMemo<Record<string, number>>(() => {
     const r: Record<string, number> = {};
-    for (const asset of ASSETS) {
+    for (const asset of ALL_ASSETS) {
       const convexRecord = asset.convexKey ? convexDefaults?.[asset.convexKey] : undefined;
       // Guard: values >100 are prices not rates (e.g., gold_price_egp = 4850)
       const convexValue = convexRecord?.value;
@@ -345,7 +461,7 @@ export default function InvestPage() {
     const years = Array.from({ length: horizon + 1 }, (_, i) => i);
     return years.map((year) => {
       const point: Record<string, number> = { year };
-      for (const asset of ASSETS) {
+      for (const asset of ALL_ASSETS) {
         const rate = effectiveReturns[asset.key] ?? 0;
         point[asset.key] = capital * Math.pow(1 + rate / 100, year);
       }
@@ -365,14 +481,33 @@ export default function InvestPage() {
   // Chart data
   const stackedData = projections.map((p) => {
     const point: Record<string, number> = { year: p.year };
-    for (const asset of ASSETS) {
+    for (const asset of ALL_ASSETS) {
       const egpVal = p.byAsset[asset.key] ?? 0;
-      const _usdDivisor = exchangeRate * Math.pow(1 + depreciationPct / 100, p.year);
       point[asset.key] = Math.round(egpVal);
     }
     point.real = Math.round(p.real);
     return point;
   });
+
+  // Track which groups are expanded in the allocation panel
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+    // Default: expand groups that have allocation in the balanced preset
+    const balancedKeys = new Set(Object.keys(PRESETS.balanced.allocation));
+    return new Set(
+      ASSET_GROUPS
+        .filter((g) => g.assets.some((a) => balancedKeys.has(a.key)))
+        .map((g) => g.key)
+    );
+  });
+
+  const toggleGroup = useCallback((groupKey: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }, []);
 
   // Handlers
   const handleAllocationChange = useCallback((key: string, value: number) => {
@@ -384,10 +519,17 @@ export default function InvestPage() {
     const preset = PRESETS[presetKey];
     if (!preset) return;
     const full: AllocationMap = {};
-    for (const a of ASSETS) full[a.key] = 0;
+    for (const a of ALL_ASSETS) full[a.key] = 0;
     const merged = { ...full, ...preset.allocation };
     setAllocation(merged);
     setActivePreset(presetKey);
+    // Auto-expand groups that have allocation in this preset
+    const presetKeys = new Set(Object.keys(preset.allocation));
+    setExpandedGroups(new Set(
+      ASSET_GROUPS
+        .filter((g) => g.assets.some((a) => presetKeys.has(a.key)))
+        .map((g) => g.key)
+    ));
   }, []);
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -522,12 +664,12 @@ export default function InvestPage() {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                   {isAr ? "استراتيجيات جاهزة" : "Quick Presets"}
                 </p>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {Object.entries(PRESETS).map(([key, preset]) => (
                     <button
                       key={key}
                       onClick={() => applyPreset(key)}
-                      className={`text-[0.65rem] font-semibold px-2 py-2 rounded-lg border transition-all ${
+                      className={`text-[0.65rem] font-semibold px-2.5 py-1.5 rounded-lg border transition-all ${
                         activePreset === key
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-border hover:border-primary/40 text-muted-foreground hover:text-foreground"
@@ -542,7 +684,7 @@ export default function InvestPage() {
 
             {/* Allocation sliders */}
             <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
-              <CardContent className="p-5 space-y-4">
+              <CardContent className="p-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                     {isAr ? "توزيع المحفظة" : "Allocation"}
@@ -558,66 +700,93 @@ export default function InvestPage() {
                   )}
                 </div>
 
-                <div className="space-y-3">
-                  {ASSETS.map((asset) => {
-                    const pct = allocation[asset.key] ?? 0;
-                    const convexRec = convexDefaults?.[asset.convexKey];
-                    const rate = convexRec?.value ?? asset.defaultReturn;
-                    const tipTexts = ASSET_TOOLTIPS[asset.key];
+                <div className="space-y-1">
+                  {ASSET_GROUPS.map((group) => {
+                    const groupTotal = group.assets.reduce((s, a) => s + (allocation[a.key] ?? 0), 0);
+                    const isExpanded = expandedGroups.has(group.key);
                     return (
-                      <div key={asset.key} className="space-y-1.5">
-                        <div className="flex items-start justify-between gap-2 flex-wrap">
-                          <div className="flex items-center gap-1.5">
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: asset.color }} />
-                            <span className="text-[0.75rem] font-medium text-foreground">
-                              {isAr ? asset.nameAr : asset.nameEn}
-                            </span>
-                            {tipTexts && (
-                              <InputTooltip text={isAr ? tipTexts.ar : tipTexts.en} />
-                            )}
-                            {convexRec && (
-                              <SanadBadge
-                                sanadLevel={convexRec.sanadLevel}
-                                sourceUrl={convexRec.sourceUrl}
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-[0.6rem] text-muted-foreground/60 font-mono">
-                              {isAr ? "عائد" : "ret"} {rate.toFixed(1)}%
-                            </span>
-                            <Badge
-                              className="text-[0.6rem] h-4 px-1.5 font-mono"
-                              style={{ background: `${asset.color}22`, color: asset.color, border: `1px solid ${asset.color}44` }}
+                      <div key={group.key}>
+                        {/* Group header */}
+                        <button
+                          type="button"
+                          onClick={() => toggleGroup(group.key)}
+                          className="w-full flex items-center gap-2 py-1.5 hover:bg-muted/30 rounded px-1 transition-colors"
+                        >
+                          <span
+                            className="w-2 h-2 rounded-full shrink-0"
+                            style={{ background: group.color }}
+                          />
+                          <span className="text-[0.7rem] font-semibold text-foreground flex-1 text-start">
+                            {isAr ? group.nameAr : group.nameEn}
+                          </span>
+                          {groupTotal > 0 && (
+                            <span
+                              className="text-[0.6rem] font-mono px-1.5 py-0.5 rounded"
+                              style={{ background: `${group.color}22`, color: group.color }}
                             >
-                              {pct}%
-                            </Badge>
+                              {groupTotal}%
+                            </span>
+                          )}
+                          {isExpanded
+                            ? <ChevronDown size={12} className="text-muted-foreground shrink-0" />
+                            : <ChevronRight size={12} className="text-muted-foreground shrink-0" />
+                          }
+                        </button>
+
+                        {/* Asset rows */}
+                        {isExpanded && (
+                          <div className="ps-3 border-s border-border/40 ms-2 mt-0.5 space-y-0.5">
+                            {group.assets.map((asset) => {
+                              const pct = allocation[asset.key] ?? 0;
+                              const convexRec = convexDefaults?.[asset.convexKey];
+                              const rate = (convexRec?.value !== undefined && convexRec.value <= 100)
+                                ? convexRec.value
+                                : asset.defaultReturn;
+                              const tipTexts = ASSET_TOOLTIPS[asset.key];
+                              return (
+                                <div key={asset.key} className="flex items-center gap-2 py-1.5">
+                                  <span className="text-sm font-medium text-foreground min-w-0 flex-1 truncate" title={isAr ? asset.nameAr : asset.nameEn}>
+                                    {isAr ? asset.nameAr : asset.nameEn}
+                                  </span>
+                                  {tipTexts && (
+                                    <InputTooltip text={isAr ? tipTexts.ar : tipTexts.en} />
+                                  )}
+                                  {convexRec && (
+                                    <SanadBadge
+                                      sanadLevel={convexRec.sanadLevel}
+                                      sourceUrl={convexRec.sourceUrl}
+                                    />
+                                  )}
+                                  <input
+                                    dir="ltr"
+                                    type="range"
+                                    min={0}
+                                    max={100}
+                                    step={1}
+                                    value={pct}
+                                    onChange={(e) => handleAllocationChange(asset.key, parseInt(e.target.value))}
+                                    className="w-24 h-1.5 cursor-pointer flex-shrink-0"
+                                    style={{ accentColor: group.color }}
+                                  />
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    max={100}
+                                    value={pct}
+                                    onChange={(e) => handleAllocationChange(
+                                      asset.key,
+                                      Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
+                                    )}
+                                    className="w-14 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-transparent"
+                                  />
+                                  <span className="text-[0.65rem] text-muted-foreground font-mono w-12 text-end shrink-0">
+                                    {rate.toFixed(1)}%
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
-                        </div>
-                        <input
-                          dir="ltr"
-                          type="range"
-                          min={0}
-                          max={100}
-                          step={5}
-                          value={pct}
-                          onChange={(e) => handleAllocationChange(asset.key, parseInt(e.target.value))}
-                          className="w-full h-1.5 cursor-pointer rounded-full appearance-none bg-muted [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-0 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-0 [&::-moz-range-track]:bg-muted [&::-moz-range-track]:rounded-full [&::-moz-range-track]:h-1.5"
-                          style={{} as React.CSSProperties}
-                          ref={(el) => {
-                            if (!el) return;
-                            const s = el.style;
-                            s.setProperty("--thumb-color", asset.color);
-                            // Inline style for webkit thumb since Tailwind can't do dynamic colors
-                            const sheet = document.createElement("style");
-                            sheet.textContent = `input[data-asset="${asset.key}"]::-webkit-slider-thumb { background: ${asset.color} !important; } input[data-asset="${asset.key}"]::-moz-range-thumb { background: ${asset.color} !important; }`;
-                            if (!document.querySelector(`style[data-slider="${asset.key}"]`)) {
-                              sheet.setAttribute("data-slider", asset.key);
-                              document.head.appendChild(sheet);
-                            }
-                          }}
-                          data-asset={asset.key}
-                        />
+                        )}
                       </div>
                     );
                   })}
@@ -807,10 +976,10 @@ export default function InvestPage() {
                   <ResponsiveContainer width="100%" height={380}>
                     <AreaChart data={stackedData} margin={{ top: 8, right: 16, bottom: 0, left: 8 }}>
                       <defs>
-                        {ASSETS.map((asset) => (
+                        {ALL_ASSETS.map((asset) => (
                           <linearGradient key={asset.key} id={`grad-${asset.key}`} x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor={asset.color} stopOpacity={0.6} />
-                            <stop offset="95%" stopColor={asset.color} stopOpacity={0.05} />
+                            <stop offset="5%" stopColor={asset.groupColor} stopOpacity={0.6} />
+                            <stop offset="95%" stopColor={asset.groupColor} stopOpacity={0.05} />
                           </linearGradient>
                         ))}
                       </defs>
@@ -837,7 +1006,7 @@ export default function InvestPage() {
                           />
                         )}
                       />
-                      {ASSETS.map((asset) => {
+                      {ALL_ASSETS.map((asset) => {
                         const pct = allocation[asset.key] ?? 0;
                         if (pct === 0) return null;
                         return (
@@ -847,7 +1016,7 @@ export default function InvestPage() {
                             dataKey={asset.key}
                             name={isAr ? asset.nameAr : asset.nameEn}
                             stackId="portfolio"
-                            stroke={asset.color}
+                            stroke={asset.groupColor}
                             fill={`url(#grad-${asset.key})`}
                             strokeWidth={1.5}
                             animationDuration={2000}
@@ -901,13 +1070,13 @@ export default function InvestPage() {
                         wrapperStyle={{ fontSize: 10, color: "#888" }}
                         formatter={(value: string) => <span style={{ color: "#888", fontSize: 10 }}>{value}</span>}
                       />
-                      {ASSETS.map((asset) => (
+                      {ALL_ASSETS.map((asset) => (
                         <Line
                           key={asset.key}
                           type="monotone"
                           dataKey={asset.key}
                           name={isAr ? asset.nameAr : asset.nameEn}
-                          stroke={asset.color}
+                          stroke={asset.groupColor}
                           strokeWidth={2}
                           dot={false}
                           animationDuration={1500}
@@ -925,7 +1094,7 @@ export default function InvestPage() {
                 {isAr ? "تفاصيل الأصول" : "Asset Breakdown"}
               </p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {ASSETS.map((asset, i) => {
+                {ALL_ASSETS.filter((asset) => (allocation[asset.key] ?? 0) > 0).map((asset, i) => {
                   const pct = allocation[asset.key] ?? 0;
                   const rate = effectiveReturns[asset.key] ?? asset.defaultReturn;
                   const finalAssetValue = projections[projections.length - 1]?.byAsset[asset.key] ?? 0;
@@ -938,14 +1107,12 @@ export default function InvestPage() {
                       transition={{ delay: i * 0.08, duration: 0.4 }}
                     >
                       <Card
-                        className={`border-border/60 bg-card/60 transition-all duration-300 ${
-                          pct > 0 ? "border-opacity-100" : "opacity-50"
-                        }`}
-                        style={pct > 0 ? { borderColor: `${asset.color}33` } : {}}
+                        className="border-border/60 bg-card/60 transition-all duration-300"
+                        style={{ borderColor: `${asset.groupColor}33` }}
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center gap-1.5 mb-2">
-                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: asset.color }} />
+                            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: asset.groupColor }} />
                             <span className="text-[0.65rem] text-muted-foreground leading-tight truncate">
                               {isAr ? asset.nameAr : asset.nameEn}
                             </span>
@@ -958,18 +1125,16 @@ export default function InvestPage() {
                           </div>
                           <p
                             className="text-lg font-black font-mono leading-tight"
-                            style={{ color: pct > 0 ? asset.color : undefined }}
+                            style={{ color: asset.groupColor }}
                           >
-                            {pct > 0 ? fmtVal(finalAssetValue) : "—"}
+                            {fmtVal(finalAssetValue)}
                           </p>
                           <p className="text-[0.6rem] text-muted-foreground">
                             EGP / {horizon}{isAr ? "ي" : "y"}
                           </p>
-                          {pct > 0 && (
-                            <p className="text-[0.58rem] text-muted-foreground/60 font-mono" dir="ltr">
-                              ≈ ${fmtCompact(finalAssetValue / (exchangeRate * Math.pow(1 + depreciationPct / 100, horizon)))} USD
-                            </p>
-                          )}
+                          <p className="text-[0.58rem] text-muted-foreground/60 font-mono" dir="ltr">
+                            ≈ ${fmtCompact(finalAssetValue / (exchangeRate * Math.pow(1 + depreciationPct / 100, horizon)))} USD
+                          </p>
                           <Separator className="my-2" />
                           <div className="flex justify-between text-[0.6rem]">
                             <span className="text-muted-foreground">{isAr ? "التوزيع" : "Alloc."}</span>
@@ -977,7 +1142,7 @@ export default function InvestPage() {
                           </div>
                           <div className="flex justify-between text-[0.6rem]">
                             <span className="text-muted-foreground">{isAr ? "العائد" : "Return"}</span>
-                            <span className="font-mono" style={{ color: asset.color }}>{rate.toFixed(1)}%</span>
+                            <span className="font-mono" style={{ color: asset.groupColor }}>{rate.toFixed(1)}%</span>
                           </div>
                         </CardContent>
                       </Card>
@@ -1088,7 +1253,7 @@ export default function InvestPage() {
                     <p>{isAr ? "متوسط مرجح للتقلب التاريخي (الانحراف المعياري للعوائد السنوية)." : "Weighted average of historical volatility (standard deviation of annual returns)."}</p>
                     <p className="mt-1">{isAr ? "المقياس: 0% (شهادات فقط) إلى 100% (أسهم فقط)." : "Scale: 0% (all CDs) to 100% (all stocks)."}</p>
                     <p className="mt-1 font-mono text-[0.65rem] bg-muted/30 p-2 rounded leading-loose">
-                      CDs 2% · T-bills 3% · Real Estate 12% · S&P 500 15% · Gold 18% · MSCI EM 20% · EGX 30 25%
+                      Bank CDs 1-2% · Gov Certs 1% · T-bills 3% · Real Estate 12% · S&P 500 15% · Gold 18% · MSCI EM 20% · EGX 30 25%
                     </p>
                   </div>
 
@@ -1108,8 +1273,9 @@ export default function InvestPage() {
                     <ul className="space-y-1 list-disc list-inside">
                       <li>{isAr ? "EGX 30: البورصة المصرية (egx.com.eg) — عوائد المؤشر التاريخية" : "EGX 30: Egyptian Exchange (egx.com.eg) — historical index returns"}</li>
                       <li>{isAr ? "العقارات: تقديرات السوق من عقارماب وبيانات CAPMAS" : "Real Estate: Market estimates from Aqarmap and CAPMAS housing data"}</li>
-                      <li>{isAr ? "الشهادات البنكية: سعر الفائدة البنكية للبنك المركزي المصري" : "Bank CDs: Central Bank of Egypt overnight deposit rate"}</li>
-                      <li>{isAr ? "أذون الخزانة: نتائج مزاد أذون 91 يوم لدى البنك المركزي" : "T-bills: CBE 91-day T-bill auction results"}</li>
+                      <li>{isAr ? "شهادات بنك مصر والبنك الأهلي وCIB: المواقع الرسمية للبنوك وتقارير البنك المركزي" : "Banque Misr, NBE, CIB certificates: Official bank websites and CBE reports"}</li>
+                      <li>{isAr ? "أذون الخزانة: نتائج مزاد أذون 91 يوم لدى البنك المركزي المصري" : "T-bills: CBE 91-day T-bill auction results"}</li>
+                      <li>{isAr ? "شهادات الادخار الحكومية: وزارة المالية وبيانات البنك المركزي" : "Government savings certificates: Ministry of Finance and CBE data"}</li>
                       <li>{isAr ? "الذهب: سعر الذهب الدولي × سعر صرف الدولار/الجنيه" : "Gold: International gold price × USD/EGP exchange rate"}</li>
                       <li>{isAr ? "S&P 500: إجمالي العائد التاريخي (FRED)" : "S&P 500: Historical S&P 500 total return (FRED)"}</li>
                       <li>{isAr ? "MSCI EM: مؤشر MSCI للأسواق الناشئة (MSCI.com)" : "MSCI EM: MSCI Emerging Markets Index (MSCI.com)"}</li>
