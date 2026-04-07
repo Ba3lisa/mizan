@@ -883,8 +883,8 @@ export default function InvestPage() {
                           {isAr ? "القيمة الاسمية" : "Nominal"}
                         </p>
                         <InputTooltip text={isAr
-                          ? "المبلغ الذي ستراه في حسابك — قبل احتساب تأثير التضخم وارتفاع الأسعار."
-                          : "The amount you'll see in your account — before accounting for inflation and rising prices."
+                          ? "الرقم الذي سيظهر في حسابك البنكي. لكن هذا لا يعني أن قوتك الشرائية زادت بنفس النسبة — لأن الأسعار ترتفع أيضاً (التضخم). انظر 'القوة الشرائية' لمعرفة القيمة الحقيقية."
+                          : "The number you'll see in your bank account. But this doesn't mean your buying power grew by the same amount — prices rise too (inflation). See 'Purchasing Power' for what your money is actually worth."
                         } />
                       </div>
                       <motion.p
@@ -899,8 +899,8 @@ export default function InvestPage() {
                       <p className="text-[0.6rem] text-muted-foreground/60 mt-1">
                         {finalValue > 0
                           ? (isAr
-                            ? `نمو ${(finalValue / capital).toFixed(1)} ضعف`
-                            : `${(finalValue / capital).toFixed(1)}x growth`)
+                            ? `نمو ${(finalValue / capital).toFixed(1)} ضعف — الرقم في حسابك`
+                            : `${(finalValue / capital).toFixed(1)}x growth — the number in your account`)
                           : "—"}
                       </p>
                     </div>
@@ -912,15 +912,17 @@ export default function InvestPage() {
                           {isAr ? "القوة الشرائية" : "Purchasing Power"}
                         </p>
                         <InputTooltip text={isAr
-                          ? "القيمة الحقيقية بعد خصم تأثير التضخم — كم يمكنك شراؤه فعلاً بهذا المبلغ مقارنة باليوم."
-                          : "Value after removing inflation — how much you can actually buy compared to today."
+                          ? `القوة الشرائية = القيمة الاسمية ÷ (١ + نسبة التضخم)^عدد السنوات. بمعدل تضخم ${Math.round(inflation)}% سنوياً، الأسعار تتضاعف كل ${(Math.log(2) / Math.log(1 + inflation / 100)).toFixed(0)} سنوات تقريباً. هذا الرقم يوضح كم يمكنك شراؤه فعلاً بأسعار اليوم.`
+                          : `Purchasing Power = Nominal ÷ (1 + inflation)^years. At ${Math.round(inflation)}% inflation, prices roughly double every ${(Math.log(2) / Math.log(1 + inflation / 100)).toFixed(0)} years. This shows what your money can actually buy in today's prices.`
                         } />
                       </div>
                       <p className="text-2xl font-black text-foreground font-mono">
                         {fmtVal(finalReal)}
                       </p>
                       <p className="text-[0.6rem] text-muted-foreground/60 mt-1">
-                        {isAr ? "بجنيه اليوم" : "in today's EGP"}
+                        {isAr
+                          ? `بجنيه اليوم (تضخم ${Math.round(inflation)}%)`
+                          : `in today's EGP (${Math.round(inflation)}% inflation)`}
                       </p>
                     </div>
 
@@ -932,8 +934,8 @@ export default function InvestPage() {
                             {isAr ? "بالدولار" : "In USD"}
                           </p>
                           <InputTooltip text={isAr
-                            ? `بافتراض انخفاض الجنيه ${depreciationPct}% سنوياً. حرّك شريط "انخفاض الجنيه" لتغيير هذا.`
-                            : `Assuming ${depreciationPct}% EGP depreciation/year. Adjust the depreciation slider to change this.`
+                            ? `بالدولار = القيمة الاسمية ÷ (سعر الصرف × (١ + نسبة انخفاض الجنيه)^عدد السنوات). سعر الصرف الحالي: ${exchangeRate.toFixed(1)} ج.م/$ مع انخفاض متوقع ${depreciationPct}% سنوياً. يمكنك تغيير معدل الانخفاض من الإعدادات.`
+                            : `USD = Nominal ÷ (exchange rate × (1 + depreciation)^years). Current rate: ${exchangeRate.toFixed(1)} EGP/$, with ${depreciationPct}% annual depreciation. Adjust the depreciation slider in settings to change this.`
                           } />
                         </div>
                         <motion.p
@@ -945,7 +947,9 @@ export default function InvestPage() {
                           ${fmtCompact(finalUsd)}
                         </motion.p>
                         <p className="text-[0.6rem] text-muted-foreground/60 mt-1">
-                          {isAr ? "بسعر صرف متوقع" : "at projected rate"}
+                          {isAr
+                            ? `بسعر صرف متوقع (${depreciationPct}%/سنة)`
+                            : `at projected rate (${depreciationPct}%/yr depreciation)`}
                         </p>
                       </div>
                     )}
