@@ -1940,6 +1940,10 @@ export const runBackfillInvestmentHistory = internalAction({
 export const orchestrateRefresh = internalAction({
   args: {},
   handler: async (ctx) => {
+    if (process.env.DISABLE_CRONS === "true") {
+      console.log("[dataAgent] Crons disabled (DISABLE_CRONS=true), skipping.");
+      return null;
+    }
     console.log("[dataAgent] orchestrateRefresh started.");
 
     const runId = Date.now().toString();

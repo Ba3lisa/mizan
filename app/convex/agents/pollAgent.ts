@@ -188,6 +188,10 @@ DATA NUGGETS:
 export const generateDailyPoll = internalAction({
   args: {},
   handler: async (ctx) => {
+    if (process.env.DISABLE_CRONS === "true") {
+      console.log("[pollAgent] Crons disabled, skipping.");
+      return;
+    }
     // Gather current data context
     const dataContext = await gatherDataContext(ctx);
 

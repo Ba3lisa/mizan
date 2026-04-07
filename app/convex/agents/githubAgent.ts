@@ -55,6 +55,10 @@ async function githubFetch(
 export const processGitHubIssues = internalAction({
   args: {},
   handler: async (ctx) => {
+    if (process.env.DISABLE_CRONS === "true") {
+      console.log("[githubAgent] Crons disabled, skipping.");
+      return null;
+    }
     console.log("[githubAgent] Starting batch GitHub Issues processing...");
     const batchId = `batch_${Date.now()}`;
 

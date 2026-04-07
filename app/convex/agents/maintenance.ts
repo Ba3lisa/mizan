@@ -17,6 +17,10 @@ const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
 export const compactRefreshLogs = internalAction({
   args: {},
   handler: async (ctx) => {
+    if (process.env.DISABLE_CRONS === "true") {
+      console.log("[maintenance] Crons disabled, skipping.");
+      return null;
+    }
     const cutoff = Date.now() - THIRTY_DAYS_MS;
     console.log(
       `[maintenance] Compacting refresh logs older than ${new Date(cutoff).toISOString()}`
