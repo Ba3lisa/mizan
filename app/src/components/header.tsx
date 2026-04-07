@@ -31,7 +31,12 @@ export function Header() {
 
   const directNav = [
     { href: "/", label: t.navHome },
+  ];
+
+  const govNav = [
     { href: "/government", label: t.navGovernment },
+    { href: "/constitution", label: t.navConstitution },
+    { href: "/governorate", label: t.navGovernorate },
   ];
 
   const dataNav = [
@@ -48,8 +53,6 @@ export function Header() {
   ];
 
   const aboutNav = [
-    { href: "/constitution", label: t.navConstitution },
-    { href: "/governorate", label: t.navGovernorate },
     { href: "/methodology", label: t.navMethodology },
     { href: "/transparency", label: t.navTransparency },
   ];
@@ -59,7 +62,7 @@ export function Header() {
   ];
 
   // Flat list for mobile menu
-  const allNav = [...directNav, ...dataNav, ...toolsNav, ...aboutNav, ...extraNav];
+  const allNav = [...directNav, ...govNav, ...dataNav, ...toolsNav, ...aboutNav, ...extraNav];
 
   const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
 
@@ -106,7 +109,7 @@ export function Header() {
 
         {/* Desktop Nav */}
         <nav className="hidden lg:flex items-center gap-6 flex-1" dir={dir}>
-          {/* Direct links: Home, Government */}
+          {/* Direct links: Home */}
           {directNav.map((n) => (
             <Link key={n.href} href={n.href}
               className={cn(
@@ -117,6 +120,9 @@ export function Header() {
               {isActive(n.href) && <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />}
             </Link>
           ))}
+
+          {/* Government dropdown */}
+          {renderDropdown(t.navGovernment, govNav)}
 
           {/* Data dropdown */}
           {renderDropdown(t.navData, dataNav)}

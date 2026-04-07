@@ -6,7 +6,6 @@ import { useLanguage } from "@/components/providers";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CabinetTab } from "./_components/cabinet-tab";
 import { ParliamentTab } from "./_components/parliament-tab";
-import { GovernorateTab } from "./_components/governorate-tab";
 
 // ─── Inner component (uses useSearchParams inside Suspense) ──────────────────
 
@@ -15,10 +14,7 @@ function GovernmentPageInner() {
   const isAr = lang === "ar";
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const defaultTab =
-    tabParam === "parliament" || tabParam === "governorates"
-      ? tabParam
-      : "cabinet";
+  const defaultTab = tabParam === "parliament" ? "parliament" : "cabinet";
 
   return (
     <div className="page-content" dir={dir}>
@@ -26,7 +22,7 @@ function GovernmentPageInner() {
         {/* Header */}
         <div className="mb-10">
           <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">
-            {isAr ? "السلطة التنفيذية" : "Executive Branch"}
+            {isAr ? "السلطة التنفيذية" : "Executive & Legislative"}
           </p>
           <h1 className="text-3xl md:text-4xl font-black mb-2">
             {isAr ? "الحكومة" : "Government"}
@@ -39,19 +35,15 @@ function GovernmentPageInner() {
         </div>
 
         <Tabs defaultValue={defaultTab} className="w-full">
-          <TabsList className="w-full grid grid-cols-3 mb-8">
+          <TabsList className="w-full grid grid-cols-2 mb-8">
             <TabsTrigger value="cabinet">{isAr ? "الحكومة" : "Cabinet"}</TabsTrigger>
             <TabsTrigger value="parliament">{isAr ? "البرلمان" : "Parliament"}</TabsTrigger>
-            <TabsTrigger value="governorates">{isAr ? "المحافظات" : "Governorates"}</TabsTrigger>
           </TabsList>
           <TabsContent value="cabinet">
             <CabinetTab />
           </TabsContent>
           <TabsContent value="parliament">
             <ParliamentTab />
-          </TabsContent>
-          <TabsContent value="governorates">
-            <GovernorateTab />
           </TabsContent>
         </Tabs>
       </div>
