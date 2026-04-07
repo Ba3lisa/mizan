@@ -683,7 +683,7 @@ export default function InvestPage() {
 
             {/* Hero Result — sticky on mobile so users see changes while adjusting controls */}
             <motion.div
-              className="sticky top-14 z-10 xl:static"
+              className="xl:static"
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
