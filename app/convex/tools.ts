@@ -31,6 +31,11 @@ export const getInvestmentDefaults = query({
       "egypt_savings_cert_1yr",
       "egypt_savings_cert_3yr",
       "egypt_savings_cert_5yr",
+      // Dividend / rental yield indicators
+      "egx30_dividend_yield",
+      "egypt_real_estate_rental_yield",
+      "sp500_dividend_yield",
+      "msci_em_dividend_yield",
     ];
 
     const result: Record<
@@ -263,6 +268,39 @@ export const seedInvestmentIndicators = internalMutation({
         sourceUrl: "https://api.stlouisfed.org",
         sourceNameEn: "FRED (St. Louis Fed)",
       },
+      // Dividend / rental yield indicators
+      {
+        indicator: "egx30_dividend_yield",
+        value: 2.5,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.egx.com.eg",
+        sourceNameEn: "Egyptian Exchange (EGX)",
+      },
+      {
+        indicator: "egypt_real_estate_rental_yield",
+        value: 4.0,
+        unit: "percent",
+        sanadLevel: 4,
+        sourceUrl: "https://www.aqarmap.com.eg",
+        sourceNameEn: "Aqarmap Egypt",
+      },
+      {
+        indicator: "sp500_dividend_yield",
+        value: 1.5,
+        unit: "percent",
+        sanadLevel: 2,
+        sourceUrl: "https://api.stlouisfed.org",
+        sourceNameEn: "FRED (St. Louis Fed)",
+      },
+      {
+        indicator: "msci_em_dividend_yield",
+        value: 2.5,
+        unit: "percent",
+        sanadLevel: 2,
+        sourceUrl: "https://www.msci.com",
+        sourceNameEn: "MSCI",
+      },
     ];
 
     for (const seed of seeds) {
@@ -341,6 +379,10 @@ export const getInvestmentIndicatorsByClass = query({
       gold_annual_return,
       sp500_annual_return,
       msci_em_return,
+      egx30_dividend_yield,
+      egypt_real_estate_rental_yield,
+      sp500_dividend_yield,
+      msci_em_dividend_yield,
     ] = await Promise.all([
       fetch("egx30_annual_return"),
       fetch("banque_misr_cd_1yr"),
@@ -357,10 +399,14 @@ export const getInvestmentIndicatorsByClass = query({
       fetch("gold_annual_return"),
       fetch("sp500_annual_return"),
       fetch("msci_em_return"),
+      fetch("egx30_dividend_yield"),
+      fetch("egypt_real_estate_rental_yield"),
+      fetch("sp500_dividend_yield"),
+      fetch("msci_em_dividend_yield"),
     ]);
 
     return {
-      egyptianStocks: { egx30 },
+      egyptianStocks: { egx30, egx30_dividend_yield },
       bankCDs: {
         banque_misr_cd_1yr,
         banque_misr_cd_3yr,
@@ -375,9 +421,14 @@ export const getInvestmentIndicatorsByClass = query({
         egypt_savings_cert_5yr,
         egypt_tbill_rate,
       },
-      realEstate: { egypt_real_estate_return },
+      realEstate: { egypt_real_estate_return, egypt_real_estate_rental_yield },
       gold: { gold_annual_return },
-      international: { sp500_annual_return, msci_em_return },
+      international: {
+        sp500_annual_return,
+        msci_em_return,
+        sp500_dividend_yield,
+        msci_em_dividend_yield,
+      },
     };
   },
 });

@@ -430,23 +430,32 @@ export default function InvestPage() {
   const [inflationPct, setInflationPct] = useState(DEFAULT_INFLATION);
   const [depreciationPct, setDepreciationPct] = useState(DEFAULT_DEPRECIATION);
   const [showMethodology, setShowMethodology] = useState(false);
+  // User-adjustable yield per asset (dividends, rent). Defaults from asset definition.
+  const [yieldOverrides, setYieldOverrides] = useState<Record<string, number>>(() => {
+    const m: Record<string, number> = {};
+    for (const a of ALL_ASSETS) {
+      if (a.yieldPct) m[a.key] = a.yieldPct;
+    }
+    return m;
+  });
+  const handleYieldChange = useCallback((key: string, value: number) => {
+    setYieldOverrides((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   const capital = CAPITAL_STEPS[capitalIdx] ?? 1_000_000;
 
-  // Build effective returns: prefer Convex, fallback to ALL_ASSETS defaults
-  // Build effective returns: price appreciation (from Convex or default) + yield (dividends/rent)
+  // Build effective returns: price appreciation (from Convex or default) + user yield override
   const effectiveReturns = useMemo<Record<string, number>>(() => {
     const r: Record<string, number> = {};
     for (const asset of ALL_ASSETS) {
       const convexRecord = asset.convexKey ? convexDefaults?.[asset.convexKey] : undefined;
-      // Guard: values >100 are prices not rates (e.g., gold_price_egp = 4850)
       const convexValue = convexRecord?.value;
       const priceReturn = (convexValue !== undefined && convexValue <= 100) ? convexValue : asset.defaultReturn;
-      // Total return = price appreciation + income yield (dividends, rent)
-      r[asset.key] = priceReturn + (asset.yieldPct ?? 0);
+      const yieldReturn = yieldOverrides[asset.key] ?? 0;
+      r[asset.key] = priceReturn + yieldReturn;
     }
     return r;
-  }, [convexDefaults]);
+  }, [convexDefaults, yieldOverrides]);
 
   const inflation = inflationPct;
 
@@ -765,10 +774,12 @@ export default function InvestPage() {
                                       {convexRec && <SanadBadge sanadLevel={convexRec.sanadLevel} sourceUrl={convexRec.sourceUrl} />}
                                     </div>
                                     <span className="text-xs text-muted-foreground font-mono shrink-0">
-                                      {rate.toFixed(1)}%
+                                      {(yieldOverrides[asset.key] ?? 0) > 0
+                                        ? `${rate.toFixed(1)}% (${(rate - (yieldOverrides[asset.key] ?? 0)).toFixed(0)}+${(yieldOverrides[asset.key] ?? 0).toFixed(0)})`
+                                        : `${rate.toFixed(1)}%`}
                                     </span>
                                   </div>
-                                  {/* Row 2: Slider + input */}
+                                  {/* Row 2: Slider + allocation input */}
                                   <div className="flex items-center gap-2" dir="ltr">
                                     <input
                                       type="range" min={0} max={100} step={1}
@@ -787,6 +798,23 @@ export default function InvestPage() {
                                       <span className="text-xs text-muted-foreground ms-0.5">%</span>
                                     </div>
                                   </div>
+                                  {/* Row 3: Yield input (for assets with income) */}
+                                  {asset.yieldPct !== undefined && (
+                                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-border/10">
+                                      <span className="text-[0.65rem] text-muted-foreground">
+                                        {isAr ? "عائد الدخل (إيجار/أرباح)" : "Income yield (rent/dividends)"}
+                                      </span>
+                                      <div className="flex items-center gap-1" dir="ltr">
+                                        <input
+                                          type="number" min={0} max={20} step={0.5}
+                                          value={yieldOverrides[asset.key] ?? 0}
+                                          onChange={(e) => handleYieldChange(asset.key, Math.min(20, Math.max(0, parseFloat(e.target.value) || 0)))}
+                                          className="w-12 text-center font-mono text-xs border border-border/60 rounded px-1 py-0.5 bg-muted/20 focus:ring-1 focus:ring-primary/40 focus:outline-none"
+                                        />
+                                        <span className="text-[0.6rem] text-muted-foreground">%</span>
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
