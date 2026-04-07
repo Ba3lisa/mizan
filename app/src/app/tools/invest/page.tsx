@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
-import { useCurrency } from "@/components/providers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -24,7 +23,7 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { TrendingUp, AlertTriangle, Info, BookOpen, ChevronDown } from "lucide-react";
+import { AlertTriangle, Info, BookOpen, ChevronDown } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -294,10 +293,9 @@ function RaceTooltip({ active, payload, label, isAr }: RaceTipProps) {
 export default function InvestPage() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
-  const { symbol, currency, fromEGP } = useCurrency();
-
-  // Currency-aware compact formatter — converts EGP to active currency
-  const fmtVal = (egpAmount: number) => `${fmtCompact(fromEGP(egpAmount))} ${symbol}`;
+  // This tool always works in EGP — ignore global currency toggle
+  const egpSymbol = isAr ? "ج.م" : "EGP";
+  const fmtVal = (egpAmount: number) => `${fmtCompact(egpAmount)} ${egpSymbol}`;
 
   // Convex data
   const convexDefaults = useQuery(api.tools.getInvestmentDefaults);
@@ -312,7 +310,6 @@ export default function InvestPage() {
   });
   const [activePreset, setActivePreset] = useState<string>("balanced");
   const [depreciationPct, setDepreciationPct] = useState(DEFAULT_DEPRECIATION);
-  const [showUsd, setShowUsd] = useState(false);
   const [showMethodology, setShowMethodology] = useState(false);
 
   const capital = CAPITAL_STEPS[capitalIdx] ?? 1_000_000;
@@ -369,8 +366,8 @@ export default function InvestPage() {
     const point: Record<string, number> = { year: p.year };
     for (const asset of ASSETS) {
       const egpVal = p.byAsset[asset.key] ?? 0;
-      const usdDivisor = exchangeRate * Math.pow(1 + depreciationPct / 100, p.year);
-      point[asset.key] = Math.round(showUsd ? egpVal / usdDivisor : egpVal);
+      const _usdDivisor = exchangeRate * Math.pow(1 + depreciationPct / 100, p.year);
+      point[asset.key] = Math.round(egpVal);
     }
     point.real = Math.round(p.real);
     return point;
@@ -413,10 +410,10 @@ export default function InvestPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 xl:items-start">
 
-          {/* ─── Config Column (1 col) ──────────────────────────────────── */}
-          <div className="xl:col-span-1 space-y-5">
+          {/* ─── Config Column (1 col) — sticky on desktop ─────────────── */}
+          <div className="xl:col-span-1 xl:sticky xl:top-16 xl:max-h-[calc(100vh-5rem)] xl:overflow-y-auto xl:scrollbar-thin space-y-5">
 
             {/* Capital */}
             <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
@@ -448,7 +445,7 @@ export default function InvestPage() {
                       className="text-2xl font-black text-foreground font-mono bg-transparent border-none outline-none text-center w-44 hover:ring-1 hover:ring-primary/20 focus:ring-1 focus:ring-primary/40 rounded px-2 py-1 transition-all cursor-text"
                       placeholder="1,000,000"
                     />
-                    <span className="text-sm text-muted-foreground">{symbol}</span>
+                    <span className="text-sm text-muted-foreground">{egpSymbol}</span>
                   </div>
                   <p className="text-[0.6rem] text-muted-foreground/40 mt-1">
                     {isAr ? "اضغط للكتابة مباشرة" : "click to type directly"}
@@ -477,7 +474,7 @@ export default function InvestPage() {
                             : "border-border hover:border-primary/50 hover:text-primary text-muted-foreground"
                         }`}
                       >
-                        {fmtCompact(fromEGP(v))}
+                        {fmtCompact(v)}
                       </button>
                     );
                   })}
@@ -682,69 +679,102 @@ export default function InvestPage() {
           </div>
 
           {/* ─── Results Columns (3 cols) ───────────────────────────────── */}
-          <div className="xl:col-span-3 space-y-6">
+          <div className="xl:col-span-3 space-y-6 min-w-0">
 
-            {/* Hero Result */}
+            {/* Hero Result — sticky on mobile so users see changes while adjusting controls */}
             <motion.div
+              className="sticky top-14 z-10 xl:static"
               initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5 }}
             >
               <Card className="border-primary/30 bg-gradient-to-br from-primary/5 via-card/80 to-card/60 backdrop-blur-sm overflow-hidden">
                 <CardContent className="p-6">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                          {isAr ? "القيمة المتوقعة" : "Projected Value"}
+                  <div className="flex items-center gap-2 mb-4">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                      {isAr ? "القيمة المتوقعة" : "Projected Value"}
+                    </p>
+                    <p className="text-xs text-muted-foreground ms-auto">
+                      {isAr
+                        ? `بعد ${horizon} سنة — من أصل ${fmtVal(capital)}`
+                        : `in ${horizon} years — from ${fmtVal(capital)}`}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" dir="ltr">
+                    {/* Nominal */}
+                    <div className="text-start">
+                      <div className="flex items-center gap-1 mb-1">
+                        <p className="text-[0.65rem] text-muted-foreground uppercase tracking-wider">
+                          {isAr ? "القيمة الاسمية" : "Nominal"}
                         </p>
-                        <button
-                          onClick={() => setShowUsd((v) => !v)}
-                          className="text-[0.6rem] font-semibold px-2 py-0.5 rounded-full border border-border hover:border-primary/50 text-muted-foreground hover:text-primary transition-colors"
-                        >
-                          {showUsd ? (isAr ? "عرض بالجنيه" : "Show in EGP") : (isAr ? "عرض بالدولار" : "Show in USD")}
-                        </button>
+                        <InputTooltip text={isAr
+                          ? "المبلغ الذي ستراه في حسابك — قبل احتساب تأثير التضخم وارتفاع الأسعار."
+                          : "The amount you'll see in your account — before accounting for inflation and rising prices."
+                        } />
                       </div>
                       <motion.p
-                        key={`${finalValue}-${showUsd}`}
+                        key={finalValue}
                         initial={{ opacity: 0.5, y: 4 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.3 }}
-                        className="text-3xl sm:text-4xl font-black text-primary font-mono" dir="ltr"
+                        className="text-2xl font-black text-primary font-mono"
                       >
                         {fmtVal(finalValue)}
                       </motion.p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {isAr
-                          ? `بعد ${horizon} سنة — من أصل ${fmtVal(capital)}`
-                          : `in ${horizon} years — from ${fmtVal(capital)}`}
+                      <p className="text-[0.6rem] text-muted-foreground/60 mt-1">
+                        {finalValue > 0
+                          ? (isAr
+                            ? `نمو ${(finalValue / capital).toFixed(1)} ضعف`
+                            : `${(finalValue / capital).toFixed(1)}x growth`)
+                          : "—"}
                       </p>
-                      {exchangeRate > 0 && (
-                        <p className="text-xs text-muted-foreground/70 mt-0.5 font-mono" dir="ltr">
-                          ≈ ${fmtCompact(finalUsd)} USD
-                        </p>
-                      )}
                     </div>
-                    <div className="sm:text-end">
-                      <div className="flex items-center gap-1.5 mb-1 sm:justify-end">
-                        <InputTooltip text={isAr
-                          ? "القيمة الحقيقية بعد خصم تأثير التضخم. يوضح القوة الشرائية الفعلية لاستثمارك — كم يمكنك شراؤه فعلاً بهذا المبلغ مقارنة باليوم."
-                          : "The real value after removing inflation's effect. Shows your investment's actual purchasing power — how much you can really buy compared to today."
-                        } />
-                        <p className="text-xs text-muted-foreground">
-                          {isAr ? "معدّل بالتضخم" : "Inflation-adjusted"}
+
+                    {/* Real (inflation-adjusted) */}
+                    <div className="text-start">
+                      <div className="flex items-center gap-1 mb-1">
+                        <p className="text-[0.65rem] text-muted-foreground uppercase tracking-wider">
+                          {isAr ? "القوة الشرائية" : "Purchasing Power"}
                         </p>
+                        <InputTooltip text={isAr
+                          ? "القيمة الحقيقية بعد خصم تأثير التضخم — كم يمكنك شراؤه فعلاً بهذا المبلغ مقارنة باليوم."
+                          : "Value after removing inflation — how much you can actually buy compared to today."
+                        } />
                       </div>
-                      <p className="text-xl font-bold text-foreground font-mono" dir="ltr">
+                      <p className="text-2xl font-black text-foreground font-mono">
                         {fmtVal(finalReal)}
                       </p>
-                      <div className="flex items-center gap-1 mt-1 sm:justify-end">
-                        <TrendingUp size={12} className="text-green-400" />
-                        <span className="text-xs text-green-400 font-mono">
-                          {finalValue > 0 ? `×${(finalValue / capital).toFixed(2)}` : "—"}
-                        </span>
-                      </div>
+                      <p className="text-[0.6rem] text-muted-foreground/60 mt-1">
+                        {isAr ? "بجنيه اليوم" : "in today's EGP"}
+                      </p>
                     </div>
+
+                    {/* USD equivalent — always shown as comparison */}
+                    {exchangeRate > 0 && (
+                      <div className="text-start">
+                        <div className="flex items-center gap-1 mb-1">
+                          <p className="text-[0.65rem] text-muted-foreground uppercase tracking-wider">
+                            {isAr ? "بالدولار" : "In USD"}
+                          </p>
+                          <InputTooltip text={isAr
+                            ? `بافتراض انخفاض الجنيه ${depreciationPct}% سنوياً. حرّك شريط "انخفاض الجنيه" لتغيير هذا.`
+                            : `Assuming ${depreciationPct}% EGP depreciation/year. Adjust the depreciation slider to change this.`
+                          } />
+                        </div>
+                        <motion.p
+                          key={`usd-${finalUsd}-${depreciationPct}`}
+                          initial={{ opacity: 0.5 }}
+                          animate={{ opacity: 1 }}
+                          className="text-2xl font-black text-foreground font-mono"
+                        >
+                          ${fmtCompact(finalUsd)}
+                        </motion.p>
+                        <p className="text-[0.6rem] text-muted-foreground/60 mt-1">
+                          {isAr ? "بسعر صرف متوقع" : "at projected rate"}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -756,7 +786,6 @@ export default function InvestPage() {
                 <div className="flex items-center justify-between mb-4">
                   <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
                     {isAr ? "نمو المحفظة عبر الزمن" : "Portfolio Growth Over Time"}
-                    {showUsd && <span className="ms-2 text-primary">· USD</span>}
                   </p>
                 </div>
                 <div dir="ltr">
@@ -779,7 +808,7 @@ export default function InvestPage() {
                       />
                       <YAxis
                         tick={{ fontSize: 10, fill: "#888" }}
-                        tickFormatter={(v: number) => `${fmtCompact(fromEGP(v))}${currency === "USD" ? "$" : ""}`}
+                        tickFormatter={(v: number) => fmtCompact(v)}
                         stroke="rgba(255,255,255,0.1)"
                         width={60}
                       />
@@ -839,7 +868,7 @@ export default function InvestPage() {
                       />
                       <YAxis
                         tick={{ fontSize: 10, fill: "#888" }}
-                        tickFormatter={(v: number) => `${fmtCompact(fromEGP(v))}${currency === "USD" ? "$" : ""}`}
+                        tickFormatter={(v: number) => fmtCompact(v)}
                         stroke="rgba(255,255,255,0.1)"
                         width={60}
                       />
