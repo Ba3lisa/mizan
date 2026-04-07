@@ -47,6 +47,12 @@ export const getHomeStats = query({
         sourceUrl: latestDebt.sourceUrl ?? "https://data.worldbank.org",
         sanadLevel: latestDebt.sanadLevel ?? 2,
       } : null,
+      domesticDebt: latestDebt ? {
+        value: latestDebt.totalDomesticDebt ?? 0,
+        source: "worldbank.org",
+        sourceUrl: latestDebt.sourceUrl ?? "https://data.worldbank.org",
+        sanadLevel: latestDebt.sanadLevel ?? 2,
+      } : null,
     };
   },
 });

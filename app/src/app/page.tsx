@@ -1,10 +1,11 @@
 "use client";
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
-  Building2, Users, BookOpen, BarChart3, TrendingDown, Landmark,
+  Building2, BookOpen, BarChart3, TrendingDown, Landmark,
   ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
   LineChart, Heart, MapPin, Calculator, Bot, BookMarked,
 } from "lucide-react";
@@ -43,19 +44,48 @@ function Stat({ value, label, source, sourceUrl, currencyUnit, sanadLevel, symbo
   );
 }
 
-const features = [
-  { icon: Building2, href: "/government", ar: "هيكل الحكومة", en: "Government", descAr: "الرئيس · الوزراء · المحافظات", descEn: "President · Ministers · Governorates" },
-  { icon: Users, href: "/parliament", ar: "البرلمان", en: "Parliament", descAr: "٥٩٦ نائب · ٣٠٠ شيوخ · ٨ أحزاب", descEn: "596 House · 300 Senate · 8 Parties" },
-  { icon: BookOpen, href: "/constitution", ar: "الدستور", en: "Constitution", descAr: "٢٤٧ مادة · تعديلات ٢٠١٩", descEn: "247 Articles · 2019 Amendments" },
-  { icon: BarChart3, href: "/budget", ar: "الموازنة", en: "Budget", descAr: "الإيرادات · المصروفات · العجز", descEn: "Revenue · Expenditure · Deficit" },
-  { icon: TrendingDown, href: "/debt", ar: "الدين العام", en: "Debt", descAr: "١٥٥ مليار$ ديون خارجية", descEn: "$155B External Debt" },
-  { icon: Landmark, href: "/elections", ar: "الانتخابات", en: "Elections", descAr: "نتائج الانتخابات الرئاسية والبرلمانية", descEn: "Presidential & parliamentary election results" },
-  { icon: LineChart, href: "/economy", ar: "الاقتصاد", en: "Economy", descAr: "مؤشرات اقتصادية · التضخم · الاحتياطي", descEn: "GDP · Inflation · Reserves · Exchange Rate" },
-  { icon: Heart, href: "/funding", ar: "التمويل", en: "Funding", descAr: "التمويل الشفاف · أين تذهب التبرعات", descEn: "Transparent funding · Where donations go" },
-  { icon: MapPin, href: "/governorate", ar: "محافظتك", en: "Your Governorate", descAr: "بيانات محافظتك · المحافظ · النواب", descEn: "Governor · MPs · Local stats" },
-  { icon: Calculator, href: "/budget/your-share", ar: "حاسبة الضريبة", en: "Tax Calculator", descAr: "أين تذهب ضرائبك؟ — حاسبة تفاعلية", descEn: "Where do your taxes go? — Interactive calculator" },
-  { icon: Bot, href: "/transparency", ar: "الشفافية", en: "Transparency", descAr: "سجل تحديث البيانات · تقارير الذكاء الاصطناعي", descEn: "AI audit log · Data refresh reports" },
-  { icon: BookMarked, href: "/methodology", ar: "المنهجية", en: "Methodology", descAr: "كيف نجمع البيانات · مصادر رسمية", descEn: "How we gather data · Official sources" },
+const featureGroups = [
+  {
+    labelAr: "الحكومة",
+    labelEn: "Government",
+    cards: [
+      { icon: Building2, href: "/government", ar: "الحكومة", en: "Government", descAr: "الرئيس · الوزراء · البرلمان · المحافظات", descEn: "President · Ministers · Parliament · Governorates" },
+    ],
+  },
+  {
+    labelAr: "البيانات",
+    labelEn: "Data",
+    cards: [
+      { icon: LineChart, href: "/economy", ar: "الاقتصاد", en: "Economy", descAr: "مؤشرات اقتصادية · التضخم · الاحتياطي", descEn: "GDP · Inflation · Reserves · Exchange Rate" },
+      { icon: BarChart3, href: "/budget", ar: "الموازنة", en: "Budget", descAr: "الإيرادات · المصروفات · العجز", descEn: "Revenue · Expenditure · Deficit" },
+      { icon: TrendingDown, href: "/debt", ar: "الدين العام", en: "Debt", descAr: "١٥٥ مليار$ ديون خارجية", descEn: "$155B External Debt" },
+      { icon: Landmark, href: "/elections", ar: "الانتخابات", en: "Elections", descAr: "نتائج الانتخابات الرئاسية والبرلمانية", descEn: "Presidential & parliamentary election results" },
+    ],
+  },
+  {
+    labelAr: "الأدوات",
+    labelEn: "Tools",
+    cards: [
+      { icon: Calculator, href: "/budget/your-share", ar: "حاسبة الضريبة", en: "Tax Calculator", descAr: "أين تذهب ضرائبك؟ — حاسبة تفاعلية", descEn: "Where do your taxes go? — Interactive calculator" },
+      { icon: MapPin, href: "/governorate", ar: "محافظتك", en: "Your Governorate", descAr: "بيانات محافظتك · المحافظ · النواب", descEn: "Governor · MPs · Local stats" },
+    ],
+  },
+  {
+    labelAr: "حول الموقع والشفافية",
+    labelEn: "About & Transparency",
+    cards: [
+      { icon: BookOpen, href: "/constitution", ar: "الدستور", en: "Constitution", descAr: "٢٤٧ مادة · تعديلات ٢٠١٩", descEn: "247 Articles · 2019 Amendments" },
+      { icon: Bot, href: "/transparency", ar: "الشفافية", en: "Transparency", descAr: "سجل تحديث البيانات · تقارير الذكاء الاصطناعي", descEn: "AI audit log · Data refresh reports" },
+      { icon: BookMarked, href: "/methodology", ar: "المنهجية", en: "Methodology", descAr: "كيف نجمع البيانات · مصادر رسمية", descEn: "How we gather data · Official sources" },
+    ],
+  },
+  {
+    labelAr: "الدعم",
+    labelEn: "Support",
+    cards: [
+      { icon: Heart, href: "/funding", ar: "التمويل", en: "Funding", descAr: "التمويل الشفاف · أين تذهب التبرعات", descEn: "Transparent funding · Where donations go" },
+    ],
+  },
 ];
 
 // Stats are now fetched live via getHomeStats query — see below in HomePage component
@@ -81,6 +111,15 @@ export default function HomePage() {
     { value: homeStats.governorates.value, ar: "محافظة", en: "Governorates", source: homeStats.governorates.source, url: homeStats.governorates.sourceUrl, sanadLevel: homeStats.governorates.sanadLevel },
     { value: homeStats.constitutionArticles.value, ar: "مادة دستورية", en: "Constitutional Articles", source: homeStats.constitutionArticles.source, url: homeStats.constitutionArticles.sourceUrl, sanadLevel: homeStats.constitutionArticles.sanadLevel },
     ...(homeStats.externalDebt ? [{ value: homeStats.externalDebt.value, ar: "مليار ديون خارجية", en: "B External Debt", source: homeStats.externalDebt.source, url: homeStats.externalDebt.sourceUrl, currencyUnit: "usd" as const, sanadLevel: homeStats.externalDebt.sanadLevel }] : []),
+    ...(homeStats.domesticDebt && homeStats.domesticDebt.value > 0 ? [{
+      value: homeStats.domesticDebt.value,
+      ar: "مليار ديون محلية",
+      en: "B Domestic Debt",
+      source: homeStats.domesticDebt.source,
+      url: homeStats.domesticDebt.sourceUrl,
+      currencyUnit: "egp" as const,
+      sanadLevel: homeStats.domesticDebt.sanadLevel,
+    }] : []),
   ] : null;
 
   return (
@@ -157,27 +196,48 @@ export default function HomePage() {
       {/* ════════ FEATURES ════════ */}
       <section className="container-page py-16 md:py-24">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {features.map((f, i) => {
-            const Icon = f.icon;
+          {featureGroups.map((group, groupIdx) => {
+            const cardOffset = featureGroups
+              .slice(0, groupIdx)
+              .reduce((acc, g) => acc + g.cards.length, 0);
             return (
-              <Link key={f.href} href={f.href} className="no-underline group animate-fade-up" style={{ animationDelay: `${i * 80}ms` }}>
-                <Card className="h-full border-border/60 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:bg-card">
-                  <CardContent className="p-6 flex flex-col h-full">
-                    <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 transition-colors group-hover:bg-primary/20">
-                      <Icon size={20} strokeWidth={1.5} />
-                    </div>
-                    <h3 className="text-base font-bold mb-1 group-hover:text-primary transition-colors">
-                      {isAr ? f.ar : f.en}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mb-4 flex-1">
-                      {isAr ? f.descAr : f.descEn}
-                    </p>
-                    <span className="text-xs font-semibold text-primary/70 group-hover:text-primary inline-flex items-center gap-1 transition-all">
-                      {isAr ? "استكشف" : "Explore"} <Chevron size={12} />
-                    </span>
-                  </CardContent>
-                </Card>
-              </Link>
+              <Fragment key={groupIdx}>
+                {/* Section header */}
+                <div className="col-span-full mt-4 first:mt-0">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
+                    {isAr ? group.labelAr : group.labelEn}
+                  </p>
+                </div>
+                {/* Cards */}
+                {group.cards.map((f, i) => {
+                  const Icon = f.icon;
+                  return (
+                    <Link
+                      key={f.href}
+                      href={f.href}
+                      className="no-underline group animate-fade-up"
+                      style={{ animationDelay: `${(cardOffset + i) * 80}ms` }}
+                    >
+                      <Card className="h-full border-border/60 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:bg-card">
+                        <CardContent className="p-6 flex flex-col h-full">
+                          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 transition-colors group-hover:bg-primary/20">
+                            <Icon size={20} strokeWidth={1.5} />
+                          </div>
+                          <h3 className="text-base font-bold mb-1 group-hover:text-primary transition-colors">
+                            {isAr ? f.ar : f.en}
+                          </h3>
+                          <p className="text-xs text-muted-foreground mb-4 flex-1">
+                            {isAr ? f.descAr : f.descEn}
+                          </p>
+                          <span className="text-xs font-semibold text-primary/70 group-hover:text-primary inline-flex items-center gap-1 transition-all">
+                            {isAr ? "استكشف" : "Explore"} <Chevron size={12} />
+                          </span>
+                        </CardContent>
+                      </Card>
+                    </Link>
+                  );
+                })}
+              </Fragment>
             );
           })}
         </div>

@@ -29,29 +29,64 @@ export function Header() {
     return () => window.removeEventListener("scroll", h);
   }, []);
 
-  const nav = [
+  const directNav = [
     { href: "/", label: t.navHome },
     { href: "/government", label: t.navGovernment },
-    { href: "/parliament", label: t.navParliament },
-    { href: "/constitution", label: t.navConstitution },
+  ];
+
+  const dataNav = [
+    { href: "/economy", label: t.navEconomy },
     { href: "/budget", label: t.navBudget },
     { href: "/debt", label: t.navDebt },
-    { href: "/transparency", label: t.navTransparency },
+    { href: "/elections", label: t.navElections },
   ];
 
   const toolsNav = [
-    { href: "/budget/your-share", label: t.navTaxCalculator },
+    { href: "/tools/tax-calculator", label: t.navTaxCalculator },
+    { href: "/tools/buy-vs-rent", label: t.navBuyVsRent },
+    { href: "/tools/invest", label: t.navInvest },
   ];
 
-  const moreNav = [
-    { href: "/elections", label: t.navElections },
-    { href: "/economy", label: t.navEconomy },
+  const aboutNav = [
+    { href: "/constitution", label: t.navConstitution },
     { href: "/governorate", label: t.navGovernorate },
-    { href: "/funding", label: t.navFunding },
     { href: "/methodology", label: t.navMethodology },
+    { href: "/transparency", label: t.navTransparency },
   ];
+
+  const extraNav = [
+    { href: "/funding", label: t.navFunding },
+  ];
+
+  // Flat list for mobile menu
+  const allNav = [...directNav, ...dataNav, ...toolsNav, ...aboutNav, ...extraNav];
 
   const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
+
+  const renderDropdown = (label: string, items: { href: string; label: string }[]) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className={cn(
+          "text-[0.8125rem] font-medium transition-colors whitespace-nowrap relative py-1 flex items-center gap-1 cursor-pointer",
+          items.some(n => isActive(n.href)) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+        )}>
+          {label} <ChevronDown size={12} />
+          {items.some(n => isActive(n.href)) && (
+            <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />
+          )}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-48">
+        {items.map((n) => (
+          <DropdownMenuItem key={n.href} asChild>
+            <Link href={n.href} className={cn("no-underline w-full", isActive(n.href) && "text-primary")}>
+              {n.label}
+            </Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <header className={cn(
@@ -70,72 +105,39 @@ export function Header() {
         </Link>
 
         {/* Desktop Nav */}
-        <nav className="hidden lg:flex items-center gap-7 flex-1" dir={dir}>
-          {nav.map((n) => (
+        <nav className="hidden lg:flex items-center gap-6 flex-1" dir={dir}>
+          {/* Direct links: Home, Government */}
+          {directNav.map((n) => (
             <Link key={n.href} href={n.href}
               className={cn(
                 "text-[0.8125rem] font-medium no-underline transition-colors whitespace-nowrap relative py-1",
-                isActive(n.href)
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+                isActive(n.href) ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}>
               {n.label}
-              {isActive(n.href) && (
-                <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />
-              )}
+              {isActive(n.href) && <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />}
             </Link>
           ))}
-          {/* Tools dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className={cn(
-                "text-[0.8125rem] font-medium no-underline transition-colors whitespace-nowrap relative py-1 flex items-center gap-1 cursor-pointer",
-                toolsNav.some(n => isActive(n.href))
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              )}>
-                {t.navTools} <ChevronDown size={12} />
-                {toolsNav.some(n => isActive(n.href)) && (
-                  <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />
-                )}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              {toolsNav.map((n) => (
-                <DropdownMenuItem key={n.href} asChild>
-                  <Link href={n.href} className={cn("no-underline w-full", isActive(n.href) && "text-primary")}>
-                    {n.label}
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
 
-          {/* More dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className={cn(
-                "text-[0.8125rem] font-medium no-underline transition-colors whitespace-nowrap relative py-1 flex items-center gap-1 cursor-pointer",
-                moreNav.some(n => isActive(n.href))
-                  ? "text-primary"
-                  : "text-muted-foreground hover:text-foreground"
+          {/* Data dropdown */}
+          {renderDropdown(t.navData, dataNav)}
+
+          {/* Tools dropdown */}
+          {renderDropdown(t.navTools, toolsNav)}
+
+          {/* About dropdown */}
+          {renderDropdown(t.navAbout, aboutNav)}
+
+          {/* Funding (standalone) */}
+          {extraNav.map((n) => (
+            <Link key={n.href} href={n.href}
+              className={cn(
+                "text-[0.8125rem] font-medium no-underline transition-colors whitespace-nowrap relative py-1",
+                isActive(n.href) ? "text-primary" : "text-muted-foreground hover:text-foreground"
               )}>
-                {t.navMore} <ChevronDown size={12} />
-                {moreNav.some(n => isActive(n.href)) && (
-                  <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />
-                )}
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              {moreNav.map((n) => (
-                <DropdownMenuItem key={n.href} asChild>
-                  <Link href={n.href} className={cn("no-underline w-full", isActive(n.href) && "text-primary")}>
-                    {n.label}
-                  </Link>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+              {n.label}
+              {isActive(n.href) && <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />}
+            </Link>
+          ))}
         </nav>
 
         {/* Controls */}
@@ -162,7 +164,7 @@ export function Header() {
               </SheetHeader>
               <Separator className="my-3" />
               <nav className="flex flex-col gap-0.5" dir={dir}>
-                {[...nav, ...toolsNav, ...moreNav].map((n) => (
+                {allNav.map((n) => (
                   <SheetClose asChild key={n.href}>
                     <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
                   </SheetClose>
