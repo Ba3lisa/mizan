@@ -700,42 +700,37 @@ export default function InvestPage() {
                   )}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {ASSET_GROUPS.map((group) => {
                     const groupTotal = group.assets.reduce((s, a) => s + (allocation[a.key] ?? 0), 0);
                     const isExpanded = expandedGroups.has(group.key);
                     return (
-                      <div key={group.key}>
+                      <div key={group.key} className="rounded-lg border border-border/50 overflow-hidden">
                         {/* Group header */}
                         <button
                           type="button"
                           onClick={() => toggleGroup(group.key)}
-                          className="w-full flex items-center gap-2 py-1.5 hover:bg-muted/30 rounded px-1 transition-colors"
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-muted/20 transition-colors"
+                          style={{ borderInlineStart: `3px solid ${group.color}` }}
                         >
-                          <span
-                            className="w-2 h-2 rounded-full shrink-0"
-                            style={{ background: group.color }}
-                          />
-                          <span className="text-[0.7rem] font-semibold text-foreground flex-1 text-start">
+                          {isExpanded
+                            ? <ChevronDown size={14} className="text-muted-foreground shrink-0" />
+                            : <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+                          }
+                          <span className="text-sm font-bold text-foreground flex-1 text-start">
                             {isAr ? group.nameAr : group.nameEn}
                           </span>
-                          {groupTotal > 0 && (
-                            <span
-                              className="text-[0.6rem] font-mono px-1.5 py-0.5 rounded"
-                              style={{ background: `${group.color}22`, color: group.color }}
-                            >
-                              {groupTotal}%
-                            </span>
-                          )}
-                          {isExpanded
-                            ? <ChevronDown size={12} className="text-muted-foreground shrink-0" />
-                            : <ChevronRight size={12} className="text-muted-foreground shrink-0" />
-                          }
+                          <span
+                            className="text-xs font-mono font-bold px-2 py-0.5 rounded-full"
+                            style={{ background: `${group.color}18`, color: group.color }}
+                          >
+                            {groupTotal}%
+                          </span>
                         </button>
 
                         {/* Asset rows */}
                         {isExpanded && (
-                          <div className="ps-3 border-s border-border/40 ms-2 mt-0.5 space-y-0.5">
+                          <div className="border-t border-border/30 divide-y divide-border/20">
                             {group.assets.map((asset) => {
                               const pct = allocation[asset.key] ?? 0;
                               const convexRec = convexDefaults?.[asset.convexKey];
@@ -744,44 +739,39 @@ export default function InvestPage() {
                                 : asset.defaultReturn;
                               const tipTexts = ASSET_TOOLTIPS[asset.key];
                               return (
-                                <div key={asset.key} className="flex items-center gap-2 py-1.5">
-                                  <span className="text-sm font-medium text-foreground min-w-0 flex-1 truncate" title={isAr ? asset.nameAr : asset.nameEn}>
-                                    {isAr ? asset.nameAr : asset.nameEn}
-                                  </span>
-                                  {tipTexts && (
-                                    <InputTooltip text={isAr ? tipTexts.ar : tipTexts.en} />
-                                  )}
-                                  {convexRec && (
-                                    <SanadBadge
-                                      sanadLevel={convexRec.sanadLevel}
-                                      sourceUrl={convexRec.sourceUrl}
+                                <div key={asset.key} className="px-3 py-2.5">
+                                  {/* Row 1: Name + return rate */}
+                                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="text-[0.8rem] font-medium text-foreground">
+                                        {isAr ? asset.nameAr : asset.nameEn}
+                                      </span>
+                                      {tipTexts && <InputTooltip text={isAr ? tipTexts.ar : tipTexts.en} />}
+                                      {convexRec && <SanadBadge sanadLevel={convexRec.sanadLevel} sourceUrl={convexRec.sourceUrl} />}
+                                    </div>
+                                    <span className="text-xs text-muted-foreground font-mono shrink-0">
+                                      {rate.toFixed(1)}%
+                                    </span>
+                                  </div>
+                                  {/* Row 2: Slider + input */}
+                                  <div className="flex items-center gap-2" dir="ltr">
+                                    <input
+                                      type="range" min={0} max={100} step={1}
+                                      value={pct}
+                                      onChange={(e) => handleAllocationChange(asset.key, parseInt(e.target.value))}
+                                      className="flex-1 h-1.5 cursor-pointer"
+                                      style={{ accentColor: group.color }}
                                     />
-                                  )}
-                                  <input
-                                    dir="ltr"
-                                    type="range"
-                                    min={0}
-                                    max={100}
-                                    step={1}
-                                    value={pct}
-                                    onChange={(e) => handleAllocationChange(asset.key, parseInt(e.target.value))}
-                                    className="w-24 h-1.5 cursor-pointer flex-shrink-0"
-                                    style={{ accentColor: group.color }}
-                                  />
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    max={100}
-                                    value={pct}
-                                    onChange={(e) => handleAllocationChange(
-                                      asset.key,
-                                      Math.min(100, Math.max(0, parseInt(e.target.value) || 0))
-                                    )}
-                                    className="w-14 text-center font-mono text-sm border border-border rounded px-1 py-0.5 bg-transparent"
-                                  />
-                                  <span className="text-[0.65rem] text-muted-foreground font-mono w-12 text-end shrink-0">
-                                    {rate.toFixed(1)}%
-                                  </span>
+                                    <div className="flex items-center shrink-0">
+                                      <input
+                                        type="number" min={0} max={100}
+                                        value={pct}
+                                        onChange={(e) => handleAllocationChange(asset.key, Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                                        className="w-12 text-center font-mono text-sm font-bold border border-border/60 rounded-md px-1 py-0.5 bg-muted/20 focus:ring-1 focus:ring-primary/40 focus:outline-none"
+                                      />
+                                      <span className="text-xs text-muted-foreground ms-0.5">%</span>
+                                    </div>
+                                  </div>
                                 </div>
                               );
                             })}
