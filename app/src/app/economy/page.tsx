@@ -324,6 +324,19 @@ function getYearLabel(record: TimelineRecord): string {
   return record.year ?? record.date.slice(0, 4);
 }
 
+/** Deduplicate timeline records by year — keep the latest record per year */
+function dedupeByYear(records: TimelineRecord[]): TimelineRecord[] {
+  const byYear = new Map<string, TimelineRecord>();
+  for (const r of records) {
+    const yr = getYearLabel(r);
+    const existing = byYear.get(yr);
+    if (!existing || r.date > existing.date) {
+      byYear.set(yr, r);
+    }
+  }
+  return Array.from(byYear.values()).sort((a, b) => a.date.localeCompare(b.date));
+}
+
 // ─── Custom Tooltip ───────────────────────────────────────────────────────────
 
 interface TooltipPayloadItem {
@@ -983,20 +996,26 @@ function MoneyFlowCard({ meta, record, isAr, accentColor, expanded, onToggle }: 
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
     indicator: meta.key,
   });
-  const values: number[] = timelineRecords ? timelineRecords.map((r) => r.value) : [];
+  const deduped = timelineRecords ? dedupeByYear(timelineRecords) : [];
+  const values: number[] = deduped.map((r) => r.value);
   const chartData = values.slice(-6).map((v, i) => ({ i, v }));
-  const fullChartData = timelineRecords
-    ? timelineRecords.map((r) => ({ year: getYearLabel(r), v: r.value }))
-    : [];
+  const fullChartData = deduped.map((r) => ({ year: getYearLabel(r), v: r.value }));
+
+  // YoY: compare to previous year, not previous data point
+  const currentYear = parseInt(record?.year ?? record?.date?.slice(0, 4) ?? new Date().getFullYear().toString());
+  let prevValue: number | null = null;
+  for (let y = currentYear - 1; y >= currentYear - 5; y--) {
+    const rec = deduped.find((r) => getYearLabel(r) === String(y));
+    if (rec) { prevValue = rec.value; break; }
+  }
+  const latestVal = values.length > 0 ? values[values.length - 1] : null;
 
   const trend: "up" | "down" =
-    values.length >= 2
-      ? values[values.length - 1] >= values[values.length - 2]
-        ? "up"
-        : "down"
+    latestVal !== null && prevValue !== null
+      ? latestVal >= prevValue ? "up" : "down"
       : "up";
   const yoyChange =
-    values.length >= 2 ? values[values.length - 1] - values[values.length - 2] : null;
+    latestVal !== null && prevValue !== null ? latestVal - prevValue : null;
 
   return (
     <Card
@@ -1343,10 +1362,9 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
     indicator: meta.key,
   });
   const isLoading = timelineRecords === undefined;
-  const values: number[] = timelineRecords ? timelineRecords.map((r) => r.value) : [];
-  const fullChartData = timelineRecords
-    ? timelineRecords.map((r) => ({ year: getYearLabel(r), v: r.value }))
-    : [];
+  const deduped = timelineRecords ? dedupeByYear(timelineRecords) : [];
+  const values: number[] = deduped.map((r) => r.value);
+  const fullChartData = deduped.map((r) => ({ year: getYearLabel(r), v: r.value }));
 
   const trend: "up" | "down" =
     values.length >= 2

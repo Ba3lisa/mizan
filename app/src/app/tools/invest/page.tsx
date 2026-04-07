@@ -36,6 +36,8 @@ interface Asset {
   defaultReturn: number; // Price appreciation only
   volatility: number;
   yieldPct?: number; // Income yield (rent, dividends) — added to total return
+  yieldLabelEn?: string;
+  yieldLabelAr?: string;
 }
 
 interface AssetGroup {
@@ -77,7 +79,7 @@ const ASSET_GROUPS: AssetGroup[] = [
     nameAr: "الأسهم المصرية",
     color: "#C9A84C",
     assets: [
-      { key: "egx30", nameEn: "EGX 30 Index", nameAr: "مؤشر البورصة EGX 30", convexKey: "egx30_annual_return", defaultReturn: 18.5, volatility: 25, yieldPct: 2.5 },
+      { key: "egx30", nameEn: "EGX 30 Index", nameAr: "مؤشر البورصة EGX 30", convexKey: "egx30_annual_return", defaultReturn: 18.5, volatility: 25, yieldPct: 2.5, yieldLabelEn: "Dividend yield", yieldLabelAr: "عائد الأرباح الموزعة" },
     ],
   },
   {
@@ -112,7 +114,7 @@ const ASSET_GROUPS: AssetGroup[] = [
     nameAr: "العقارات",
     color: "#2EC4B6",
     assets: [
-      { key: "realEstate", nameEn: "Egyptian Real Estate", nameAr: "العقارات المصرية", convexKey: "egypt_real_estate_return", defaultReturn: 15, volatility: 12, yieldPct: 4 },
+      { key: "realEstate", nameEn: "Egyptian Real Estate", nameAr: "العقارات المصرية", convexKey: "egypt_real_estate_return", defaultReturn: 15, volatility: 12, yieldPct: 4, yieldLabelEn: "Rental income", yieldLabelAr: "دخل الإيجار" },
     ],
   },
   {
@@ -130,7 +132,7 @@ const ASSET_GROUPS: AssetGroup[] = [
     nameAr: "أسواق دولية",
     color: "#8B5CF6",
     assets: [
-      { key: "sp500", nameEn: "S&P 500 (USD)", nameAr: "S&P 500", convexKey: "sp500_annual_return", defaultReturn: 10, volatility: 15, yieldPct: 1.5 },
+      { key: "sp500", nameEn: "S&P 500 (USD)", nameAr: "S&P 500", convexKey: "sp500_annual_return", defaultReturn: 10, volatility: 15, yieldPct: 1.5, yieldLabelEn: "Dividend yield", yieldLabelAr: "عائد الأرباح الموزعة" },
       { key: "msciEm", nameEn: "MSCI Emerging Markets", nameAr: "الأسواق الناشئة", convexKey: "msci_em_return", defaultReturn: 7.5, volatility: 20 },
     ],
   },
@@ -798,8 +800,8 @@ export default function InvestPage() {
                                       <span className="text-xs text-muted-foreground ms-0.5">%</span>
                                     </div>
                                   </div>
-                                  {/* Row 3: Yield input (for assets with income) */}
-                                  {asset.yieldPct !== undefined && (
+                                  {/* Row 3: Yield input OR pure-income label */}
+                                  {asset.yieldPct !== undefined ? (
                                     <div className="flex items-center justify-between mt-1 pt-1 border-t border-border/10">
                                       <span className="text-[0.65rem] text-muted-foreground">
                                         {isAr ? "عائد الدخل (إيجار/أرباح)" : "Income yield (rent/dividends)"}
@@ -814,7 +816,19 @@ export default function InvestPage() {
                                         <span className="text-[0.6rem] text-muted-foreground">%</span>
                                       </div>
                                     </div>
-                                  )}
+                                  ) : (group.key === "bank_cds" || group.key === "gov_fixed_income") ? (
+                                    <div className="flex items-center justify-between mt-1 pt-1 border-t border-border/10">
+                                      <span className="text-[0.6rem] text-muted-foreground/60">
+                                        {isAr ? "العائد بالكامل دخل ثابت — لا ارتفاع في السعر" : "100% fixed income — no price appreciation"}
+                                      </span>
+                                      {convexRec?.sourceUrl && (
+                                        <a href={convexRec.sourceUrl} target="_blank" rel="noopener noreferrer"
+                                          className="text-[0.6rem] text-primary/50 hover:text-primary no-underline font-mono">
+                                          {isAr ? "المصدر" : "source"} ↗
+                                        </a>
+                                      )}
+                                    </div>
+                                  ) : null}
                                 </div>
                               );
                             })}
