@@ -61,9 +61,6 @@ export function Header() {
     { href: "/funding", label: t.navFunding },
   ];
 
-  // Flat list for mobile menu
-  const allNav = [...directNav, ...govNav, ...dataNav, ...toolsNav, ...aboutNav, ...extraNav];
-
   const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   const renderDropdown = (label: string, items: { href: string; label: string }[]) => (
@@ -169,8 +166,49 @@ export function Header() {
                 </SheetTitle>
               </SheetHeader>
               <Separator className="my-3" />
-              <nav className="flex flex-col gap-0.5" dir={dir}>
-                {allNav.map((n) => (
+              <nav className="flex flex-col gap-0.5 overflow-y-auto max-h-[calc(100vh-8rem)] pb-6" dir={dir}>
+                {/* Home */}
+                {directNav.map((n) => (
+                  <SheetClose asChild key={n.href}>
+                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
+                  </SheetClose>
+                ))}
+
+                {/* Government group */}
+                <p className="px-3 pt-3 pb-1 text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-widest">{t.navGovernment}</p>
+                {govNav.map((n) => (
+                  <SheetClose asChild key={n.href}>
+                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
+                  </SheetClose>
+                ))}
+
+                {/* Data group */}
+                <p className="px-3 pt-3 pb-1 text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-widest">{t.navData}</p>
+                {dataNav.map((n) => (
+                  <SheetClose asChild key={n.href}>
+                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
+                  </SheetClose>
+                ))}
+
+                {/* Tools group */}
+                <p className="px-3 pt-3 pb-1 text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-widest">{t.navTools}</p>
+                {toolsNav.map((n) => (
+                  <SheetClose asChild key={n.href}>
+                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
+                  </SheetClose>
+                ))}
+
+                {/* About group */}
+                <p className="px-3 pt-3 pb-1 text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-widest">{t.navAbout}</p>
+                {aboutNav.map((n) => (
+                  <SheetClose asChild key={n.href}>
+                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
+                  </SheetClose>
+                ))}
+
+                {/* Funding */}
+                <Separator className="my-2" />
+                {extraNav.map((n) => (
                   <SheetClose asChild key={n.href}>
                     <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
                   </SheetClose>
