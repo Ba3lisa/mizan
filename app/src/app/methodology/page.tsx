@@ -278,7 +278,7 @@ export default function MethodologyPage() {
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {isAr
-                    ? "تصنيف مستويات السند هو الجزء الوحيد في ميزان الذي يتضمن رأياً بشرياً. نعمل على أتمتة هذا التصنيف عبر مجلس الذكاء الاصطناعي (LLM Council) لجعل المنصة أقل اعتماداً على الآراء."
+                    ? "تصنيف مستويات السند هو الجزء الوحيد في ميزان الذي يتضمن رأياً بشرياً. نعمل على تطوير نظام تقييم مستقل عبر مجلس نماذج الذكاء الاصطناعي لتقليل الاعتماد على التقدير البشري."
                     : "Sanad level assignment is the only opinionated part of Mizan. We are working on automating this via the LLM Council to make the platform less opinion-dependent."}
                 </p>
               </div>
