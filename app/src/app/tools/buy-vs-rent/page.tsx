@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
+import { usePersistedState } from "@/lib/use-persisted-state";
 import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -51,6 +52,7 @@ interface CalcParams {
   insurancePct: number;
   propertyTaxPct: number;
   monthlyFees: number;
+  monthlyUtilities: number; // electricity, water, gas, internet — applies to BOTH rent and buy
   // rent costs
   securityDepositMonths: number;
   brokerFeePct: number;
@@ -87,7 +89,7 @@ function calculateBuyCosts(params: CalcParams, years: number): CostBreakdown {
     homePrice, financingType, mortgageRatePct, downPaymentPct, mortgageTerm,
     installDownPaymentPct, installPeriod, installAnnualIncreasePct,
     homePriceGrowthPct, investmentReturnPct, closingCostsPct, sellingCostsPct,
-    maintenancePct, insurancePct, propertyTaxPct, monthlyFees,
+    maintenancePct, insurancePct, propertyTaxPct, monthlyFees, monthlyUtilities,
   } = params;
 
   // ── Initial Costs ──
@@ -122,6 +124,7 @@ function calculateBuyCosts(params: CalcParams, years: number): CostBreakdown {
     recurringCosts += propVal * (insurancePct / 100);
     recurringCosts += propVal * (propertyTaxPct / 100);
     recurringCosts += monthlyFees * 12;
+    recurringCosts += monthlyUtilities * 12;
   }
 
   // ── Opportunity Cost on Initial Outlay ──
@@ -144,7 +147,7 @@ function calculateRentCosts(params: CalcParams, years: number): CostBreakdown {
   const {
     monthlyRent, rentGrowthPct, investmentReturnPct,
     homePrice, closingCostsPct, downPaymentPct, securityDepositMonths,
-    brokerFeePct, rentersInsurancePct,
+    brokerFeePct, rentersInsurancePct, monthlyUtilities,
   } = params;
 
   // What the buyer spent as initial costs — renter invests this instead
@@ -161,6 +164,7 @@ function calculateRentCosts(params: CalcParams, years: number): CostBreakdown {
   for (let y = 1; y <= years; y++) {
     recurringCosts += annualRent;
     recurringCosts += annualRent * (rentersInsurancePct / 100);
+    recurringCosts += monthlyUtilities * 12;
     annualRent *= 1 + rentGrowthPct / 100;
   }
 
@@ -421,47 +425,48 @@ export default function BuyVsRentPage() {
   const convexInflation = investmentData?.["inflation"]?.value;
 
   // ─── Section 1: Basics ─────────────────────────────────────────────────────
-  const [homePrice, setHomePrice] = useState(3_000_000);
-  const [monthlyRent, setMonthlyRent] = useState(10_000);
-  const [years, setYears] = useState(10);
+  const [homePrice, setHomePrice] = usePersistedState("bvr-homePrice", 3_000_000);
+  const [monthlyRent, setMonthlyRent] = usePersistedState("bvr-monthlyRent", 10_000);
+  const [years, setYears] = usePersistedState("bvr-years", 10);
 
   // ─── Section 2: Financing ──────────────────────────────────────────────────
-  const [financingType, setFinancingType] = useState<FinancingType>("mortgage");
-  const [mortgageRatePct, setMortgageRatePct] = useState(20);
-  const [downPaymentPct, setDownPaymentPct] = useState(20);
-  const [mortgageTerm, setMortgageTerm] = useState(20);
-  const [installDownPaymentPct, setInstallDownPaymentPct] = useState(10);
-  const [installPeriod, setInstallPeriod] = useState(5);
-  const [installAnnualIncreasePct, setInstallAnnualIncreasePct] = useState(5);
+  const [financingType, setFinancingType] = usePersistedState<FinancingType>("bvr-financingType", "mortgage");
+  const [mortgageRatePct, setMortgageRatePct] = usePersistedState("bvr-mortgageRatePct", 20);
+  const [downPaymentPct, setDownPaymentPct] = usePersistedState("bvr-downPaymentPct", 20);
+  const [mortgageTerm, setMortgageTerm] = usePersistedState("bvr-mortgageTerm", 20);
+  const [installDownPaymentPct, setInstallDownPaymentPct] = usePersistedState("bvr-installDownPaymentPct", 10);
+  const [installPeriod, setInstallPeriod] = usePersistedState("bvr-installPeriod", 5);
+  const [installAnnualIncreasePct, setInstallAnnualIncreasePct] = usePersistedState("bvr-installAnnualIncreasePct", 5);
 
   // ─── Section 3: Future ─────────────────────────────────────────────────────
-  const [homePriceGrowthPct, setHomePriceGrowthPct] = useState(12);
-  const [rentGrowthPct, setRentGrowthPct] = useState(10);
-  const [investmentReturnPct, setInvestmentReturnPct] = useState(18);
-  const [inflationPct, setInflationPct] = useState(28);
-  const [egpDepreciationPct, setEgpDepreciationPct] = useState(7);
+  const [homePriceGrowthPct, setHomePriceGrowthPct] = usePersistedState("bvr-homePriceGrowthPct", 12);
+  const [rentGrowthPct, setRentGrowthPct] = usePersistedState("bvr-rentGrowthPct", 10);
+  const [investmentReturnPct, setInvestmentReturnPct] = usePersistedState("bvr-investmentReturnPct", 18);
+  const [inflationPct, setInflationPct] = usePersistedState("bvr-inflationPct", 28);
+  const [egpDepreciationPct, setEgpDepreciationPct] = usePersistedState("bvr-egpDepreciationPct", 7);
 
   // ─── Section 4: Buy Costs ──────────────────────────────────────────────────
-  const [closingCostsPct, setClosingCostsPct] = useState(3);
-  const [sellingCostsPct, setSellingCostsPct] = useState(2.5);
-  const [maintenancePct, setMaintenancePct] = useState(1);
-  const [insurancePct, setInsurancePct] = useState(0.25);
-  const [propertyTaxPct, setPropertyTaxPct] = useState(0);
-  const [monthlyFees, setMonthlyFees] = useState(500);
+  const [closingCostsPct, setClosingCostsPct] = usePersistedState("bvr-closingCostsPct", 3);
+  const [sellingCostsPct, setSellingCostsPct] = usePersistedState("bvr-sellingCostsPct", 2.5);
+  const [maintenancePct, setMaintenancePct] = usePersistedState("bvr-maintenancePct", 1);
+  const [insurancePct, setInsurancePct] = usePersistedState("bvr-insurancePct", 0.25);
+  const [propertyTaxPct, setPropertyTaxPct] = usePersistedState("bvr-propertyTaxPct", 0);
+  const [monthlyFees, setMonthlyFees] = usePersistedState("bvr-monthlyFees", 500);
+  const [monthlyUtilities, setMonthlyUtilities] = usePersistedState("bvr-monthlyUtilities", 3000);
 
   // ─── Section 5: Rent Costs ─────────────────────────────────────────────────
-  const [securityDepositMonths, setSecurityDepositMonths] = useState(2);
-  const [brokerFeePct, setBrokerFeePct] = useState(50);
-  const [rentersInsurancePct, setRentersInsurancePct] = useState(0.5);
+  const [securityDepositMonths, setSecurityDepositMonths] = usePersistedState("bvr-securityDepositMonths", 2);
+  const [brokerFeePct, setBrokerFeePct] = usePersistedState("bvr-brokerFeePct", 50);
+  const [rentersInsurancePct, setRentersInsurancePct] = usePersistedState("bvr-rentersInsurancePct", 0.5);
 
   // Sync Convex values on load
   useEffect(() => {
     if (convexMortgageRate !== undefined) setMortgageRatePct(convexMortgageRate);
-  }, [convexMortgageRate]);
+  }, [convexMortgageRate, setMortgageRatePct]);
 
   useEffect(() => {
     if (convexInflation !== undefined) setInflationPct(Math.round(convexInflation * 10) / 10);
-  }, [convexInflation]);
+  }, [convexInflation, setInflationPct]);
 
   // ─── Build params object ───────────────────────────────────────────────────
   const params = useMemo<CalcParams>(
@@ -487,6 +492,7 @@ export default function BuyVsRentPage() {
       insurancePct,
       propertyTaxPct,
       monthlyFees,
+      monthlyUtilities,
       securityDepositMonths,
       brokerFeePct,
       rentersInsurancePct,
@@ -497,7 +503,7 @@ export default function BuyVsRentPage() {
       installDownPaymentPct, installPeriod, installAnnualIncreasePct,
       homePriceGrowthPct, rentGrowthPct, investmentReturnPct,
       inflationPct, egpDepreciationPct, closingCostsPct, sellingCostsPct,
-      maintenancePct, insurancePct, propertyTaxPct, monthlyFees,
+      maintenancePct, insurancePct, propertyTaxPct, monthlyFees, monthlyUtilities,
       securityDepositMonths, brokerFeePct, rentersInsurancePct,
     ]
   );
@@ -1099,6 +1105,25 @@ export default function BuyVsRentPage() {
                   "Security, cleaning, shared maintenance — varies widely by compound"
                 )}
               />
+              <SliderRow
+                label={t("المصاريف الشهرية", "Monthly Utilities")}
+                value={monthlyUtilities}
+                min={0}
+                max={10_000}
+                step={100}
+                displayValue={`${fmtCompact(monthlyUtilities)} ج.م`}
+                onChange={setMonthlyUtilities}
+                tooltip={t(
+                  "الكهرباء والمياه والغاز والإنترنت — تُضاف لكلا السيناريوهين (شراء وإيجار)",
+                  "Electricity, water, gas, internet — applies to both buy and rent scenarios"
+                )}
+              />
+              <p className="text-[0.65rem] text-muted-foreground/60 -mt-3 mb-6">
+                {t(
+                  "تُحتسب لكلا السيناريوهين — تُظهر التكلفة الحقيقية للسكن",
+                  "Counted in both scenarios — shows the true total cost of living"
+                )}
+              </p>
             </Section>
 
             {/* ── Section 5: Rent Costs ─────────────────────────────────── */}

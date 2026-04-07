@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef } from "react";
+import { usePersistedState } from "@/lib/use-persisted-state";
 import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
@@ -421,28 +422,30 @@ export default function InvestPage() {
   const convexDefaults = useQuery(api.tools.getInvestmentDefaults);
 
   // State
-  const [capitalIdx, setCapitalIdx] = useState(DEFAULT_CAPITAL_INDEX);
-  const [horizon, setHorizon] = useState(DEFAULT_HORIZON);
-  const [allocation, setAllocation] = useState<AllocationMap>(() => {
+  const [capitalIdx, setCapitalIdx] = usePersistedState("invest-capitalIdx", DEFAULT_CAPITAL_INDEX);
+  const [horizon, setHorizon] = usePersistedState("invest-horizon", DEFAULT_HORIZON);
+  const defaultAllocation: AllocationMap = useMemo(() => {
     const m: AllocationMap = {};
     for (const a of ALL_ASSETS) m[a.key] = 0;
     return { ...m, ...PRESETS.balanced.allocation };
-  });
-  const [activePreset, setActivePreset] = useState<string>("balanced");
-  const [inflationPct, setInflationPct] = useState(DEFAULT_INFLATION);
-  const [depreciationPct, setDepreciationPct] = useState(DEFAULT_DEPRECIATION);
+  }, []);
+  const [allocation, setAllocation] = usePersistedState<AllocationMap>("invest-allocation", defaultAllocation);
+  const [activePreset, setActivePreset] = usePersistedState<string>("invest-activePreset", "balanced");
+  const [inflationPct, setInflationPct] = usePersistedState("invest-inflationPct", DEFAULT_INFLATION);
+  const [depreciationPct, setDepreciationPct] = usePersistedState("invest-depreciationPct", DEFAULT_DEPRECIATION);
   const [showMethodology, setShowMethodology] = useState(false);
   // User-adjustable yield per asset (dividends, rent). Defaults from asset definition.
-  const [yieldOverrides, setYieldOverrides] = useState<Record<string, number>>(() => {
+  const defaultYieldOverrides: Record<string, number> = useMemo(() => {
     const m: Record<string, number> = {};
     for (const a of ALL_ASSETS) {
       if (a.yieldPct) m[a.key] = a.yieldPct;
     }
     return m;
-  });
+  }, []);
+  const [yieldOverrides, setYieldOverrides] = usePersistedState<Record<string, number>>("invest-yieldOverrides", defaultYieldOverrides);
   const handleYieldChange = useCallback((key: string, value: number) => {
     setYieldOverrides((prev) => ({ ...prev, [key]: value }));
-  }, []);
+  }, [setYieldOverrides]);
 
   const capital = CAPITAL_STEPS[capitalIdx] ?? 1_000_000;
 
@@ -539,7 +542,7 @@ export default function InvestPage() {
   const handleAllocationChange = useCallback((key: string, value: number) => {
     setAllocation((prev) => ({ ...prev, [key]: value }));
     setActivePreset("");
-  }, []);
+  }, [setAllocation, setActivePreset]);
 
   const applyPreset = useCallback((presetKey: string) => {
     const preset = PRESETS[presetKey];
@@ -556,7 +559,7 @@ export default function InvestPage() {
         .filter((g) => g.assets.some((a) => presetKeys.has(a.key)))
         .map((g) => g.key)
     ));
-  }, []);
+  }, [setAllocation, setActivePreset]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
