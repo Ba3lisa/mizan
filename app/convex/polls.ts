@@ -45,6 +45,25 @@ export const getRecentPolls = query({
   },
 });
 
+export const getCompletedPolls = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 20;
+    const polls = await ctx.db
+      .query("polls")
+      .withIndex("by_createdAt")
+      .order("desc")
+      .take(limit + 1); // fetch one extra to check if more exist
+    // Only return expired/inactive polls (completed)
+    const completed = polls.filter(
+      (p) => !p.isActive || p.expiresAt < Date.now()
+    );
+    return completed.slice(0, limit);
+  },
+});
+
 export const checkIfVoted = query({
   args: {
     pollId: v.id("polls"),
