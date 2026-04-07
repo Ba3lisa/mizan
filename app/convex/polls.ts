@@ -64,6 +64,30 @@ export const getCompletedPolls = query({
   },
 });
 
+/** One-time cleanup: delete inactive polls and their votes. */
+export const deleteInactivePolls = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const polls = await ctx.db.query("polls").collect();
+    let deleted = 0;
+    for (const poll of polls) {
+      if (!poll.isActive) {
+        // Delete votes for this poll
+        const votes = await ctx.db
+          .query("pollVotes")
+          .withIndex("by_pollId", (q) => q.eq("pollId", poll._id))
+          .collect();
+        for (const vote of votes) {
+          await ctx.db.delete(vote._id);
+        }
+        await ctx.db.delete(poll._id);
+        deleted++;
+      }
+    }
+    return deleted;
+  },
+});
+
 export const checkIfVoted = query({
   args: {
     pollId: v.id("polls"),
