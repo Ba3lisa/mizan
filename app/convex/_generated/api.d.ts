@@ -43,6 +43,7 @@ import type * as githubIssueQueries from "../githubIssueQueries.js";
 import type * as government from "../government.js";
 import type * as governmentCleanup from "../governmentCleanup.js";
 import type * as imfData from "../imfData.js";
+import type * as lib_tokenCost from "../lib/tokenCost.js";
 import type * as lib_urlValidator from "../lib/urlValidator.js";
 import type * as lineage from "../lineage.js";
 import type * as maintenance from "../maintenance.js";
@@ -62,6 +63,7 @@ import type * as taxData from "../taxData.js";
 import type * as testFetch from "../testFetch.js";
 import type * as tools from "../tools.js";
 import type * as transparency from "../transparency.js";
+import type * as usage from "../usage.js";
 
 import type {
   ApiFromModules,
@@ -105,6 +107,7 @@ declare const fullApi: ApiFromModules<{
   government: typeof government;
   governmentCleanup: typeof governmentCleanup;
   imfData: typeof imfData;
+  "lib/tokenCost": typeof lib_tokenCost;
   "lib/urlValidator": typeof lib_urlValidator;
   lineage: typeof lineage;
   maintenance: typeof maintenance;
@@ -124,6 +127,7 @@ declare const fullApi: ApiFromModules<{
   testFetch: typeof testFetch;
   tools: typeof tools;
   transparency: typeof transparency;
+  usage: typeof usage;
 }>;
 
 /**

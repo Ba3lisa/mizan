@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Skeleton } from "boneyard-js/react";
 import { useQuery } from "convex/react";
@@ -10,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 import {
   Heart,
   DollarSign,
@@ -24,7 +26,30 @@ import {
   Calendar,
   ShieldCheck,
   CircleDollarSign,
+  Activity,
+  Cpu,
+  ChevronDown,
+  ChevronRight,
+  Zap,
+  Globe,
+  Layers,
+  BrainCircuit,
 } from "lucide-react";
+import {
+  ResponsiveContainer,
+  AreaChart,
+  LineChart,
+  PieChart,
+  Pie,
+  Area,
+  Line,
+  Cell,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  Legend,
+} from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +101,25 @@ interface DonationRow {
   createdAt: number;
 }
 
+// Types for usage data (api.usage may not exist yet — handled defensively)
+interface DailyUsageEntry {
+  date: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  callCount: number;
+}
+
+interface ProviderUsageEntry {
+  provider: string;
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  costUsd: number;
+  callCount: number;
+}
+
 // ─── Category config ──────────────────────────────────────────────────────────
 
 interface CategoryConfig {
@@ -123,6 +167,135 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
     icon: <MoreHorizontal size={14} />,
   },
 ];
+
+// ─── Fixed infrastructure costs ───────────────────────────────────────────────
+
+const FIXED_COSTS = [
+  { serviceEn: "Convex Pro", serviceAr: "Convex Pro", monthlyUsd: 25 },
+  { serviceEn: "DigitalOcean App", serviceAr: "DigitalOcean App", monthlyUsd: 12 },
+  { serviceEn: "Domain", serviceAr: "اسم النطاق", monthlyUsd: 1 },
+  { serviceEn: "Cloudflare", serviceAr: "Cloudflare", monthlyUsd: 0 },
+];
+const FIXED_TOTAL_USD = FIXED_COSTS.reduce((s, c) => s + c.monthlyUsd, 0);
+
+// ─── Scaling Roadmap tiers ────────────────────────────────────────────────────
+
+const SCALING_TIERS = [
+  {
+    budgetUsd: 50,
+    labelEn: "Current",
+    labelAr: "الحالي",
+    color: "#C9A84C",
+    featuresEn: [
+      "Single LLM (Haiku)",
+      "6-hour data refresh cycle",
+      "Basic web scraping",
+      "Core government data",
+    ],
+    featuresAr: [
+      "نموذج ذكاء اصطناعي واحد (Haiku)",
+      "تحديث البيانات كل 6 ساعات",
+      "استخراج بيانات أساسي",
+      "بيانات الحكومة الأساسية",
+    ],
+    current: true,
+  },
+  {
+    budgetUsd: 100,
+    labelEn: "Growth",
+    labelAr: "النمو",
+    color: "#6C8EEF",
+    featuresEn: [
+      "Multi-LLM council (3 providers)",
+      "3-hour refresh cycle",
+      "Cross-source data verification",
+      "Expanded parliament coverage",
+    ],
+    featuresAr: [
+      "مجلس من 3 نماذج ذكاء اصطناعي",
+      "تحديث البيانات كل 3 ساعات",
+      "التحقق من مصادر متعددة",
+      "تغطية أوسع للبرلمان",
+    ],
+    current: false,
+  },
+  {
+    budgetUsd: 250,
+    labelEn: "Scale",
+    labelAr: "التوسع",
+    color: "#2EC4B6",
+    featuresEn: [
+      "Browser automation (Browserbase)",
+      "Hourly key economic indicators",
+      "Real-time EGX stock data",
+      "Full JS-rendered site scraping",
+    ],
+    featuresAr: [
+      "أتمتة المتصفح (Browserbase)",
+      "المؤشرات الاقتصادية كل ساعة",
+      "بيانات البورصة في الوقت الحقيقي",
+      "استخراج المواقع الديناميكية",
+    ],
+    current: false,
+  },
+  {
+    budgetUsd: 500,
+    labelEn: "Professional",
+    labelAr: "الاحترافي",
+    color: "#E76F51",
+    featuresEn: [
+      "Full multi-source verification",
+      "All government sites scraped",
+      "Sentiment & trend analysis",
+      "API access for researchers",
+    ],
+    featuresAr: [
+      "تحقق شامل من مصادر متعددة",
+      "استخراج جميع المواقع الحكومية",
+      "تحليل المشاعر والاتجاهات",
+      "وصول API للباحثين",
+    ],
+    current: false,
+  },
+  {
+    budgetUsd: 1000,
+    labelEn: "Enterprise",
+    labelAr: "المؤسسي",
+    color: "#7A8299",
+    featuresEn: [
+      "Real-time official data feeds",
+      "ML anomaly detection",
+      "Mobile push alerts",
+      "Dedicated research reports",
+    ],
+    featuresAr: [
+      "تغذية بيانات رسمية في الوقت الحقيقي",
+      "كشف الشذوذ بالتعلم الآلي",
+      "تنبيهات فورية على الهاتف",
+      "تقارير بحثية مخصصة",
+    ],
+    current: false,
+  },
+];
+
+// ─── Provider colors ──────────────────────────────────────────────────────────
+
+const PROVIDER_COLORS: Record<string, string> = {
+  anthropic: "#C9A84C",
+  openai: "#2EC4B6",
+  google: "#6C8EEF",
+  openrouter: "#E76F51",
+  other: "#7A8299",
+};
+
+// ─── Fade-in animation props ──────────────────────────────────────────────────
+
+const fadeInUpProps = {
+  initial: { opacity: 0, y: 20 },
+  whileInView: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, ease: "easeOut" },
+  viewport: { once: true, margin: "-80px" },
+} as const;
 
 // ─── Summary Cards ────────────────────────────────────────────────────────────
 
@@ -554,6 +727,642 @@ function TimelineChart({ timeline, isAr, fmtUsd }: TimelineChartProps) {
   );
 }
 
+// ─── API Usage Dashboard ──────────────────────────────────────────────────────
+// Uses api.usage queries that may not exist yet. If the module is absent, shows
+// a placeholder card instead of crashing.
+
+// Determine at module load whether api.usage exists. It's stable per build.
+const usageApi = (api as unknown as Record<string, Record<string, unknown>>)["usage"] as
+  | {
+      getDailyUsage: Parameters<typeof useQuery>[0];
+      getUsageByProvider: Parameters<typeof useQuery>[0];
+    }
+  | undefined;
+
+interface ApiUsageDashboardInnerProps {
+  isAr: boolean;
+}
+
+// This inner component is only mounted when usageApi is defined.
+function ApiUsageDashboardInner({ isAr }: ApiUsageDashboardInnerProps) {
+  // Hooks are always called here since this component is only mounted when
+  // usageApi is defined — safe per Rules of Hooks.
+  const dailyUsage = useQuery(
+    usageApi!.getDailyUsage,
+    { days: 30 },
+  ) as DailyUsageEntry[] | null | undefined;
+
+  const providerUsage = useQuery(
+    usageApi!.getUsageByProvider,
+    { days: 30 },
+  ) as ProviderUsageEntry[] | null | undefined;
+
+  const currentMonthCost = dailyUsage
+    ? dailyUsage.slice(-30).reduce((s, d) => s + d.costUsd, 0)
+    : null;
+
+  const currentMonthTokens = dailyUsage
+    ? dailyUsage.slice(-30).reduce((s, d) => s + d.totalTokens, 0)
+    : null;
+
+  const totalCalls = dailyUsage
+    ? dailyUsage.slice(-30).reduce((s, d) => s + d.callCount, 0)
+    : null;
+
+  // Accumulate cost over time for line chart
+  const costAccumulation = dailyUsage
+    ? dailyUsage.reduce<Array<{ date: string; cumulative: number }>>((acc, d, i) => {
+        const prev = i > 0 ? acc[i - 1].cumulative : 0;
+        acc.push({ date: d.date.slice(5), cumulative: Math.round((prev + d.costUsd) * 100) / 100 });
+        return acc;
+      }, [])
+    : [];
+
+  const fmtTokens = (n: number) =>
+    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(0)}K` : String(n);
+
+  return (
+    <div className="space-y-6">
+      {/* Metric cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          {
+            labelEn: "API Cost (30d)",
+            labelAr: "تكلفة API (٣٠ يوم)",
+            value: currentMonthCost !== null ? `$${currentMonthCost.toFixed(2)}` : "—",
+            icon: <DollarSign size={16} className="text-[#C9A84C]" />,
+            accent: "text-[#C9A84C]",
+          },
+          {
+            labelEn: "Total Tokens",
+            labelAr: "إجمالي التوكنز",
+            value: currentMonthTokens !== null ? fmtTokens(currentMonthTokens) : "—",
+            icon: <Cpu size={16} className="text-[#6C8EEF]" />,
+            accent: "text-[#6C8EEF]",
+          },
+          {
+            labelEn: "API Calls",
+            labelAr: "عدد الطلبات",
+            value: totalCalls !== null ? totalCalls.toLocaleString() : "—",
+            icon: <Activity size={16} className="text-[#2EC4B6]" />,
+            accent: "text-[#2EC4B6]",
+          },
+          {
+            labelEn: "Providers",
+            labelAr: "مزودو الخدمة",
+            value: providerUsage ? String(providerUsage.length) : "—",
+            icon: <Globe size={16} className="text-purple-400" />,
+            accent: "text-purple-400",
+          },
+        ].map((card) => (
+          <Card key={card.labelEn} className="border-border/60">
+            <CardContent className="p-5">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  {isAr ? card.labelAr : card.labelEn}
+                </span>
+                {card.icon}
+              </div>
+              <p className={cn("text-2xl font-black tabular-nums", card.accent)}>
+                {card.value}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Charts row */}
+      <div className="grid md:grid-cols-2 gap-6">
+        {/* Daily tokens area chart */}
+        <Card className="border-border/60">
+          <CardContent className="p-5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+              {isAr ? "التوكنز اليومية (٣٠ يوم)" : "Daily Tokens (30 days)"}
+            </p>
+            {!dailyUsage || dailyUsage.length === 0 ? (
+              <div className="h-40 flex items-center justify-center text-sm text-muted-foreground/60">
+                {isAr ? "لا توجد بيانات بعد" : "No data yet"}
+              </div>
+            ) : (
+              <div dir="ltr" className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={dailyUsage} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="tokenGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#C9A84C" stopOpacity={0.3} />
+                        <stop offset="95%" stopColor="#C9A84C" stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#252A36" />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 9, fill: "#7A8299" }}
+                      tickLine={false}
+                      axisLine={false}
+                      interval={6}
+                      tickFormatter={(v: string) => v.slice(5)}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 9, fill: "#7A8299" }}
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v: number) => fmtTokens(v)}
+                    />
+                    <Tooltip
+                      contentStyle={{ background: "#1A1F2E", border: "1px solid #252A36", borderRadius: 6 }}
+                      labelStyle={{ color: "#7A8299", fontSize: 10 }}
+                      itemStyle={{ color: "#C9A84C", fontSize: 10 }}
+                      formatter={(v: unknown) => [fmtTokens(Number(v)), isAr ? "التوكنز" : "Tokens"]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="totalTokens"
+                      stroke="#C9A84C"
+                      strokeWidth={2}
+                      fill="url(#tokenGrad)"
+                      dot={false}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Provider breakdown pie */}
+        <Card className="border-border/60">
+          <CardContent className="p-5">
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+              {isAr ? "توزيع مزودي الذكاء الاصطناعي" : "AI Provider Breakdown"}
+            </p>
+            {!providerUsage || providerUsage.length === 0 ? (
+              <div className="h-40 flex items-center justify-center text-sm text-muted-foreground/60">
+                {isAr ? "لا توجد بيانات بعد" : "No data yet"}
+              </div>
+            ) : (
+              <div dir="ltr" className="h-40">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={providerUsage}
+                      dataKey="totalTokens"
+                      nameKey="provider"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={30}
+                      outerRadius={55}
+                      paddingAngle={3}
+                    >
+                      {providerUsage.map((entry, idx) => (
+                        <Cell
+                          key={`cell-${idx}`}
+                          fill={PROVIDER_COLORS[entry.provider.toLowerCase()] ?? "#7A8299"}
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ background: "#1A1F2E", border: "1px solid #252A36", borderRadius: 6 }}
+                      labelStyle={{ color: "#7A8299", fontSize: 10 }}
+                      itemStyle={{ fontSize: 10 }}
+                      formatter={(v: unknown) => [fmtTokens(Number(v)), isAr ? "التوكنز" : "Tokens"]}
+                    />
+                    <Legend
+                      formatter={(value: string) => (
+                        <span style={{ fontSize: 10, color: "#7A8299" }}>
+                          {value.charAt(0).toUpperCase() + value.slice(1)}
+                        </span>
+                      )}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Cost accumulation line */}
+      <Card className="border-border/60">
+        <CardContent className="p-5">
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-4">
+            {isAr ? "تراكم التكلفة (٣٠ يوم)" : "Cost Accumulation (30 days)"}
+          </p>
+          {costAccumulation.length === 0 ? (
+            <div className="h-32 flex items-center justify-center text-sm text-muted-foreground/60">
+              {isAr ? "لا توجد بيانات بعد" : "No data yet"}
+            </div>
+          ) : (
+            <div dir="ltr" className="h-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={costAccumulation} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#252A36" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 9, fill: "#7A8299" }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval={6}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 9, fill: "#7A8299" }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v: number) => `$${v.toFixed(1)}`}
+                  />
+                  <Tooltip
+                    contentStyle={{ background: "#1A1F2E", border: "1px solid #252A36", borderRadius: 6 }}
+                    labelStyle={{ color: "#7A8299", fontSize: 10 }}
+                    itemStyle={{ color: "#2EC4B6", fontSize: 10 }}
+                    formatter={(v: unknown) => [`$${Number(v).toFixed(2)}`, isAr ? "التكلفة التراكمية" : "Cumulative Cost"]}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="cumulative"
+                    stroke="#2EC4B6"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+interface ApiUsageDashboardProps {
+  isAr: boolean;
+}
+
+function ApiUsageDashboard({ isAr }: ApiUsageDashboardProps) {
+  if (!usageApi) {
+    // Data agent hasn't created api.usage yet — show placeholder
+    return (
+      <Card className="border-border/60 border-dashed">
+        <CardContent className="py-12 text-center space-y-3">
+          <BrainCircuit size={28} className="mx-auto text-muted-foreground/30" />
+          <p className="text-sm font-semibold text-muted-foreground">
+            {isAr ? "قريباً — لوحة استخدام الذكاء الاصطناعي" : "Coming soon — AI API Usage Dashboard"}
+          </p>
+          <p className="text-xs text-muted-foreground/60 max-w-xs mx-auto">
+            {isAr
+              ? "سيتم عرض إحصائيات الاستخدام التفصيلية هنا بعد إنشاء واجهة api.usage من قِبَل وكيل البيانات."
+              : "Detailed usage stats will appear here once the data agent creates the api.usage module."}
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return <ApiUsageDashboardInner isAr={isAr} />;
+}
+
+// ─── Infrastructure Costs Card ────────────────────────────────────────────────
+
+interface InfrastructureCostsCardProps {
+  isAr: boolean;
+  fmtUsd: (v: number) => string;
+  apiCostThisMonth: number | null;
+}
+
+function InfrastructureCostsCard({ isAr, fmtUsd, apiCostThisMonth }: InfrastructureCostsCardProps) {
+  const total = FIXED_TOTAL_USD + (apiCostThisMonth ?? 0);
+
+  return (
+    <Card className="border-border/60">
+      <CardContent className="p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Server size={16} className="text-[#6C8EEF]" />
+          <p className="text-sm font-bold">
+            {isAr ? "التكاليف الشهرية" : "Monthly Cost Breakdown"}
+          </p>
+        </div>
+        <div className="space-y-2">
+          {FIXED_COSTS.map((row) => (
+            <div key={row.serviceEn} className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">{isAr ? row.serviceAr : row.serviceEn}</span>
+              <span className="tabular-nums font-mono text-foreground/80">
+                {row.monthlyUsd === 0 ? (isAr ? "مجاني" : "Free") : fmtUsd(row.monthlyUsd)}
+              </span>
+            </div>
+          ))}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground flex items-center gap-1">
+              <Bot size={12} className="text-[#C9A84C]" />
+              {isAr ? "AI API (هذا الشهر)" : "AI API (this month)"}
+            </span>
+            <span className="tabular-nums font-mono text-[#C9A84C]">
+              {apiCostThisMonth !== null ? fmtUsd(apiCostThisMonth) : "—"}
+            </span>
+          </div>
+          <Separator className="my-2 opacity-30" />
+          <div className="flex items-center justify-between text-sm font-bold">
+            <span>{isAr ? "الإجمالي الشهري" : "Total Monthly"}</span>
+            <span className="tabular-nums text-primary">{fmtUsd(total)}</span>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Runway Calculator ────────────────────────────────────────────────────────
+
+interface RunwayCalculatorProps {
+  summaries: FundingSummaryRow[] | undefined;
+  isAr: boolean;
+  fmtUsd: (v: number) => string;
+  apiCostThisMonth: number | null;
+}
+
+function RunwayCalculator({ summaries, isAr, fmtUsd, apiCostThisMonth }: RunwayCalculatorProps) {
+  const isLoading = summaries === undefined;
+
+  const balance = summaries
+    ? summaries.reduce((s, r) => s + r.totalDonationsUsd - r.totalAllocatedUsd, 0)
+    : 0;
+
+  const monthlyBurn = FIXED_TOTAL_USD + (apiCostThisMonth ?? 0);
+  const runwayMonths = monthlyBurn > 0 ? Math.floor(balance / monthlyBurn) : Infinity;
+  const progressPct = Math.min(100, Math.max(0, (runwayMonths / 12) * 100));
+
+  const runwayColor =
+    runwayMonths > 6
+      ? { bar: "#2EC4B6", text: "text-[#2EC4B6]" }
+      : runwayMonths >= 3
+      ? { bar: "#C9A84C", text: "text-[#C9A84C]" }
+      : { bar: "#E5484D", text: "text-[#E5484D]" };
+
+  const runwayLabel =
+    runwayMonths === Infinity
+      ? isAr ? "غير محدود" : "Unlimited"
+      : `${runwayMonths} ${isAr ? "شهر" : "months"}`;
+
+  return (
+    <Card className="border-border/60">
+      <CardContent className="p-6">
+        <div className="flex items-center gap-2 mb-5">
+          <TrendingUp size={16} className="text-primary" />
+          <p className="text-sm font-bold">
+            {isAr ? "حاسبة الاستمرارية" : "Runway Calculator"}
+          </p>
+        </div>
+
+        {isLoading ? (
+          <div className="h-24 bg-muted/20 rounded-lg animate-pulse" />
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {isAr ? "الرصيد الحالي" : "Current Balance"}
+                </p>
+                <p className="text-lg font-black text-blue-400 tabular-nums">{fmtUsd(balance)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {isAr ? "الإنفاق الشهري" : "Monthly Burn"}
+                </p>
+                <p className="text-lg font-black text-[#C9A84C] tabular-nums">{fmtUsd(monthlyBurn)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {isAr ? "مدة الاستمرارية" : "Runway"}
+                </p>
+                <p className={cn("text-lg font-black tabular-nums", runwayColor.text)}>
+                  {runwayLabel}
+                </p>
+              </div>
+            </div>
+
+            <div>
+              <div className="h-3 w-full rounded-full bg-muted/30 overflow-hidden">
+                <div
+                  className="h-3 rounded-full transition-all duration-700"
+                  style={{ width: `${progressPct}%`, backgroundColor: runwayColor.bar }}
+                />
+              </div>
+              <div className="flex justify-between mt-1">
+                <span className="text-[0.6rem] text-muted-foreground">0</span>
+                <span className="text-[0.6rem] text-muted-foreground">6 {isAr ? "أشهر" : "mo"}</span>
+                <span className="text-[0.6rem] text-muted-foreground">12 {isAr ? "شهراً" : "mo"}</span>
+              </div>
+            </div>
+
+            {runwayMonths < 3 && (
+              <p className="text-xs text-[#E5484D] bg-[#E5484D]/10 rounded-lg px-3 py-2">
+                {isAr
+                  ? "تحذير: رصيد الاستمرارية منخفض. يُرجى دعم المشروع."
+                  : "Warning: Low runway. Please consider supporting the project."}
+              </p>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Scaling Roadmap ──────────────────────────────────────────────────────────
+
+interface ScalingRoadmapProps {
+  isAr: boolean;
+  fmtUsd: (v: number) => string;
+}
+
+function ScalingRoadmap({ isAr, fmtUsd }: ScalingRoadmapProps) {
+  return (
+    <div className="space-y-4">
+      {SCALING_TIERS.map((tier, idx) => (
+        <div
+          key={tier.budgetUsd}
+          className={cn(
+            "relative rounded-xl border p-5 transition-all",
+            tier.current
+              ? "border-[#C9A84C]/60 bg-[#C9A84C]/5 shadow-[0_0_20px_rgba(201,168,76,0.08)]"
+              : "border-border/40 opacity-70 hover:opacity-90",
+          )}
+        >
+          {/* Gold top-border accent for current tier */}
+          {tier.current && (
+            <div
+              className="absolute top-0 left-6 right-6 h-0.5 rounded-full"
+              style={{ backgroundColor: tier.color }}
+            />
+          )}
+
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                style={{ backgroundColor: tier.color + "22", color: tier.color }}
+              >
+                <Layers size={15} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap mb-1">
+                  <span className="text-sm font-bold" style={{ color: tier.color }}>
+                    {isAr ? tier.labelAr : tier.labelEn}
+                  </span>
+                  {tier.current && (
+                    <Badge
+                      variant="outline"
+                      className="text-[0.55rem] px-1.5 py-0"
+                      style={{ borderColor: tier.color + "60", color: tier.color }}
+                    >
+                      {isAr ? "الوضع الحالي" : "Current"}
+                    </Badge>
+                  )}
+                </div>
+                <ul className="space-y-1 mt-2">
+                  {(isAr ? tier.featuresAr : tier.featuresEn).map((f, fi) => (
+                    <li key={fi} className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                      <ChevronRight size={10} className="mt-0.5 shrink-0" style={{ color: tier.color }} />
+                      {f}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <p className="text-xl font-black tabular-nums" style={{ color: tier.color }}>
+                {fmtUsd(tier.budgetUsd)}
+              </p>
+              <p className="text-[0.6rem] text-muted-foreground">{isAr ? "/شهر" : "/mo"}</p>
+              {idx < SCALING_TIERS.length - 1 && (
+                <p className="text-[0.6rem] text-muted-foreground/50 mt-1">
+                  {isAr ? "الهدف التالي" : "next tier"}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Cost Transparency Table ──────────────────────────────────────────────────
+
+interface CostTransparencyTableProps {
+  isAr: boolean;
+}
+
+// Similar to ApiUsageDashboard — only mount inner query component when API exists
+function CostTransparencyTable({ isAr }: CostTransparencyTableProps) {
+  const [expanded, setExpanded] = useState(false);
+
+  if (!usageApi) {
+    return (
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <Activity size={14} />
+          {isAr ? "سجل استدعاءات API (آخر ٧ أيام)" : "API Call Log (last 7 days)"}
+        </span>
+        <ChevronDown
+          size={14}
+          className={cn("transition-transform", expanded && "rotate-180")}
+        />
+      </button>
+    );
+  }
+
+  return <CostTransparencyTableInner isAr={isAr} />;
+}
+
+function CostTransparencyTableInner({ isAr }: { isAr: boolean }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const recentData = useQuery(
+    usageApi!.getDailyUsage,
+    { days: 7 },
+  ) as DailyUsageEntry[] | null | undefined;
+
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-3 text-sm font-semibold hover:text-primary transition-colors"
+      >
+        <span className="flex items-center gap-2">
+          <Activity size={14} />
+          {isAr ? "سجل استدعاءات API (آخر ٧ أيام)" : "API Call Log (last 7 days)"}
+          {recentData && (
+            <Badge variant="secondary" className="text-[0.6rem] px-1.5 py-0">
+              {recentData.length}
+            </Badge>
+          )}
+        </span>
+        <ChevronDown
+          size={14}
+          className={cn("transition-transform", expanded && "rotate-180")}
+        />
+      </button>
+
+      {expanded && (
+        <div className="border-t border-border/40 overflow-x-auto">
+          {!recentData || recentData.length === 0 ? (
+            <p className="text-center py-8 text-sm text-muted-foreground/60">
+              {isAr ? "لا توجد بيانات متاحة" : "No data available"}
+            </p>
+          ) : (
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr className="border-b border-border/40 bg-muted/20">
+                  {[
+                    { en: "Date / التاريخ", ar: "التاريخ" },
+                    { en: "Tokens In / الإدخال", ar: "توكنز الإدخال" },
+                    { en: "Tokens Out / الإخراج", ar: "توكنز الإخراج" },
+                    { en: "Total Tokens / الإجمالي", ar: "إجمالي التوكنز" },
+                    { en: "Cost / التكلفة", ar: "التكلفة" },
+                    { en: "Calls / الطلبات", ar: "الطلبات" },
+                  ].map((col) => (
+                    <th
+                      key={col.en}
+                      className="px-4 py-2 text-start text-[0.65rem] font-bold uppercase tracking-widest text-muted-foreground"
+                    >
+                      {isAr ? col.ar : col.en}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {recentData.slice(0, 20).map((row, i) => (
+                  <tr key={i} className="border-b border-border/20 hover:bg-muted/10 transition-colors">
+                    <td className="px-4 py-2.5 tabular-nums text-xs font-mono text-muted-foreground">
+                      {row.date}
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums text-xs">
+                      {row.inputTokens.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums text-xs">
+                      {row.outputTokens.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums text-xs font-semibold">
+                      {row.totalTokens.toLocaleString()}
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums text-xs text-[#C9A84C] font-mono">
+                      ${row.costUsd.toFixed(4)}
+                    </td>
+                    <td className="px-4 py-2.5 tabular-nums text-xs text-muted-foreground">
+                      {row.callCount}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function FundingPage() {
@@ -574,6 +1383,10 @@ export default function FundingPage() {
     donations !== undefined &&
     summaries.length === 0 &&
     donations.length === 0;
+
+  // Compute API cost this month for infrastructure / runway cards.
+  // If usage API doesn't exist, stays null.
+  const apiCostThisMonth: number | null = null;
 
   return (
     <div className="page-content" dir={dir}>
@@ -660,6 +1473,48 @@ export default function FundingPage() {
           <SummaryCards summaries={summaries} isAr={isAr} fmtUsd={fmtUsd} />
         </section>
 
+        {/* ════════ AI API USAGE DASHBOARD ════════ */}
+        <motion.section
+          className="mb-12"
+          id="api-usage"
+          {...fadeInUpProps}
+        >
+          <div className="flex items-center gap-2 mb-5">
+            <BrainCircuit size={16} className="text-primary" />
+            <h2 className="text-base font-bold uppercase tracking-widest text-primary">
+              {isAr ? "استخدام واجهات الذكاء الاصطناعي" : "AI API Usage"}
+            </h2>
+          </div>
+          <ApiUsageDashboard isAr={isAr} />
+        </motion.section>
+
+        {/* ════════ INFRASTRUCTURE + RUNWAY ════════ */}
+        <motion.section
+          className="mb-12"
+          id="costs"
+          {...fadeInUpProps}
+        >
+          <div className="flex items-center gap-2 mb-5">
+            <Zap size={16} className="text-primary" />
+            <h2 className="text-base font-bold uppercase tracking-widest text-primary">
+              {isAr ? "التكاليف والاستمرارية" : "Costs & Runway"}
+            </h2>
+          </div>
+          <div className="grid md:grid-cols-2 gap-6">
+            <InfrastructureCostsCard
+              isAr={isAr}
+              fmtUsd={fmtUsd}
+              apiCostThisMonth={apiCostThisMonth}
+            />
+            <RunwayCalculator
+              summaries={summaries}
+              isAr={isAr}
+              fmtUsd={fmtUsd}
+              apiCostThisMonth={apiCostThisMonth}
+            />
+          </div>
+        </motion.section>
+
         {/* ════════ MONTHLY TIMELINE ════════ */}
         <section className="mb-12" id="timeline">
           <div className="flex items-center gap-2 mb-5">
@@ -694,6 +1549,43 @@ export default function FundingPage() {
             </CardContent>
           </Card>
         </section>
+
+        {/* ════════ SCALING ROADMAP ════════ */}
+        <motion.section
+          className="mb-12"
+          id="roadmap"
+          {...fadeInUpProps}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <Layers size={16} className="text-primary" />
+            <h2 className="text-base font-bold uppercase tracking-widest text-primary">
+              {isAr ? "خريطة التوسع" : "Scaling Roadmap"}
+            </h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-5 max-w-xl">
+            {isAr
+              ? "كل مستوى تمويل يفتح إمكانات جديدة لميزان. هذا هو المسار نحو منصة بيانات حكومية متكاملة."
+              : "Each funding tier unlocks new capabilities for Mizan. This is the path to a comprehensive government data platform."}
+          </p>
+          <ScalingRoadmap isAr={isAr} fmtUsd={fmtUsd} />
+        </motion.section>
+
+        {/* ════════ COST TRANSPARENCY TABLE ════════ */}
+        <motion.section
+          className="mb-12"
+          id="transparency-table"
+          {...fadeInUpProps}
+        >
+          <div className="flex items-center gap-2 mb-5">
+            <Activity size={16} className="text-primary" />
+            <h2 className="text-base font-bold uppercase tracking-widest text-primary">
+              {isAr ? "سجل التكاليف" : "Cost Transparency Log"}
+            </h2>
+          </div>
+          <Card className="border-border/60 overflow-hidden">
+            <CostTransparencyTable isAr={isAr} />
+          </Card>
+        </motion.section>
 
         {/* ════════ RECENT DONATIONS ════════ */}
         <section className="mb-12" id="donations">

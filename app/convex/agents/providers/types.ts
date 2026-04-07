@@ -2,6 +2,16 @@
 // Shared types for all LLM providers.
 // Every provider implements these interfaces so the pipeline is model-agnostic.
 
+export interface LLMCallResult {
+  text: string | null;
+  usage: {
+    inputTokens: number;
+    outputTokens: number;
+    model: string;
+    durationMs: number;
+  } | null;
+}
+
 export interface ToolSchema {
   name: string;
   description: string;

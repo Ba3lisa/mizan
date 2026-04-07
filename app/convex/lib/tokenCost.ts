@@ -1,0 +1,19 @@
+// Model pricing per 1M tokens (USD)
+const MODEL_PRICING: Record<string, { input: number; output: number }> = {
+  "claude-haiku-4-5-20251001": { input: 0.80, output: 3.20 },
+  "claude-sonnet-4-20250514": { input: 3.00, output: 15.00 },
+  "gpt-4o-mini": { input: 0.15, output: 0.60 },
+  "gpt-4o": { input: 2.50, output: 10.00 },
+  "gemini-2.0-flash": { input: 0.075, output: 0.30 },
+  "meta-llama/llama-4-scout": { input: 0.15, output: 0.60 },
+};
+
+export function estimateCost(model: string, inputTokens: number, outputTokens: number): number {
+  const pricing = MODEL_PRICING[model];
+  if (!pricing) return 0;
+  return (inputTokens * pricing.input + outputTokens * pricing.output) / 1_000_000;
+}
+
+export function getModelPricing(): typeof MODEL_PRICING {
+  return MODEL_PRICING;
+}

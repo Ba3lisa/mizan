@@ -729,6 +729,23 @@ export default defineSchema({
     .index("by_pollId", ["pollId"])
     .index("by_pollId_and_visitorHash", ["pollId", "visitorHash"]),
 
+  // API USAGE TRACKING (real-time token + cost logging)
+  apiUsageLog: defineTable({
+    provider: v.string(),
+    model: v.string(),
+    purpose: v.string(),
+    inputTokens: v.number(),
+    outputTokens: v.number(),
+    totalTokens: v.number(),
+    costUsd: v.number(),
+    durationMs: v.number(),
+    success: v.boolean(),
+    timestamp: v.number(),
+  })
+    .index("by_provider", ["provider"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_purpose", ["purpose"]),
+
   // PIPELINE PROGRESS — real-time tracking of AI data refresh runs
   pipelineProgress: defineTable({
     runId: v.string(),
