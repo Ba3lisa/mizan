@@ -9,6 +9,7 @@ import {
   ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
   LineChart, Heart, MapPin, Calculator, Bot, BookMarked,
 } from "lucide-react";
+import { DailyPoll } from "@/components/daily-poll";
 import { useLanguage, useCurrency } from "@/components/providers";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -125,44 +126,52 @@ export default function HomePage() {
   return (
     <div className="page-content" dir={dir}>
 
-      {/* ════════ HERO ════════ */}
+      {/* ════════ HERO + DAILY POLL ════════ */}
       <section className="container-page">
-        <div className="relative max-w-2xl mx-auto text-center py-12 md:py-20">
-          {/* Subtle radial glow behind title */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden>
-            <div className="w-96 h-96 rounded-full opacity-[0.07]"
-              style={{ background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)" }} />
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start py-12 md:py-20">
+          {/* Hero content */}
+          <div className="relative max-w-2xl mx-auto lg:mx-0 text-center lg:text-start">
+            {/* Subtle radial glow behind title */}
+            <div className="absolute inset-0 flex items-center justify-center lg:justify-start pointer-events-none" aria-hidden>
+              <div className="w-96 h-96 rounded-full opacity-[0.07]"
+                style={{ background: "radial-gradient(circle, var(--primary) 0%, transparent 70%)" }} />
+            </div>
+
+            <div className="relative">
+              <Scale size={28} className="text-primary mx-auto lg:mx-0 mb-6 opacity-80" strokeWidth={1.5} />
+              <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-4" style={{ lineHeight: 0.95 }}>
+                {isAr ? "ميزان" : "Mizan"}
+              </h1>
+              <p className="text-base md:text-lg text-muted-foreground mb-2">
+                {isAr ? "مصر، بالأرقام." : "Egypt, visualized."}
+              </p>
+              <p className="text-sm text-muted-foreground/60 mx-auto lg:mx-0 mb-6 max-w-sm leading-relaxed">
+                {isAr
+                  ? "بيانات موثّقة عن البرلمان والوزارات والدستور والميزانية والديون."
+                  : "Cited data on parliament, ministries, constitution, budget, and debt."}
+              </p>
+              <p className="text-xs text-muted-foreground/40 mx-auto lg:mx-0 mb-10 max-w-md leading-relaxed">
+                {isAr
+                  ? "هذا الموقع يُدار بالكامل بواسطة الذكاء الاصطناعي — من جمع البيانات إلى التحقق والعرض. اعرف المزيد في صفحات الشفافية والمنهجية."
+                  : "This site is fully managed by AI — from data collection to verification and display. Learn more on the Transparency and Methodology pages."}
+              </p>
+              <div className="flex flex-wrap justify-center lg:justify-start gap-3">
+                <Button asChild size="lg" className="gap-2 rounded-full px-7 font-bold">
+                  <Link href="/government">
+                    {isAr ? "استكشاف الحكومة" : "Explore Government"}
+                    <Chevron size={16} />
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" size="lg" className="rounded-full px-7">
+                  <Link href="/constitution">{isAr ? "الدستور" : "Constitution"}</Link>
+                </Button>
+              </div>
+            </div>
           </div>
 
-          <div className="relative">
-            <Scale size={28} className="text-primary mx-auto mb-6 opacity-80" strokeWidth={1.5} />
-            <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-4" style={{ lineHeight: 0.95 }}>
-              {isAr ? "ميزان" : "Mizan"}
-            </h1>
-            <p className="text-base md:text-lg text-muted-foreground mb-2">
-              {isAr ? "مصر، بالأرقام." : "Egypt, visualized."}
-            </p>
-            <p className="text-sm text-muted-foreground/60 mx-auto mb-6 max-w-sm leading-relaxed">
-              {isAr
-                ? "بيانات موثّقة عن البرلمان والوزارات والدستور والميزانية والديون."
-                : "Cited data on parliament, ministries, constitution, budget, and debt."}
-            </p>
-            <p className="text-xs text-muted-foreground/40 mx-auto mb-10 max-w-md leading-relaxed">
-              {isAr
-                ? "هذا الموقع يُدار بالكامل بواسطة الذكاء الاصطناعي — من جمع البيانات إلى التحقق والعرض. اعرف المزيد في صفحات الشفافية والمنهجية."
-                : "This site is fully managed by AI — from data collection to verification and display. Learn more on the Transparency and Methodology pages."}
-            </p>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Button asChild size="lg" className="gap-2 rounded-full px-7 font-bold">
-                <Link href="/government">
-                  {isAr ? "استكشاف الحكومة" : "Explore Government"}
-                  <Chevron size={16} />
-                </Link>
-              </Button>
-              <Button asChild variant="outline" size="lg" className="rounded-full px-7">
-                <Link href="/constitution">{isAr ? "الدستور" : "Constitution"}</Link>
-              </Button>
-            </div>
+          {/* Daily Poll sidebar */}
+          <div className="lg:sticky lg:top-24 w-full max-w-sm mx-auto lg:mx-0">
+            <DailyPoll />
           </div>
         </div>
       </section>

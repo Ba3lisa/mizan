@@ -19,6 +19,14 @@ crons.interval(
   {}
 );
 
+// Generate a new daily poll every 24 hours using AI.
+crons.interval(
+  "generate-daily-poll",
+  { hours: 24 },
+  internal.agents.pollAgent.generateDailyPoll,
+  {}
+);
+
 // Compact old refresh logs daily (keeps last 30 days, archives the rest).
 crons.interval(
   "compact-logs",

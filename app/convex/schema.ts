@@ -685,6 +685,50 @@ export default defineSchema({
   })
     .index("by_agency", ["agency"]),
 
+  // DAILY POLLS — AI-generated anonymous opinion polls
+  polls: defineTable({
+    questionAr: v.string(),
+    questionEn: v.string(),
+    options: v.array(v.object({
+      labelAr: v.string(),
+      labelEn: v.string(),
+      votes: v.number(),
+    })),
+    category: v.union(
+      v.literal("economy"),
+      v.literal("budget"),
+      v.literal("debt"),
+      v.literal("parliament"),
+      v.literal("government"),
+      v.literal("constitution"),
+      v.literal("general")
+    ),
+    contextAr: v.optional(v.string()),
+    contextEn: v.optional(v.string()),
+    dataNuggets: v.optional(v.array(v.object({
+      labelAr: v.string(),
+      labelEn: v.string(),
+      value: v.string(),
+      linkPath: v.optional(v.string()),
+    }))),
+    totalVotes: v.number(),
+    isActive: v.boolean(),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_isActive", ["isActive"])
+    .index("by_isActive_and_expiresAt", ["isActive", "expiresAt"])
+    .index("by_createdAt", ["createdAt"]),
+
+  pollVotes: defineTable({
+    pollId: v.id("polls"),
+    optionIndex: v.number(),
+    visitorHash: v.string(),
+    votedAt: v.number(),
+  })
+    .index("by_pollId", ["pollId"])
+    .index("by_pollId_and_visitorHash", ["pollId", "visitorHash"]),
+
   // PIPELINE PROGRESS — real-time tracking of AI data refresh runs
   pipelineProgress: defineTable({
     runId: v.string(),
