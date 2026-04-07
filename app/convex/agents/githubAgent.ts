@@ -58,19 +58,13 @@ export const processGitHubIssues = internalAction({
     console.log("[githubAgent] Starting batch GitHub Issues processing...");
     const batchId = `batch_${Date.now()}`;
 
-    // Fetch open data issues
+    // Fetch open data correction issues
     const dataIssues = await githubFetch(
-      `/repos/${GITHUB_REPO}/issues?state=open&labels=data-correction,stale-data&per_page=20`
-    );
-
-    // Fetch open UI issues
-    const uiIssues = await githubFetch(
-      `/repos/${GITHUB_REPO}/issues?state=open&labels=ui-issue&per_page=10`
+      `/repos/${GITHUB_REPO}/issues?state=open&labels=data-correction&per_page=20`
     );
 
     const allIssues: Array<GitHubIssue> = [];
     if (Array.isArray(dataIssues)) allIssues.push(...(dataIssues as Array<GitHubIssue>));
-    if (Array.isArray(uiIssues)) allIssues.push(...(uiIssues as Array<GitHubIssue>));
 
     if (allIssues.length === 0) {
       console.log("[githubAgent] No open issues found");
@@ -97,13 +91,7 @@ export const processGitHubIssues = internalAction({
         continue;
       }
 
-      const isUI = issue.labels.some((l) => l.name === "ui-issue");
-
-      if (isUI) {
-        await processUIIssue(ctx, issue, batchId);
-      } else {
-        await processDataIssue(ctx, issue, batchId);
-      }
+      await processDataIssue(ctx, issue, batchId);
       processed++;
     }
 
@@ -111,29 +99,6 @@ export const processGitHubIssues = internalAction({
     return null;
   },
 });
-
-// ─── UI ISSUE HANDLER ───────────────────────────────────────────────────────
-
-async function processUIIssue(
-  ctx: ActionCtx,
-  issue: GitHubIssue,
-  batchId: string
-): Promise<void> {
-  console.log(`[githubAgent] Recording UI issue #${issue.number}`);
-
-  await ctx.runMutation(internal.githubIssueQueries.recordIssue, {
-    issueNumber: issue.number,
-    issueType: "ui" as const,
-    status: "queued" as const,
-    authorUsername: issue.user?.login ?? "unknown",
-    batchId,
-  });
-
-  await addComment(
-    issue.number,
-    `**Mizan AI Agent**: Thank you for the UI suggestion! UI issues are reviewed by maintainers during sprint planning. See [CONTRIBUTING.md](https://github.com/${GITHUB_REPO}/blob/main/CONTRIBUTING.md) for the UI contribution path.\n\n_This is an automated response._`
-  );
-}
 
 // ─── DATA ISSUE HANDLER ─────────────────────────────────────────────────────
 
