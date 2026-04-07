@@ -9,7 +9,8 @@ export async function GET() {
     const [
       hierarchy,
       governorates,
-      parliamentStats,
+      houseStats,
+      senateStats,
       parties,
       fiscalYears,
       latestDebt,
@@ -23,6 +24,7 @@ export async function GET() {
       fetchQuery(api.government.getGovernmentHierarchy),
       fetchQuery(api.government.listGovernorates),
       fetchQuery(api.parliament.getParliamentStats, { chamber: "house" }),
+      fetchQuery(api.parliament.getParliamentStats, { chamber: "senate" }),
       fetchQuery(api.parliament.listParties),
       fetchQuery(api.budget.listFiscalYears),
       fetchQuery(api.debt.getLatestDebtRecord),
@@ -61,7 +63,7 @@ export async function GET() {
       if (ministers.length > 0) {
         md += `### Cabinet Ministers (${ministers.length})\n`;
         for (const m of ministers) {
-          md += `- ${m.nameEn ?? ""} — ${m.portfolioEn ?? ""}\n`;
+          md += `- ${m.nameEn ?? ""} — ${m.portfolioEn ?? m.titleEn ?? ""}\n`;
         }
         md += `\n`;
       }
@@ -77,17 +79,17 @@ export async function GET() {
 
     // ── Parliament ──
     md += `## Parliament\n\n`;
-    if (parliamentStats) {
-      const ps = parliamentStats as Record<string, unknown>;
-      md += `- House Members: ${ps.houseMembers ?? "N/A"}\n`;
-      md += `- Senate Members: ${ps.senateMembers ?? "N/A"}\n`;
-      md += `- Total Parties: ${ps.totalParties ?? "N/A"}\n`;
-      md += `- Committees: ${ps.totalCommittees ?? "N/A"}\n\n`;
+    if (houseStats || senateStats) {
+      const hs = houseStats as Record<string, unknown> | null;
+      const ss = senateStats as Record<string, unknown> | null;
+      md += `- House Members: ${hs?.totalMembers ?? "N/A"}\n`;
+      md += `- Senate Members: ${ss?.totalMembers ?? "N/A"}\n`;
+      md += `\n`;
     }
     if (parties && Array.isArray(parties)) {
       md += `### Political Parties (${parties.length})\n`;
       for (const p of parties as Array<Record<string, unknown>>) {
-        md += `- ${p.nameEn ?? ""} (${p.nameAr ?? ""}): ${p.seatsHouse ?? 0} House seats, ${p.seatsSenate ?? 0} Senate seats\n`;
+        md += `- ${p.nameEn ?? ""} (${p.nameAr ?? ""})\n`;
       }
       md += `\n`;
     }
@@ -96,7 +98,7 @@ export async function GET() {
     md += `## Budget\n\n`;
     if (fiscalYears && Array.isArray(fiscalYears)) {
       for (const fy of fiscalYears as Array<Record<string, unknown>>) {
-        md += `### ${fy.yearLabel ?? fy.year ?? "Unknown Year"}\n`;
+        md += `### ${fy.year ?? "Unknown Year"}\n`;
         md += `- Total Revenue: ${formatNum(fy.totalRevenue as number | undefined)} EGP\n`;
         md += `- Total Expenditure: ${formatNum(fy.totalExpenditure as number | undefined)} EGP\n`;
         md += `- Deficit: ${formatNum(fy.deficit as number | undefined)} EGP\n`;
@@ -109,28 +111,32 @@ export async function GET() {
     md += `## Debt\n\n`;
     if (latestDebt) {
       const d = latestDebt as Record<string, unknown>;
-      md += `### Latest Record (${d.year ?? "N/A"})\n`;
-      md += `- External Debt: $${formatNum(d.externalDebt as number | undefined)}B\n`;
-      md += `- Domestic Debt: ${formatNum(d.domesticDebt as number | undefined)}B EGP\n`;
-      md += `- Debt-to-GDP: ${d.debtToGdp ?? "N/A"}%\n`;
+      md += `### Latest Record (${d.date ?? "N/A"})\n`;
+      md += `- External Debt: $${formatNum(d.totalExternalDebt as number | undefined)}B\n`;
+      md += `- Domestic Debt: ${formatNum(d.totalDomesticDebt as number | undefined)}B EGP\n`;
+      md += `- Debt-to-GDP: ${formatPct(d.debtToGdpRatio as number | undefined)}\n`;
       if (d.sourceUrl) md += `- Source: ${d.sourceUrl}\n`;
       md += `\n`;
     }
     if (debtTimeline && Array.isArray(debtTimeline)) {
       md += `### Debt Timeline\n`;
-      md += `| Year | External ($B) | Domestic (B EGP) | Debt/GDP |\n`;
+      md += `| Date | External ($B) | Domestic (B EGP) | Debt/GDP |\n`;
       md += `|------|--------------|-----------------|----------|\n`;
       for (const d of debtTimeline as Array<Record<string, unknown>>) {
-        md += `| ${d.year ?? ""} | ${formatNum(d.externalDebt as number | undefined)} | ${formatNum(d.domesticDebt as number | undefined)} | ${d.debtToGdp ?? ""}% |\n`;
+        md += `| ${d.date ?? ""} | ${formatNum(d.totalExternalDebt as number | undefined)} | ${formatNum(d.totalDomesticDebt as number | undefined)} | ${formatPct(d.debtToGdpRatio as number | undefined)} |\n`;
       }
       md += `\n`;
     }
 
     // ── Economy ──
     md += `## Economy\n\n`;
-    if (economyLatest && Array.isArray(economyLatest)) {
-      for (const ind of economyLatest as Array<Record<string, unknown>>) {
-        md += `- ${ind.nameEn ?? ind.indicatorKey ?? ""}: ${ind.value ?? "N/A"} ${ind.unit ?? ""} (${ind.year ?? ""})\n`;
+    if (economyLatest && typeof economyLatest === "object" && !Array.isArray(economyLatest)) {
+      // getAllLatest returns an object keyed by indicator name
+      const indicators = economyLatest as Record<string, Record<string, unknown>>;
+      for (const [key, ind] of Object.entries(indicators)) {
+        if (ind && typeof ind === "object") {
+          md += `- ${key}: ${ind.value ?? "N/A"} ${ind.unit ?? ""} (${ind.year ?? ind.date ?? ""})\n`;
+        }
       }
       md += `\n`;
     }
@@ -139,16 +145,9 @@ export async function GET() {
     md += `## Elections\n\n`;
     if (elections && Array.isArray(elections)) {
       for (const e of elections as Array<Record<string, unknown>>) {
-        md += `### ${e.nameEn ?? e.type ?? ""} (${e.year ?? ""})\n`;
-        md += `- Type: ${e.type ?? ""}\n`;
-        md += `- Turnout: ${e.turnout ?? "N/A"}%\n`;
-        const candidates = (e.candidates as Array<Record<string, unknown>>) ?? [];
-        if (candidates.length > 0) {
-          md += `- Results:\n`;
-          for (const c of candidates) {
-            md += `  - ${c.nameEn ?? c.name ?? ""}: ${c.votes ?? ""} votes (${c.percentage ?? ""}%)\n`;
-          }
-        }
+        md += `### ${e.type ?? ""} (${e.year ?? ""})\n`;
+        md += `- Date Held: ${e.dateHeld ?? ""}\n`;
+        md += `- Turnout: ${formatPct(e.turnoutPercentage as number | undefined)}\n`;
         md += `\n`;
       }
     }
@@ -204,4 +203,9 @@ export async function GET() {
 function formatNum(n: number | undefined | null): string {
   if (n === undefined || n === null) return "N/A";
   return n.toLocaleString("en-US", { maximumFractionDigits: 1 });
+}
+
+function formatPct(n: number | undefined | null): string {
+  if (n === undefined || n === null) return "N/A";
+  return `${n.toFixed(1)}%`;
 }
