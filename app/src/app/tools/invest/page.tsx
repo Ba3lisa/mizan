@@ -171,7 +171,7 @@ const PRESETS: Record<string, Preset> = {
   },
 };
 
-const DEFAULT_INFLATION = 25;
+const DEFAULT_INFLATION = 12; // Long-term estimate (IMF projects ~7% by 2027, historical avg ~10-15%)
 const DEFAULT_HORIZON = 10;
 const DEFAULT_CAPITAL_INDEX = 4; // 1M
 const DEFAULT_DEPRECIATION = 7;
@@ -426,6 +426,7 @@ export default function InvestPage() {
     return { ...m, ...PRESETS.balanced.allocation };
   });
   const [activePreset, setActivePreset] = useState<string>("balanced");
+  const [inflationPct, setInflationPct] = useState(DEFAULT_INFLATION);
   const [depreciationPct, setDepreciationPct] = useState(DEFAULT_DEPRECIATION);
   const [showMethodology, setShowMethodology] = useState(false);
 
@@ -443,9 +444,7 @@ export default function InvestPage() {
     return r;
   }, [convexDefaults]);
 
-  const inflation = useMemo(() => {
-    return convexDefaults?.["inflation"]?.value ?? DEFAULT_INFLATION;
-  }, [convexDefaults]);
+  const inflation = inflationPct;
 
   const exchangeRate = useMemo(() => {
     return convexDefaults?.["exchange_rate"]?.value ?? 50;
@@ -820,33 +819,71 @@ export default function InvestPage() {
               </CardContent>
             </Card>
 
-            {/* EGP Depreciation */}
+            {/* Inflation + Depreciation */}
             <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
-              <CardContent className="p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
-                      {isAr ? "انخفاض الجنيه / سنة" : "EGP Depreciation / yr"}
-                    </p>
-                    <InputTooltip text={isAr ? "مقدار انخفاض الجنيه أمام الدولار سنوياً. تاريخياً: ~7-15% منذ 2022." : "How much EGP loses against USD annually. Historical: ~7-15%/year since 2022."} />
+              <CardContent className="p-5 space-y-5">
+                {/* Inflation */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                        {isAr ? "معدل التضخم / سنة" : "Inflation / yr"}
+                      </p>
+                      <InputTooltip text={isAr
+                        ? "معدل ارتفاع الأسعار سنوياً. التضخم الحالي ~28% لكنه مؤقت — صندوق النقد يتوقع انخفاضه لـ7% بحلول 2027. المتوسط التاريخي ~10-15%. اختر معدلاً يعكس توقعاتك طويلة المدى."
+                        : "Annual price increase rate. Current inflation is ~28% but temporary — IMF projects 7% by 2027. Historical average ~10-15%. Choose a rate reflecting your long-term expectation."
+                      } />
+                    </div>
+                    <Badge variant="secondary" className="font-mono text-xs">
+                      {inflationPct}%
+                    </Badge>
                   </div>
-                  <Badge variant="secondary" className="font-mono text-xs">
-                    {depreciationPct}%
-                  </Badge>
+                  <input
+                    dir="ltr"
+                    type="range"
+                    min={2}
+                    max={40}
+                    step={1}
+                    value={inflationPct}
+                    onChange={(e) => setInflationPct(parseInt(e.target.value))}
+                    className="w-full accent-[#C9A84C] cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono" dir="ltr">
+                    <span>2%</span>
+                    <span className="text-primary/60" dir="ltr">~28% <span className="text-muted-foreground/40">{isAr ? "(الحالي)" : "(now)"}</span></span>
+                    <span>40%</span>
+                  </div>
                 </div>
-                <input
-                  dir="ltr"
-                  type="range"
-                  min={0}
-                  max={30}
-                  step={1}
-                  value={depreciationPct}
-                  onChange={(e) => setDepreciationPct(parseInt(e.target.value))}
-                  className="w-full accent-[#C9A84C] cursor-pointer"
-                />
-                <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono" dir="ltr">
-                  <span>0%</span>
-                  <span>30%</span>
+
+                <Separator />
+
+                {/* Depreciation */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">
+                        {isAr ? "انخفاض الجنيه / سنة" : "EGP Depreciation / yr"}
+                      </p>
+                      <InputTooltip text={isAr ? "مقدار انخفاض الجنيه أمام الدولار سنوياً. تاريخياً: ~7-15% منذ 2022." : "How much EGP loses against USD annually. Historical: ~7-15%/year since 2022."} />
+                    </div>
+                    <Badge variant="secondary" className="font-mono text-xs">
+                      {depreciationPct}%
+                    </Badge>
+                  </div>
+                  <input
+                    dir="ltr"
+                    type="range"
+                    min={0}
+                    max={30}
+                    step={1}
+                    value={depreciationPct}
+                    onChange={(e) => setDepreciationPct(parseInt(e.target.value))}
+                    className="w-full accent-[#C9A84C] cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono" dir="ltr">
+                    <span>0%</span>
+                    <span>30%</span>
+                  </div>
                 </div>
               </CardContent>
             </Card>

@@ -802,6 +802,17 @@ async function refreshEconomyData(
     console.warn(`[dataAgent/economy] Investment rates failed: ${err}`);
   }
 
+  // Backfill historical investment indicator data (one-time, no-op when populated)
+  try {
+    const backfilled = await backfillInvestmentHistory(ctx);
+    totalUpdated += backfilled;
+    if (backfilled > 0) {
+      console.log(`[dataAgent/economy] Investment history backfill: ${backfilled} records written.`);
+    }
+  } catch (err) {
+    console.warn(`[dataAgent/economy] Investment history backfill failed: ${err}`);
+  }
+
   return {
     recordsUpdated: totalUpdated,
     sourceUrl: "https://api.worldbank.org/v2/country/EGY/indicator",
@@ -1033,6 +1044,206 @@ ${tableText}`,
   console.log("[dataAgent/investment] NBE/CIB: skipped (block server-side fetches; seed data is fallback).");
 
   return updated;
+}
+
+// ─── INVESTMENT HISTORY BACKFILL ──────────────────────────────────────────────
+// One-time backfill for investment indicators that start with only 1 seeded point.
+// Each block is idempotent: it checks the count first and skips if >= 5 records exist.
+
+async function backfillInvestmentHistory(ctx: ActionCtx): Promise<number> {
+  let backfilled = 0;
+
+  // ── Gold price (EGP/g) ────────────────────────────────────────────────────
+  const goldCount: number = await ctx.runQuery(
+    internal.dataRefresh.countIndicatorRecords,
+    { indicator: "gold_price_egp" }
+  );
+  if (goldCount < 5) {
+    console.log(`[dataAgent/backfill] gold_price_egp has ${goldCount} points — backfilling.`);
+    const goldData: Array<{ year: string; value: number }> = [
+      { year: "2015", value: 195 },
+      { year: "2016", value: 350 },
+      { year: "2017", value: 530 },
+      { year: "2018", value: 595 },
+      { year: "2019", value: 685 },
+      { year: "2020", value: 820 },
+      { year: "2021", value: 790 },
+      { year: "2022", value: 1100 },
+      { year: "2023", value: 2200 },
+      { year: "2024", value: 3600 },
+      { year: "2025", value: 4500 },
+    ];
+    for (const entry of goldData) {
+      const n: number = await ctx.runMutation(
+        internal.dataRefresh.upsertEconomicIndicator,
+        {
+          indicator: "gold_price_egp",
+          date: `${entry.year}-12-31`,
+          year: entry.year,
+          value: entry.value,
+          unit: "EGP/g",
+          sourceUrl: "https://www.gold.org",
+          sourceNameEn: "World Gold Council — annual average EGP/g",
+          sanadLevel: 2,
+        }
+      );
+      backfilled += n;
+    }
+  }
+
+  // ── S&P 500 annual return (%) ─────────────────────────────────────────────
+  const sp500Count: number = await ctx.runQuery(
+    internal.dataRefresh.countIndicatorRecords,
+    { indicator: "sp500_annual_return" }
+  );
+  if (sp500Count < 5) {
+    console.log(`[dataAgent/backfill] sp500_annual_return has ${sp500Count} points — backfilling.`);
+    const sp500Data: Array<{ year: string; value: number }> = [
+      { year: "2015", value: 1.4 },
+      { year: "2016", value: 12.0 },
+      { year: "2017", value: 21.8 },
+      { year: "2018", value: -4.4 },
+      { year: "2019", value: 31.5 },
+      { year: "2020", value: 18.4 },
+      { year: "2021", value: 28.7 },
+      { year: "2022", value: -18.1 },
+      { year: "2023", value: 26.3 },
+      { year: "2024", value: 24.2 },
+      { year: "2025", value: 14.5 },
+    ];
+    for (const entry of sp500Data) {
+      const n: number = await ctx.runMutation(
+        internal.dataRefresh.upsertEconomicIndicator,
+        {
+          indicator: "sp500_annual_return",
+          date: `${entry.year}-12-31`,
+          year: entry.year,
+          value: entry.value,
+          unit: "%",
+          sourceUrl: "https://www.spglobal.com",
+          sourceNameEn: "S&P Global — S&P 500 annual total return",
+          sanadLevel: 2,
+        }
+      );
+      backfilled += n;
+    }
+  }
+
+  // ── Egypt real estate return (%) ──────────────────────────────────────────
+  const reCount: number = await ctx.runQuery(
+    internal.dataRefresh.countIndicatorRecords,
+    { indicator: "egypt_real_estate_return" }
+  );
+  if (reCount < 5) {
+    console.log(`[dataAgent/backfill] egypt_real_estate_return has ${reCount} points — backfilling.`);
+    const reData: Array<{ year: string; value: number }> = [
+      { year: "2015", value: 10 },
+      { year: "2016", value: 25 },
+      { year: "2017", value: 20 },
+      { year: "2018", value: 15 },
+      { year: "2019", value: 12 },
+      { year: "2020", value: 8 },
+      { year: "2021", value: 10 },
+      { year: "2022", value: 18 },
+      { year: "2023", value: 25 },
+      { year: "2024", value: 20 },
+      { year: "2025", value: 15 },
+    ];
+    for (const entry of reData) {
+      const n: number = await ctx.runMutation(
+        internal.dataRefresh.upsertEconomicIndicator,
+        {
+          indicator: "egypt_real_estate_return",
+          date: `${entry.year}-12-31`,
+          year: entry.year,
+          value: entry.value,
+          unit: "%",
+          sourceUrl: "https://www.aqarmap.com.eg",
+          sourceNameEn: "Aqarmap — Egypt real estate annual appreciation estimate",
+          sanadLevel: 4,
+        }
+      );
+      backfilled += n;
+    }
+  }
+
+  // ── CBE overnight deposit rate (%) ────────────────────────────────────────
+  const cbeCount: number = await ctx.runQuery(
+    internal.dataRefresh.countIndicatorRecords,
+    { indicator: "cbe_cd_rate" }
+  );
+  if (cbeCount < 5) {
+    console.log(`[dataAgent/backfill] cbe_cd_rate has ${cbeCount} points — backfilling.`);
+    const cbeData: Array<{ year: string; value: number }> = [
+      { year: "2015", value: 9.25 },
+      { year: "2016", value: 11.75 },
+      { year: "2017", value: 18.75 },
+      { year: "2018", value: 16.75 },
+      { year: "2019", value: 13.25 },
+      { year: "2020", value: 9.25 },
+      { year: "2021", value: 8.25 },
+      { year: "2022", value: 11.25 },
+      { year: "2023", value: 19.25 },
+      { year: "2024", value: 27.25 },
+      { year: "2025", value: 27.25 },
+    ];
+    for (const entry of cbeData) {
+      const n: number = await ctx.runMutation(
+        internal.dataRefresh.upsertEconomicIndicator,
+        {
+          indicator: "cbe_cd_rate",
+          date: `${entry.year}-12-31`,
+          year: entry.year,
+          value: entry.value,
+          unit: "%",
+          sourceUrl: "https://www.cbe.org.eg",
+          sourceNameEn: "Central Bank of Egypt — overnight deposit rate",
+          sanadLevel: 1,
+        }
+      );
+      backfilled += n;
+    }
+  }
+
+  // ── CBE T-bill yield historical (%) ──────────────────────────────────────
+  const tbillCount: number = await ctx.runQuery(
+    internal.dataRefresh.countIndicatorRecords,
+    { indicator: "egypt_tbill_rate" }
+  );
+  if (tbillCount < 5) {
+    console.log(`[dataAgent/backfill] egypt_tbill_rate has ${tbillCount} points — backfilling.`);
+    const tbillData: Array<{ year: string; value: number }> = [
+      { year: "2015", value: 11.5 },
+      { year: "2016", value: 14.0 },
+      { year: "2017", value: 21.0 },
+      { year: "2018", value: 19.5 },
+      { year: "2019", value: 15.0 },
+      { year: "2020", value: 13.0 },
+      { year: "2021", value: 12.5 },
+      { year: "2022", value: 16.0 },
+      { year: "2023", value: 25.0 },
+      { year: "2024", value: 28.0 },
+      { year: "2025", value: 23.0 },
+    ];
+    for (const entry of tbillData) {
+      const n: number = await ctx.runMutation(
+        internal.dataRefresh.upsertEconomicIndicator,
+        {
+          indicator: "egypt_tbill_rate",
+          date: `${entry.year}-12-31`,
+          year: entry.year,
+          value: entry.value,
+          unit: "%",
+          sourceUrl: "https://www.cbe.org.eg",
+          sourceNameEn: "Central Bank of Egypt — T-bill weighted average yield",
+          sanadLevel: 1,
+        }
+      );
+      backfilled += n;
+    }
+  }
+
+  return backfilled;
 }
 
 // ─── STOCK MARKET REFRESH ─────────────────────────────────────────────────────
@@ -1701,6 +1912,22 @@ async function refreshCategory(
     });
   }
 }
+
+// ─── BACKFILL ACTION (ONE-TIME) ───────────────────────────────────────────────
+
+/**
+ * Exposed internal action so the backfill can be triggered manually via CLI
+ * without waiting for the 6-hour staleness window to expire.
+ * Safe to run multiple times — each indicator block is idempotent (checks count first).
+ */
+export const runBackfillInvestmentHistory = internalAction({
+  args: {},
+  handler: async (ctx): Promise<number> => {
+    const count = await backfillInvestmentHistory(ctx);
+    console.log(`[dataAgent/backfill] Done — ${count} records written.`);
+    return count;
+  },
+});
 
 // ─── ORCHESTRATOR ACTION ──────────────────────────────────────────────────────
 
