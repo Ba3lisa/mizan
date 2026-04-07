@@ -4,32 +4,56 @@ import Link from "next/link";
 import { Scale, ExternalLink, Github } from "lucide-react";
 import { useLanguage } from "@/components/providers";
 
-const nav = [
+const stateNav = [
   { href: "/government", ar: "الحكومة", en: "Government" },
   { href: "/parliament", ar: "البرلمان", en: "Parliament" },
   { href: "/constitution", ar: "الدستور", en: "Constitution" },
-  { href: "/budget", ar: "الميزانية", en: "Budget" },
+  { href: "/elections", ar: "الانتخابات", en: "Elections" },
+];
+
+const economyNav = [
+  { href: "/economy", ar: "المؤشرات الاقتصادية", en: "Economy" },
+  { href: "/budget", ar: "الموازنة العامة", en: "Budget" },
   { href: "/debt", ar: "الدين العام", en: "Debt" },
+];
+
+const dataToolsNav = [
+  { href: "/budget/your-share", ar: "حاسبة الضريبة", en: "Tax Calculator" },
+  { href: "/governorate", ar: "بيانات المحافظات", en: "Governorates" },
+];
+
+const aboutNav = [
   { href: "/transparency", ar: "الشفافية", en: "Transparency" },
   { href: "/methodology", ar: "المنهجية", en: "Methodology" },
+  { href: "/funding", ar: "التمويل", en: "Funding" },
 ];
 
 const srcs = [
   { name: "parliament.gov.eg", url: "https://www.parliament.gov.eg" },
-  { name: "ahram.org.eg", url: "https://english.ahram.org.eg" },
   { name: "mof.gov.eg", url: "https://www.mof.gov.eg" },
   { name: "cbe.org.eg", url: "https://www.cbe.org.eg" },
   { name: "worldbank.org", url: "https://data.worldbank.org/country/egypt-arab-rep" },
+  { name: "imf.org", url: "https://www.imf.org/en/Countries/EGY" },
 ];
 
 export function Footer() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
+  const NavColumn = ({ title, items }: { title: string; items: typeof stateNav }) => (
+    <div>
+      <h4 className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{title}</h4>
+      <nav className="flex flex-col gap-1.5">
+        {items.map((l) => <Link key={l.href} href={l.href} className="text-sm text-muted-foreground no-underline hover:text-primary transition-colors">{isAr ? l.ar : l.en}</Link>)}
+      </nav>
+    </div>
+  );
+
   return (
     <footer className="container-page border-t border-border" dir={dir}>
-      <div className="py-10 grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div>
+      <div className="py-10 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-8">
+        {/* Brand */}
+        <div className="col-span-2 md:col-span-3 lg:col-span-1">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-5 h-5 rounded bg-primary text-primary-foreground flex items-center justify-center"><Scale size={10} strokeWidth={2} /></div>
             <span className="font-bold text-sm">{isAr ? "ميزان" : "Mizan"}</span>
@@ -42,12 +66,14 @@ export function Footer() {
             <Github size={14} /> GitHub
           </a>
         </div>
-        <div>
-          <h4 className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{isAr ? "التصفح" : "Navigation"}</h4>
-          <nav className="flex flex-col gap-1.5">
-            {nav.map((l) => <Link key={l.href} href={l.href} className="text-sm text-muted-foreground no-underline hover:text-primary transition-colors">{isAr ? l.ar : l.en}</Link>)}
-          </nav>
-        </div>
+
+        {/* Nav columns */}
+        <NavColumn title={isAr ? "مؤسسات الدولة" : "State Institutions"} items={stateNav} />
+        <NavColumn title={isAr ? "الاقتصاد والمالية" : "Economy & Finance"} items={economyNav} />
+        <NavColumn title={isAr ? "بيانات وأدوات" : "Data & Tools"} items={dataToolsNav} />
+        <NavColumn title={isAr ? "عن ميزان" : "About Mizan"} items={aboutNav} />
+
+        {/* Sources */}
         <div>
           <h4 className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{isAr ? "المصادر" : "Sources"}</h4>
           <nav className="flex flex-col gap-1.5">

@@ -2,12 +2,14 @@
 
 import { Fragment } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
   Building2, BookOpen, BarChart3, TrendingDown, Landmark,
   ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
   LineChart, Heart, MapPin, Calculator, Bot, BookMarked,
+  ArrowRight, ArrowLeft, Users, TrendingUp, Home,
 } from "lucide-react";
 import { DailyPoll } from "@/components/daily-poll";
 import { useLanguage, useCurrency } from "@/components/providers";
@@ -16,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { AiPipelineStatus } from "@/components/ai-pipeline-status";
 import { SanadBadge } from "@/components/sanad-badge";
 
+/* ─── Stat counter used in the metrics strip ─── */
 function Stat({ value, label, source, sourceUrl, currencyUnit, sanadLevel, symbol, fromUSD, fromEGP, fmtNum }: {
   value: number; label: string; source: string; sourceUrl: string;
   currencyUnit?: "usd" | "egp"; sanadLevel?: number;
@@ -45,83 +48,75 @@ function Stat({ value, label, source, sourceUrl, currencyUnit, sanadLevel, symbo
   );
 }
 
+/* ─── Feature card groups ─── */
 const featureGroups = [
   {
-    labelAr: "الحكومة",
-    labelEn: "Government",
-    cards: [
-      { icon: Building2, href: "/government", ar: "الحكومة", en: "Government", descAr: "الرئيس · الوزراء · البرلمان · المحافظات", descEn: "President · Ministers · Parliament · Governorates" },
-    ],
-  },
-  {
-    labelAr: "البيانات",
-    labelEn: "Data",
-    cards: [
-      { icon: LineChart, href: "/economy", ar: "الاقتصاد", en: "Economy", descAr: "مؤشرات اقتصادية · التضخم · الاحتياطي", descEn: "GDP · Inflation · Reserves · Exchange Rate" },
-      { icon: BarChart3, href: "/budget", ar: "الموازنة", en: "Budget", descAr: "الإيرادات · المصروفات · العجز", descEn: "Revenue · Expenditure · Deficit" },
-      { icon: TrendingDown, href: "/debt", ar: "الدين العام", en: "Debt", descAr: "١٥٥ مليار$ ديون خارجية", descEn: "$155B External Debt" },
-      { icon: Landmark, href: "/elections", ar: "الانتخابات", en: "Elections", descAr: "نتائج الانتخابات الرئاسية والبرلمانية", descEn: "Presidential & parliamentary election results" },
-    ],
-  },
-  {
-    labelAr: "الأدوات",
-    labelEn: "Tools",
-    cards: [
-      { icon: Calculator, href: "/budget/your-share", ar: "حاسبة الضريبة", en: "Tax Calculator", descAr: "أين تذهب ضرائبك؟ — حاسبة تفاعلية", descEn: "Where do your taxes go? — Interactive calculator" },
-      { icon: MapPin, href: "/governorate", ar: "محافظتك", en: "Your Governorate", descAr: "بيانات محافظتك · المحافظ · النواب", descEn: "Governor · MPs · Local stats" },
-    ],
-  },
-  {
-    labelAr: "حول الموقع والشفافية",
-    labelEn: "About & Transparency",
-    cards: [
+    titleAr: "مؤسسات الدولة",
+    titleEn: "State Institutions",
+    items: [
+      { icon: Building2, href: "/government", ar: "الحكومة", en: "Government", descAr: "الرئيس · الوزراء · المحافظات", descEn: "President · Ministers · Governorates" },
+      { icon: Users, href: "/parliament", ar: "البرلمان", en: "Parliament", descAr: "٥٩٦ نائب · ٣٠٠ شيوخ · الأحزاب", descEn: "596 House · 300 Senate · Parties" },
       { icon: BookOpen, href: "/constitution", ar: "الدستور", en: "Constitution", descAr: "٢٤٧ مادة · تعديلات ٢٠١٩", descEn: "247 Articles · 2019 Amendments" },
-      { icon: Bot, href: "/transparency", ar: "الشفافية", en: "Transparency", descAr: "سجل تحديث البيانات · تقارير الذكاء الاصطناعي", descEn: "AI audit log · Data refresh reports" },
-      { icon: BookMarked, href: "/methodology", ar: "المنهجية", en: "Methodology", descAr: "كيف نجمع البيانات · مصادر رسمية", descEn: "How we gather data · Official sources" },
+      { icon: Landmark, href: "/elections", ar: "الانتخابات", en: "Elections", descAr: "نتائج رئاسية وبرلمانية", descEn: "Presidential & parliamentary results" },
     ],
   },
   {
-    labelAr: "الدعم",
-    labelEn: "Support",
-    cards: [
-      { icon: Heart, href: "/funding", ar: "التمويل", en: "Funding", descAr: "التمويل الشفاف · أين تذهب التبرعات", descEn: "Transparent funding · Where donations go" },
+    titleAr: "الاقتصاد والمالية",
+    titleEn: "Economy & Finance",
+    items: [
+      { icon: LineChart, href: "/economy", ar: "المؤشرات الاقتصادية", en: "Economy", descAr: "الناتج المحلي · التضخم · سعر الصرف", descEn: "GDP · Inflation · Exchange Rate" },
+      { icon: BarChart3, href: "/budget", ar: "الموازنة العامة", en: "Budget", descAr: "إيرادات · مصروفات · عجز", descEn: "Revenue · Expenditure · Deficit" },
+      { icon: TrendingDown, href: "/debt", ar: "الدين العام", en: "Debt", descAr: "الدين الخارجي والداخلي", descEn: "External & domestic debt" },
+    ],
+  },
+  {
+    titleAr: "بيانات وأدوات",
+    titleEn: "Data & Tools",
+    items: [
+      { icon: Calculator, href: "/tools/tax-calculator", ar: "حاسبة الضريبة", en: "Tax Calculator", descAr: "أين تذهب ضرائبك؟ — تقدير تفاعلي", descEn: "Where do your taxes go? — Interactive breakdown" },
+      { icon: Home, href: "/tools/buy-vs-rent", ar: "شراء أم إيجار؟", en: "Buy vs Rent", descAr: "حاسبة القرار العقاري في مصر", descEn: "Real estate decision calculator for Egypt" },
+      { icon: TrendingUp, href: "/tools/invest", ar: "محاكي الاستثمار", en: "Investment Simulator", descAr: "قارن بين الذهب · الدولار · العقار · البورصة", descEn: "Gold · USD · Real Estate · Stocks — compare returns" },
+      { icon: MapPin, href: "/governorate", ar: "بيانات المحافظات", en: "Governorates", descAr: "المحافظ · النواب · الإحصاءات", descEn: "Governor · MPs · Local stats" },
+    ],
+  },
+  {
+    titleAr: "عن ميزان",
+    titleEn: "About Mizan",
+    items: [
+      { icon: Bot, href: "/transparency", ar: "الشفافية", en: "Transparency", descAr: "سجل تحديث البيانات", descEn: "AI audit log · Data refresh reports" },
+      { icon: BookMarked, href: "/methodology", ar: "المنهجية", en: "Methodology", descAr: "كيف نجمع البيانات", descEn: "How we gather & verify data" },
+      { icon: Heart, href: "/funding", ar: "التمويل", en: "Funding", descAr: "التمويل الشفاف", descEn: "Transparent funding" },
     ],
   },
 ];
 
-// Stats are now fetched live via getHomeStats query — see below in HomePage component
-
 const sources = [
-  { ar: "مجلس النواب — قائمة الأعضاء", en: "Parliament — Members List", url: "https://www.parliament.gov.eg/en/MPs", domain: "parliament.gov.eg/en/MPs" },
-  { ar: "الأهرام أونلاين — التشكيل الوزاري", en: "Ahram Online — Cabinet Lineup", url: "https://english.ahram.org.eg/News/562168.aspx", domain: "ahram.org.eg" },
-  { ar: "وزارة المالية — البيانات المالية", en: "MOF — Financial Statements", url: "https://www.mof.gov.eg/en/posts/statementsAndReports/5", domain: "mof.gov.eg/reports" },
-  { ar: "البنك المركزي — النشرة الإحصائية", en: "CBE — Statistical Bulletin", url: "https://www.cbe.org.eg/en/economic-research/statistics", domain: "cbe.org.eg/statistics" },
-  { ar: "البنك الدولي — بيانات مصر", en: "World Bank — Egypt Data", url: "https://data.worldbank.org/country/egypt-arab-rep", domain: "worldbank.org/egypt" },
-  { ar: "صندوق النقد الدولي — تقارير مصر", en: "IMF — Egypt Reports", url: "https://www.imf.org/en/Countries/EGY", domain: "imf.org/EGY" },
+  { ar: "مجلس النواب — قائمة الأعضاء", en: "Parliament — Members List", url: "https://www.parliament.gov.eg/en/MPs", domain: "parliament.gov.eg" },
+  { ar: "وزارة المالية — البيانات المالية", en: "MOF — Financial Statements", url: "https://www.mof.gov.eg/en/posts/statementsAndReports/5", domain: "mof.gov.eg" },
+  { ar: "البنك المركزي — النشرة الإحصائية", en: "CBE — Statistical Bulletin", url: "https://www.cbe.org.eg/en/economic-research/statistics", domain: "cbe.org.eg" },
+  { ar: "البنك الدولي — بيانات مصر", en: "World Bank — Egypt Data", url: "https://data.worldbank.org/country/egypt-arab-rep", domain: "worldbank.org" },
+  { ar: "صندوق النقد الدولي — تقارير مصر", en: "IMF — Egypt Reports", url: "https://www.imf.org/en/Countries/EGY", domain: "imf.org" },
 ];
 
 export default function HomePage() {
   const { lang, dir } = useLanguage();
   const { symbol, fromUSD, fromEGP, fmt: fmtNum } = useCurrency();
+  const router = useRouter();
   const isAr = lang === "ar";
   const Chevron = dir === "rtl" ? ChevronLeft : ChevronRight;
+  const Arrow = dir === "rtl" ? ArrowLeft : ArrowRight;
   const homeStats = useQuery(api.government.getHomeStats);
 
+  /* Build live stat cards from query */
   const liveStats = homeStats ? [
-    { value: homeStats.parliamentarians.value, ar: "إجمالي أعضاء البرلمان", en: "Total Parliamentarians", source: homeStats.parliamentarians.source, url: homeStats.parliamentarians.sourceUrl, sanadLevel: homeStats.parliamentarians.sanadLevel },
-    { value: homeStats.governorates.value, ar: "محافظة", en: "Governorates", source: homeStats.governorates.source, url: homeStats.governorates.sourceUrl, sanadLevel: homeStats.governorates.sanadLevel },
+    { value: homeStats.parliamentarians.value, ar: "عضو برلمان", en: "Parliamentarians", source: homeStats.parliamentarians.source, url: homeStats.parliamentarians.sourceUrl, sanadLevel: homeStats.parliamentarians.sanadLevel },
+    { value: homeStats.ministries.value, ar: "وزارة", en: "Ministries", source: homeStats.ministries.source, url: homeStats.ministries.sourceUrl, sanadLevel: homeStats.ministries.sanadLevel },
     { value: homeStats.constitutionArticles.value, ar: "مادة دستورية", en: "Constitutional Articles", source: homeStats.constitutionArticles.source, url: homeStats.constitutionArticles.sourceUrl, sanadLevel: homeStats.constitutionArticles.sanadLevel },
-    ...(homeStats.externalDebt ? [{ value: homeStats.externalDebt.value, ar: "مليار ديون خارجية", en: "B External Debt", source: homeStats.externalDebt.source, url: homeStats.externalDebt.sourceUrl, currencyUnit: "usd" as const, sanadLevel: homeStats.externalDebt.sanadLevel }] : []),
-    ...(homeStats.domesticDebt && homeStats.domesticDebt.value > 0 ? [{
-      value: homeStats.domesticDebt.value,
-      ar: "مليار ديون محلية",
-      en: "B Domestic Debt",
-      source: homeStats.domesticDebt.source,
-      url: homeStats.domesticDebt.sourceUrl,
-      currencyUnit: "egp" as const,
-      sanadLevel: homeStats.domesticDebt.sanadLevel,
-    }] : []),
+    { value: homeStats.governorates.value, ar: "محافظة", en: "Governorates", source: homeStats.governorates.source, url: homeStats.governorates.sourceUrl, sanadLevel: homeStats.governorates.sanadLevel },
   ] : null;
+
+  /* Total debt computation */
+  const totalDebt = homeStats?.totalDebt;
 
   return (
     <div className="page-content" dir={dir}>
@@ -179,18 +174,17 @@ export default function HomePage() {
       {/* ════════ AI PIPELINE STATUS ════════ */}
       <AiPipelineStatus />
 
-      {/* ════════ STATS (live from Convex) ════════ */}
+      {/* ════════ GOVERNANCE METRICS STRIP ════════ */}
       <section className="container-page">
         <div className="border border-border rounded-xl bg-card/50">
           <div className="grid grid-cols-2 md:grid-cols-4 [&>*:not(:first-child)]:border-s [&>*:not(:first-child)]:border-border">
             {liveStats ? liveStats.map((s) => (
               <Stat key={s.source} value={s.value}
                 label={isAr ? s.ar : s.en} source={s.source} sourceUrl={s.url}
-                currencyUnit={s.currencyUnit} sanadLevel={s.sanadLevel}
+                sanadLevel={s.sanadLevel}
                 symbol={symbol} fromUSD={fromUSD} fromEGP={fromEGP} fmtNum={fmtNum}
               />
             )) : (
-              /* Skeleton while loading */
               Array.from({ length: 4 }).map((_, i) => (
                 <div key={i} className="text-center py-5">
                   <div className="h-10 w-20 mx-auto bg-muted/20 animate-pulse rounded mb-2" />
@@ -202,54 +196,153 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ════════ FEATURES ════════ */}
-      <section className="container-page py-16 md:py-24">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {featureGroups.map((group, groupIdx) => {
-            const cardOffset = featureGroups
-              .slice(0, groupIdx)
-              .reduce((acc, g) => acc + g.cards.length, 0);
-            return (
-              <Fragment key={groupIdx}>
-                {/* Section header */}
-                <div className="col-span-full mt-4 first:mt-0">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-                    {isAr ? group.labelAr : group.labelEn}
-                  </p>
+
+      {/* ════════ TOTAL DEBT HIGHLIGHT ════════ */}
+      {totalDebt && totalDebt.value > 0 && (
+        <section className="container-page pt-6">
+          {/* Use div+onClick instead of Link to avoid <a> nesting with SanadBadge */}
+          <div
+            onClick={() => router.push("/debt")}
+            className="no-underline group block cursor-pointer"
+          >
+            <div className="border border-border rounded-xl bg-card/50 px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-primary/40 transition-colors">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center flex-shrink-0">
+                  <TrendingDown size={24} strokeWidth={1.5} />
                 </div>
-                {/* Cards */}
-                {group.cards.map((f, i) => {
-                  const Icon = f.icon;
-                  return (
-                    <Link
-                      key={f.href}
-                      href={f.href}
-                      className="no-underline group animate-fade-up"
-                      style={{ animationDelay: `${(cardOffset + i) * 80}ms` }}
-                    >
-                      <Card className="h-full border-border/60 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:bg-card">
-                        <CardContent className="p-6 flex flex-col h-full">
-                          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-4 transition-colors group-hover:bg-primary/20">
-                            <Icon size={20} strokeWidth={1.5} />
-                          </div>
-                          <h3 className="text-base font-bold mb-1 group-hover:text-primary transition-colors">
-                            {isAr ? f.ar : f.en}
-                          </h3>
-                          <p className="text-xs text-muted-foreground mb-4 flex-1">
-                            {isAr ? f.descAr : f.descEn}
+                <div>
+                  <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">
+                    {isAr ? "إجمالي الدين العام" : "Total Public Debt"}
+                  </p>
+                  <div className="flex items-baseline gap-3 flex-wrap">
+                    <span className="font-mono text-2xl md:text-3xl font-bold tracking-tighter tabular-nums text-foreground flex items-center gap-1.5" dir="ltr">
+                      {symbol}{fmtNum(
+                        fromUSD(homeStats.externalDebt?.value ?? 0) +
+                        fromEGP(homeStats.domesticDebt?.value ?? 0),
+                        { decimals: 1 }
+                      )} {isAr ? "مليار" : "B"}
+                    </span>
+                    {totalDebt.debtToGdpRatio && (
+                      <span className="text-sm text-muted-foreground font-mono">
+                        {totalDebt.debtToGdpRatio.toFixed(1)}% {isAr ? "من الناتج المحلي" : "of GDP"}
+                      </span>
+                    )}
+                    <SanadBadge sanadLevel={totalDebt.sanadLevel} sourceUrl={totalDebt.sourceUrl} />
+                  </div>
+                  <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground/70">
+                    {homeStats?.externalDebt && (
+                      <span className="flex items-center gap-1.5">
+                        <span>{isAr ? "خارجي:" : "External:"}</span>
+                        <span dir="ltr" className="inline-block whitespace-nowrap">
+                          {symbol}{fmtNum(fromUSD(homeStats.externalDebt.value), { decimals: 1 })} {isAr ? "مليار" : "B"}
+                        </span>
+                      </span>
+                    )}
+                    {homeStats?.domesticDebt && (
+                      <span className="flex items-center gap-1.5">
+                        <span>{isAr ? "داخلي:" : "Domestic:"}</span>
+                        <span dir="ltr" className="inline-block whitespace-nowrap">
+                          {symbol}{fmtNum(fromEGP(homeStats.domesticDebt.value), { decimals: 1 })} {isAr ? "مليار" : "B"}
+                        </span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <span className="text-sm font-semibold text-primary/70 group-hover:text-primary inline-flex items-center gap-1.5 transition-all flex-shrink-0">
+                {isAr ? "تفاصيل الدين" : "Debt Details"} <Arrow size={14} />
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ════════ BUDGET SNAPSHOT ════════ */}
+      {homeStats?.budget && (homeStats.budget.totalRevenue > 0 || homeStats.budget.totalExpenditure > 0) && (
+        <section className="container-page pt-4">
+          {/* Use div+onClick instead of Link to avoid potential <a> nesting issues */}
+          <div
+            onClick={() => router.push("/budget")}
+            className="no-underline group block cursor-pointer"
+          >
+            <div className="border border-border rounded-xl bg-card/50 px-6 py-5 hover:border-primary/40 transition-colors">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center flex-shrink-0">
+                    <BarChart3 size={24} strokeWidth={1.5} />
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-0.5">
+                      {isAr ? `موازنة ${homeStats.budget.year}` : `${homeStats.budget.year} Budget`}
+                    </p>
+                    <div className="flex items-center gap-6 flex-wrap">
+                      <div>
+                        <span className="text-xs text-muted-foreground">{isAr ? "إيرادات" : "Revenue"}</span>
+                        <p className="font-mono text-lg font-bold tabular-nums" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
+                          {symbol}{fmtNum(fromEGP(homeStats.budget.totalRevenue), { decimals: 0 })} {isAr ? "مليار" : "B"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-xs text-muted-foreground">{isAr ? "مصروفات" : "Expenditure"}</span>
+                        <p className="font-mono text-lg font-bold tabular-nums" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
+                          {symbol}{fmtNum(fromEGP(homeStats.budget.totalExpenditure), { decimals: 0 })} {isAr ? "مليار" : "B"}
+                        </p>
+                      </div>
+                      {homeStats.budget.deficit !== 0 && (
+                        <div>
+                          <span className="text-xs text-muted-foreground">{isAr ? "العجز" : "Deficit"}</span>
+                          <p className="font-mono text-lg font-bold tabular-nums text-destructive" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
+                            {symbol}{fmtNum(fromEGP(Math.abs(homeStats.budget.deficit)), { decimals: 0 })} {isAr ? "مليار" : "B"}
                           </p>
-                          <span className="text-xs font-semibold text-primary/70 group-hover:text-primary inline-flex items-center gap-1 transition-all">
-                            {isAr ? "استكشف" : "Explore"} <Chevron size={12} />
-                          </span>
-                        </CardContent>
-                      </Card>
-                    </Link>
-                  );
-                })}
-              </Fragment>
-            );
-          })}
-        </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <span className="text-sm font-semibold text-primary/70 group-hover:text-primary inline-flex items-center gap-1.5 transition-all flex-shrink-0">
+                  {isAr ? "استكشف الموازنة" : "Explore Budget"} <Arrow size={14} />
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ════════ GROUPED FEATURES ════════ */}
+      <section className="container-page py-16 md:py-24">
+        {featureGroups.map((group, gi) => (
+          <div key={group.titleEn} className={gi > 0 ? "mt-10" : ""}>
+            <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">
+              {isAr ? group.titleAr : group.titleEn}
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+              {group.items.map((f, i) => {
+                const Icon = f.icon;
+                return (
+                  <Link key={f.href} href={f.href} className="no-underline group animate-fade-up" style={{ animationDelay: `${(gi * 4 + i) * 60}ms` }}>
+                    <Card className="h-full border-border/60 bg-card/60 backdrop-blur-sm transition-all duration-300 hover:border-primary/40 hover:bg-card">
+                      <CardContent className="p-5 flex flex-col h-full">
+                        <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3 transition-colors group-hover:bg-primary/20">
+                          <Icon size={20} strokeWidth={1.5} />
+                        </div>
+                        <h3 className="text-base font-bold mb-1 group-hover:text-primary transition-colors">
+                          {isAr ? f.ar : f.en}
+                        </h3>
+                        <p className="text-xs text-muted-foreground mb-3 flex-1">
+                          {isAr ? f.descAr : f.descEn}
+                        </p>
+                        <span className="text-xs font-semibold text-primary/70 group-hover:text-primary inline-flex items-center gap-1 transition-all">
+                          {isAr ? "استكشف" : "Explore"} <Chevron size={12} />
+                        </span>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
       </section>
 
       {/* ════════ AI-MANAGED ════════ */}
@@ -263,38 +356,26 @@ export default function HomePage() {
           </div>
           <p className="text-xs text-muted-foreground mb-6 max-w-lg">
             {isAr
-              ? "كل البيانات تُجمع وتُحقق وتُحدث تلقائياً كل ٦ ساعات بواسطة وكلاء ذكاء اصطناعي. الكود نفسه يُكتب بواسطة الذكاء الاصطناعي ويُراجع آلياً."
-              : "All data is collected, verified, and refreshed every 6 hours by AI agents. The code itself is written by AI and auto-reviewed."}
+              ? "كل البيانات تُجمع وتُحقق وتُحدث تلقائياً كل ٦ ساعات بواسطة وكلاء ذكاء اصطناعي."
+              : "All data is collected, verified, and refreshed every 6 hours by AI agents."}
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Link href="/transparency" className="no-underline group">
               <div className="border border-border rounded-lg p-4 hover:border-primary/40 transition-colors">
-                <p className="text-sm font-semibold group-hover:text-primary transition-colors">
-                  {isAr ? "الشفافية" : "Transparency"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isAr ? "سجل كامل لكل تحديث بيانات وقرارات الوكلاء" : "Full audit log of every data update and agent decision"}
-                </p>
+                <p className="text-sm font-semibold group-hover:text-primary transition-colors">{isAr ? "الشفافية" : "Transparency"}</p>
+                <p className="text-xs text-muted-foreground mt-1">{isAr ? "سجل كامل لكل تحديث بيانات" : "Full audit log of every data update"}</p>
               </div>
             </Link>
             <Link href="/methodology" className="no-underline group">
               <div className="border border-border rounded-lg p-4 hover:border-primary/40 transition-colors">
-                <p className="text-sm font-semibold group-hover:text-primary transition-colors">
-                  {isAr ? "المنهجية" : "Methodology"}
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isAr ? "كيف نجمع البيانات ونتحقق منها من مصادر رسمية" : "How we collect and verify data from official sources"}
-                </p>
+                <p className="text-sm font-semibold group-hover:text-primary transition-colors">{isAr ? "المنهجية" : "Methodology"}</p>
+                <p className="text-xs text-muted-foreground mt-1">{isAr ? "كيف نجمع البيانات من مصادر رسمية" : "How we collect data from official sources"}</p>
               </div>
             </Link>
             <a href="https://github.com/Ba3lisa/mizan" target="_blank" rel="noopener noreferrer" className="no-underline group">
               <div className="border border-border rounded-lg p-4 hover:border-primary/40 transition-colors">
-                <p className="text-sm font-semibold group-hover:text-primary transition-colors inline-flex items-center gap-1.5">
-                  GitHub <ExternalLink size={12} />
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isAr ? "الكود مفتوح المصدر — ساهم أو راجع بنفسك" : "Open source — contribute or audit the code yourself"}
-                </p>
+                <p className="text-sm font-semibold group-hover:text-primary transition-colors inline-flex items-center gap-1.5">GitHub <ExternalLink size={12} /></p>
+                <p className="text-xs text-muted-foreground mt-1">{isAr ? "الكود مفتوح المصدر" : "Open source — audit the code"}</p>
               </div>
             </a>
           </div>
@@ -305,62 +386,38 @@ export default function HomePage() {
       <section className="container-page py-10">
         <div className="flex items-center gap-2 mb-2">
           <Bot size={16} className="text-primary" />
-          <h2 className="text-sm font-bold">
-            {isAr ? "للذكاء الاصطناعي والوكلاء" : "For AI Agents & LLMs"}
-          </h2>
+          <h2 className="text-sm font-bold">{isAr ? "للذكاء الاصطناعي والوكلاء" : "For AI Agents & LLMs"}</h2>
         </div>
         <p className="text-xs text-muted-foreground mb-4 max-w-lg">
           {isAr
-            ? "بيانات ميزان متاحة بتنسيق مُحسّن للذكاء الاصطناعي. يمكن لنماذج اللغة والوكلاء قراءة جميع البيانات مباشرةً."
-            : "Mizan data is available in LLM-optimized formats. Language models and AI agents can read all data directly."}
+            ? "بيانات ميزان متاحة بتنسيق مُحسّن للذكاء الاصطناعي."
+            : "Mizan data is available in LLM-optimized formats."}
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <a href="/llms.txt" className="no-underline group">
             <div className="border border-border rounded-lg p-4 hover:border-blue-500/40 transition-colors">
-              <p className="text-sm font-semibold group-hover:text-blue-500 transition-colors inline-flex items-center gap-1.5 font-mono">
-                /llms.txt <ExternalLink size={12} />
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {isAr
-                  ? "ملخص هيكلي لجميع البيانات والمصادر — مثالي لنافذة سياق الذكاء الاصطناعي"
-                  : "Structured overview of all data and sources — ideal for LLM context windows"}
-              </p>
+              <p className="text-sm font-semibold group-hover:text-blue-500 transition-colors inline-flex items-center gap-1.5 font-mono">/llms.txt <ExternalLink size={12} /></p>
+              <p className="text-xs text-muted-foreground mt-1">{isAr ? "ملخص هيكلي لجميع البيانات" : "Structured overview for LLM context windows"}</p>
             </div>
           </a>
           <a href="/llms-full.txt" className="no-underline group">
             <div className="border border-border rounded-lg p-4 hover:border-blue-500/40 transition-colors">
-              <p className="text-sm font-semibold group-hover:text-blue-500 transition-colors inline-flex items-center gap-1.5 font-mono">
-                /llms-full.txt <ExternalLink size={12} />
-              </p>
-              <p className="text-xs text-muted-foreground mt-1">
-                {isAr
-                  ? "تصدير كامل لجميع البيانات بتنسيق Markdown — يُحدَّث كل ٦ ساعات"
-                  : "Full data export in Markdown — refreshed every 6 hours with the pipeline"}
-              </p>
+              <p className="text-sm font-semibold group-hover:text-blue-500 transition-colors inline-flex items-center gap-1.5 font-mono">/llms-full.txt <ExternalLink size={12} /></p>
+              <p className="text-xs text-muted-foreground mt-1">{isAr ? "تصدير كامل بتنسيق Markdown" : "Full data export in Markdown"}</p>
             </div>
           </a>
         </div>
-        <p className="text-[0.65rem] text-muted-foreground/50 mt-2">
-          {isAr
-            ? "يدعم أيضاً WebMCP — وكلاء Chrome AI يمكنها اكتشاف أدوات ميزان تلقائياً."
-            : "Also supports WebMCP — Chrome AI agents can auto-discover Mizan tools via navigator.modelContext."}
-        </p>
       </section>
 
       {/* ════════ SOURCES ════════ */}
       <section className="container-page pb-16">
         <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
           <div>
-            <h2 className="text-sm font-bold mb-1">
-              {isAr ? "مصادر البيانات" : "Data Sources"}
-            </h2>
-            <p className="text-xs text-muted-foreground">
-              {isAr ? "جميع البيانات من منشورات رسمية موثقة." : "All data from official, verifiable publications."}
-            </p>
+            <h2 className="text-sm font-bold mb-1">{isAr ? "مصادر البيانات" : "Data Sources"}</h2>
+            <p className="text-xs text-muted-foreground">{isAr ? "جميع البيانات من منشورات رسمية موثقة." : "All data from official, verifiable publications."}</p>
           </div>
           <span className="last-updated"><span className="pulse-dot" /> {isAr ? "أبريل ٢٠٢٦" : "Apr 2026"}</span>
         </div>
-
         <Card className="overflow-hidden border-border/60 bg-card/60 backdrop-blur-sm">
           <CardContent className="p-0 divide-y divide-border">
             {sources.map((s) => (
@@ -374,7 +431,6 @@ export default function HomePage() {
             ))}
           </CardContent>
         </Card>
-
         <div className="flex items-center justify-between mt-3 flex-wrap gap-3">
           <p className="text-xs text-muted-foreground/60 inline-flex items-center gap-1.5">
             <Clock size={11} /> {isAr ? "تحديث تلقائي كل ٦ ساعات" : "Auto-refreshed every 6 hours"}
