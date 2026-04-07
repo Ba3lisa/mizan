@@ -1,33 +1,20 @@
 ---
 name: Bug Report
-about: Report a visual bug, broken feature, or rendering issue
-title: "[BUG] "
+about: Report a visual or functional bug
 labels: bug
-assignees: essamgouda97
 ---
-
-## Description
 
 **What happened?**
 
 
-**What did you expect?**
+**Screenshot**
+<!-- Paste screenshot here -->
 
+**Platform**
+- [ ] Desktop web
+- [ ] Mobile web
+- [ ] Other: 
 
-## Steps to Reproduce
+**Device / Browser**
+<!-- e.g. iPhone 15 Safari, Chrome on Windows -->
 
-1. Go to...
-2. Click on...
-3. See error
-
-## Environment
-
-- **Browser**: 
-- **Language**: Arabic / English
-- **Theme**: Dark / Light
-- **Device**: Desktop / Mobile
-- **Screen size**: 
-
-## Screenshots
-
-(Include screenshots showing the issue)
