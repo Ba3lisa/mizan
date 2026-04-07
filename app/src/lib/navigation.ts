@@ -59,6 +59,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/parliament", labelKey: "navParliament", en: "Parliament", ar: "البرلمان", icon: Users, descEn: "596 House · 300 Senate · Parties", descAr: "٥٩٦ نائب · ٣٠٠ شيوخ · الأحزاب" },
       { href: "/constitution", labelKey: "navConstitution", en: "Constitution", ar: "الدستور", icon: BookOpen, descEn: "247 Articles · 2019 Amendments", descAr: "٢٤٧ مادة · تعديلات ٢٠١٩" },
       { href: "/elections", labelKey: "navElections", en: "Elections", ar: "الانتخابات", icon: Landmark, descEn: "Presidential & parliamentary results", descAr: "نتائج رئاسية وبرلمانية" },
+      { href: "/governorate", labelKey: "navGovernorate", en: "Governorates", ar: "بيانات المحافظات", icon: MapPin, descEn: "Governor · MPs · Local stats", descAr: "المحافظ · النواب · الإحصاءات" },
     ],
   },
   {
@@ -72,14 +73,13 @@ export const NAV_GROUPS: NavGroup[] = [
     ],
   },
   {
-    labelKey: "navDataTools",
-    en: "Data & Tools",
-    ar: "بيانات وأدوات",
+    labelKey: "navTools",
+    en: "Tools",
+    ar: "أدوات",
     items: [
       { href: "/tools/tax-calculator", labelKey: "navTaxCalculator", en: "Tax Calculator", ar: "حاسبة الضريبة", icon: Calculator, descEn: "Where do your taxes go? — Interactive breakdown", descAr: "أين تذهب ضرائبك؟ — تقدير تفاعلي" },
       { href: "/tools/buy-vs-rent", labelKey: "navBuyVsRent", en: "Buy vs Rent", ar: "شراء أم إيجار؟", icon: HomeIcon, descEn: "Real estate decision calculator for Egypt", descAr: "حاسبة القرار العقاري في مصر" },
       { href: "/tools/invest", labelKey: "navInvest", en: "Investment Simulator", ar: "محاكي الاستثمار", icon: TrendingUp, descEn: "Gold · USD · Real Estate · Stocks — compare returns", descAr: "قارن بين الذهب · الدولار · العقار · البورصة" },
-      { href: "/governorate", labelKey: "navGovernorate", en: "Governorates", ar: "بيانات المحافظات", icon: MapPin, descEn: "Governor · MPs · Local stats", descAr: "المحافظ · النواب · الإحصاءات" },
     ],
   },
   {
