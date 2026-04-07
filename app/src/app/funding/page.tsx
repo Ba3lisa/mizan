@@ -171,10 +171,9 @@ const CATEGORY_CONFIG: CategoryConfig[] = [
 // ─── Fixed infrastructure costs ───────────────────────────────────────────────
 
 const FIXED_COSTS = [
-  { serviceEn: "Convex Pro", serviceAr: "Convex Pro", monthlyUsd: 25 },
-  { serviceEn: "DigitalOcean App", serviceAr: "DigitalOcean App", monthlyUsd: 12 },
-  { serviceEn: "Domain", serviceAr: "اسم النطاق", monthlyUsd: 1 },
-  { serviceEn: "Cloudflare", serviceAr: "Cloudflare", monthlyUsd: 0 },
+  { serviceEn: "Convex (current: Starter)", serviceAr: "Convex (الباقة الحالية)", monthlyUsd: 10, maxUsd: 20, noteEn: "Pay-as-you-go, capped at $20", noteAr: "دفع حسب الاستخدام، بحد أقصى $20", paidSince: "2026-03" },
+  { serviceEn: "DigitalOcean App Platform", serviceAr: "DigitalOcean App", monthlyUsd: 12, noteEn: "App hosting + deployment", noteAr: "استضافة التطبيق", paidSince: "2026-04" },
+  { serviceEn: "Cloudflare DNS + CDN", serviceAr: "Cloudflare DNS + CDN", monthlyUsd: 0, noteEn: "Free tier", noteAr: "مجاني", paidSince: "2026-04" },
 ];
 const FIXED_TOTAL_USD = FIXED_COSTS.reduce((s, c) => s + c.monthlyUsd, 0);
 
@@ -182,97 +181,97 @@ const FIXED_TOTAL_USD = FIXED_COSTS.reduce((s, c) => s + c.monthlyUsd, 0);
 
 const SCALING_TIERS = [
   {
-    budgetUsd: 50,
-    labelEn: "Current",
-    labelAr: "الحالي",
+    budgetUsd: 22,
+    labelEn: "Current — Bootstrapped",
+    labelAr: "الحالي — تمويل ذاتي",
     color: "#C9A84C",
     featuresEn: [
-      "Single LLM (Haiku)",
-      "6-hour data refresh cycle",
-      "Basic web scraping",
-      "Core government data",
+      "Single LLM (Claude Haiku) for data extraction",
+      "6-hour automated refresh cycle",
+      "Basic HTML scraping (no JS-rendered sites)",
+      "~120 AI calls/month, minimal token budget",
     ],
     featuresAr: [
-      "نموذج ذكاء اصطناعي واحد (Haiku)",
-      "تحديث البيانات كل 6 ساعات",
-      "استخراج بيانات أساسي",
-      "بيانات الحكومة الأساسية",
+      "نموذج واحد (Claude Haiku) لاستخراج البيانات",
+      "تحديث تلقائي كل 6 ساعات",
+      "استخراج HTML أساسي (بدون مواقع JS)",
+      "~120 استدعاء AI شهرياً، ميزانية محدودة",
     ],
     current: true,
   },
   {
-    budgetUsd: 100,
-    labelEn: "Growth",
-    labelAr: "النمو",
+    budgetUsd: 75,
+    labelEn: "Multi-Model Verification",
+    labelAr: "تحقق متعدد النماذج",
     color: "#6C8EEF",
     featuresEn: [
-      "Multi-LLM council (3 providers)",
-      "3-hour refresh cycle",
-      "Cross-source data verification",
-      "Expanded parliament coverage",
+      "3 LLM providers (Claude + GPT-4o-mini + Gemini Flash)",
+      "LLM Council: every data point verified by 3 models",
+      "3-hour refresh cycle for key indicators",
+      "~1,000 AI calls/month across providers",
     ],
     featuresAr: [
-      "مجلس من 3 نماذج ذكاء اصطناعي",
-      "تحديث البيانات كل 3 ساعات",
-      "التحقق من مصادر متعددة",
-      "تغطية أوسع للبرلمان",
+      "3 نماذج ذكاء اصطناعي (Claude + GPT + Gemini)",
+      "مجلس التحقق: كل بيان يُراجع من 3 نماذج",
+      "تحديث المؤشرات الرئيسية كل 3 ساعات",
+      "~1,000 استدعاء AI شهرياً عبر النماذج",
     ],
     current: false,
   },
   {
-    budgetUsd: 250,
-    labelEn: "Scale",
-    labelAr: "التوسع",
+    budgetUsd: 200,
+    labelEn: "Browser Automation",
+    labelAr: "أتمتة المتصفح",
     color: "#2EC4B6",
     featuresEn: [
-      "Browser automation (Browserbase)",
-      "Hourly key economic indicators",
-      "Real-time EGX stock data",
-      "Full JS-rendered site scraping",
+      "Browserbase: access JS-rendered gov sites (cabinet.gov.eg, parliament.gov.eg)",
+      "Hourly refresh for exchange rates + stock market",
+      "Deep extraction: PDFs, dynamic tables, multi-page navigation",
+      "~5,000 AI calls + ~500 browser sessions/month",
     ],
     featuresAr: [
-      "أتمتة المتصفح (Browserbase)",
-      "المؤشرات الاقتصادية كل ساعة",
-      "بيانات البورصة في الوقت الحقيقي",
-      "استخراج المواقع الديناميكية",
+      "Browserbase: الوصول للمواقع الحكومية (مجلس الوزراء، البرلمان)",
+      "تحديث سعر الصرف والبورصة كل ساعة",
+      "استخراج عميق: PDF، جداول ديناميكية، تنقل متعدد الصفحات",
+      "~5,000 استدعاء AI + ~500 جلسة متصفح شهرياً",
     ],
     current: false,
   },
   {
     budgetUsd: 500,
-    labelEn: "Professional",
-    labelAr: "الاحترافي",
+    labelEn: "Comprehensive Intelligence",
+    labelAr: "ذكاء شامل",
     color: "#E76F51",
     featuresEn: [
-      "Full multi-source verification",
-      "All government sites scraped",
-      "Sentiment & trend analysis",
-      "API access for researchers",
+      "Claude Sonnet / GPT-4o for complex analysis (not just extraction)",
+      "Multi-source cross-referencing: every number verified from 3+ sources",
+      "AI-generated Arabic research reports with citations",
+      "Open-source model fallbacks (Llama via OpenRouter)",
     ],
     featuresAr: [
-      "تحقق شامل من مصادر متعددة",
-      "استخراج جميع المواقع الحكومية",
-      "تحليل المشاعر والاتجاهات",
-      "وصول API للباحثين",
+      "Claude Sonnet / GPT-4o للتحليل المعقد (ليس فقط استخراج)",
+      "مراجعة من 3+ مصادر لكل رقم",
+      "تقارير بحثية عربية بالذكاء الاصطناعي مع مراجع",
+      "نماذج مفتوحة المصدر كبديل (Llama عبر OpenRouter)",
     ],
     current: false,
   },
   {
     budgetUsd: 1000,
-    labelEn: "Enterprise",
-    labelAr: "المؤسسي",
-    color: "#7A8299",
+    labelEn: "Real-Time Data Platform",
+    labelAr: "منصة بيانات لحظية",
+    color: "#9B72CF",
     featuresEn: [
-      "Real-time official data feeds",
-      "ML anomaly detection",
-      "Mobile push alerts",
-      "Dedicated research reports",
+      "Real-time feeds: EGX tick data, CBE rate changes, breaking news",
+      "ML anomaly detection: flag unusual data changes automatically",
+      "Full 596 parliament member tracking with voting records",
+      "Public API for researchers, journalists, and civic organizations",
     ],
     featuresAr: [
-      "تغذية بيانات رسمية في الوقت الحقيقي",
-      "كشف الشذوذ بالتعلم الآلي",
-      "تنبيهات فورية على الهاتف",
-      "تقارير بحثية مخصصة",
+      "بيانات لحظية: بورصة، أسعار بنك مركزي، أخبار عاجلة",
+      "كشف تلقائي للبيانات غير الطبيعية بالتعلم الآلي",
+      "متابعة كاملة لـ596 نائب مع سجل التصويت",
+      "واجهة برمجة عامة للباحثين والصحفيين والمنظمات المدنية",
     ],
     current: false,
   },
@@ -1041,11 +1040,20 @@ function InfrastructureCostsCard({ isAr, fmtUsd, apiCostThisMonth }: Infrastruct
         </div>
         <div className="space-y-2">
           {FIXED_COSTS.map((row) => (
-            <div key={row.serviceEn} className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">{isAr ? row.serviceAr : row.serviceEn}</span>
-              <span className="tabular-nums font-mono text-foreground/80">
-                {row.monthlyUsd === 0 ? (isAr ? "مجاني" : "Free") : fmtUsd(row.monthlyUsd)}
-              </span>
+            <div key={row.serviceEn} className="space-y-0.5">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">{isAr ? row.serviceAr : row.serviceEn}</span>
+                <span className="tabular-nums font-mono text-foreground/80">
+                  {row.monthlyUsd === 0 ? (isAr ? "مجاني" : "Free") : fmtUsd(row.monthlyUsd)}
+                  {"maxUsd" in row && row.maxUsd ? ` / ${fmtUsd(row.maxUsd)} max` : ""}
+                </span>
+              </div>
+              {"noteEn" in row && (
+                <p className="text-[0.6rem] text-muted-foreground/50">
+                  {isAr ? row.noteAr : row.noteEn}
+                  {"paidSince" in row && ` · ${isAr ? "يُدفع منذ" : "paid since"} ${row.paidSince}`}
+                </p>
+              )}
             </div>
           ))}
           <div className="flex items-center justify-between text-sm">
