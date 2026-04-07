@@ -21,6 +21,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { AdjustableSlider } from "@/components/adjustable-slider";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -273,20 +274,15 @@ function SliderRow({
           {displayValue}
         </span>
       </div>
-      <input
-        type="range"
-        dir="ltr"
-        min={min}
-        max={max}
-        step={step}
+      <AdjustableSlider
         value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1.5 rounded-full appearance-none bg-muted cursor-pointer accent-[#C9A84C]"
+        onChange={onChange}
+        defaultMin={min}
+        defaultMax={max}
+        step={step}
+        accentColor="#C9A84C"
+        formatLabel={(v) => (v >= 1000 ? fmtCompact(v) : String(v))}
       />
-      <div className="flex justify-between text-[0.6rem] text-muted-foreground/50 mt-1 font-mono" dir="ltr">
-        <span>{min >= 1000 ? fmtCompact(min) : min}</span>
-        <span>{max >= 1000 ? fmtCompact(max) : max}</span>
-      </div>
     </div>
   );
 }

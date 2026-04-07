@@ -26,6 +26,7 @@ import {
   Legend,
 } from "recharts";
 import { AlertTriangle, Info, BookOpen, ChevronDown, ChevronRight } from "lucide-react";
+import { AdjustableSlider } from "@/components/adjustable-slider";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -670,20 +671,15 @@ export default function InvestPage() {
                     {horizon} {isAr ? "سنة" : "yr"}
                   </Badge>
                 </div>
-                <input
-                  dir="ltr"
-                  type="range"
-                  min={1}
-                  max={30}
-                  step={1}
+                <AdjustableSlider
                   value={horizon}
-                  onChange={(e) => setHorizon(parseInt(e.target.value))}
-                  className="w-full accent-[#C9A84C] cursor-pointer"
+                  onChange={(v) => setHorizon(v)}
+                  defaultMin={1}
+                  defaultMax={30}
+                  step={1}
+                  accentColor="#C9A84C"
+                  formatLabel={(v) => `${v}yr`}
                 />
-                <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono" dir="ltr">
-                  <span>1y</span>
-                  <span>30y</span>
-                </div>
               </CardContent>
             </Card>
 
@@ -899,21 +895,15 @@ export default function InvestPage() {
                       {inflationPct}%
                     </Badge>
                   </div>
-                  <input
-                    dir="ltr"
-                    type="range"
-                    min={2}
-                    max={40}
-                    step={1}
+                  <AdjustableSlider
                     value={inflationPct}
-                    onChange={(e) => setInflationPct(parseInt(e.target.value))}
-                    className="w-full accent-[#C9A84C] cursor-pointer"
+                    onChange={(v) => setInflationPct(v)}
+                    defaultMin={2}
+                    defaultMax={40}
+                    step={1}
+                    accentColor="#C9A84C"
+                    formatLabel={(v) => `${v}%`}
                   />
-                  <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono" dir="ltr">
-                    <span>2%</span>
-                    <span className="text-primary/60" dir="ltr">~28% <span className="text-muted-foreground/40">{isAr ? "(الحالي)" : "(now)"}</span></span>
-                    <span>40%</span>
-                  </div>
                 </div>
 
                 <Separator />
@@ -931,20 +921,15 @@ export default function InvestPage() {
                       {depreciationPct}%
                     </Badge>
                   </div>
-                  <input
-                    dir="ltr"
-                    type="range"
-                    min={0}
-                    max={30}
-                    step={1}
+                  <AdjustableSlider
                     value={depreciationPct}
-                    onChange={(e) => setDepreciationPct(parseInt(e.target.value))}
-                    className="w-full accent-[#C9A84C] cursor-pointer"
+                    onChange={(v) => setDepreciationPct(v)}
+                    defaultMin={0}
+                    defaultMax={30}
+                    step={1}
+                    accentColor="#C9A84C"
+                    formatLabel={(v) => `${v}%`}
                   />
-                  <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono" dir="ltr">
-                    <span>0%</span>
-                    <span>30%</span>
-                  </div>
                 </div>
               </CardContent>
             </Card>
