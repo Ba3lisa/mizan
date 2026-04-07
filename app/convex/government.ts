@@ -7,7 +7,7 @@ export const getHomeStats = query({
   args: {},
   handler: async (ctx) => {
     // Parliament members count — use bounded take, house ~568, senate ~300
-    const [houseMembers, senateMembers, governorates, articles, latestDebt] =
+    const [houseMembers, senateMembers, governorates, articles] =
       await Promise.all([
         ctx.db
           .query("parliamentMembers")
@@ -27,12 +27,6 @@ export const getHomeStats = query({
         // by reading only what we need for the count (all fields are fetched, but
         // the take bound prevents unbounded growth from triggering re-reads).
         ctx.db.query("constitutionArticles").take(300),
-        // Latest external debt record
-        ctx.db
-          .query("debtRecords")
-          .withIndex("by_date")
-          .order("desc")
-          .first(),
       ]);
 
     const parliamentarians = houseMembers.length + senateMembers.length;

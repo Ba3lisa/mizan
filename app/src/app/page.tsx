@@ -1,6 +1,5 @@
 "use client";
 
-import { Fragment } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";

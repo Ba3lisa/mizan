@@ -36,18 +36,19 @@ const srcs = [
   { name: "imf.org", url: "https://www.imf.org/en/Countries/EGY" },
 ];
 
+const NavColumn = ({ title, items, isAr }: { title: string; items: typeof stateNav; isAr: boolean }) => (
+  <div>
+    <h4 className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{title}</h4>
+    <nav className="flex flex-col gap-1.5">
+      {items.map((l) => <Link key={l.href} href={l.href} className="text-sm text-muted-foreground no-underline hover:text-primary transition-colors">{isAr ? l.ar : l.en}</Link>)}
+    </nav>
+  </div>
+);
+
 export function Footer() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
-  const NavColumn = ({ title, items }: { title: string; items: typeof stateNav }) => (
-    <div>
-      <h4 className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{title}</h4>
-      <nav className="flex flex-col gap-1.5">
-        {items.map((l) => <Link key={l.href} href={l.href} className="text-sm text-muted-foreground no-underline hover:text-primary transition-colors">{isAr ? l.ar : l.en}</Link>)}
-      </nav>
-    </div>
-  );
 
   return (
     <footer className="container-page border-t border-border" dir={dir}>
@@ -68,10 +69,10 @@ export function Footer() {
         </div>
 
         {/* Nav columns */}
-        <NavColumn title={isAr ? "مؤسسات الدولة" : "State Institutions"} items={stateNav} />
-        <NavColumn title={isAr ? "الاقتصاد والمالية" : "Economy & Finance"} items={economyNav} />
-        <NavColumn title={isAr ? "بيانات وأدوات" : "Data & Tools"} items={dataToolsNav} />
-        <NavColumn title={isAr ? "عن ميزان" : "About Mizan"} items={aboutNav} />
+        <NavColumn title={isAr ? "مؤسسات الدولة" : "State Institutions"} items={stateNav} isAr={isAr} />
+        <NavColumn title={isAr ? "الاقتصاد والمالية" : "Economy & Finance"} items={economyNav} isAr={isAr} />
+        <NavColumn title={isAr ? "بيانات وأدوات" : "Data & Tools"} items={dataToolsNav} isAr={isAr} />
+        <NavColumn title={isAr ? "عن ميزان" : "About Mizan"} items={aboutNav} isAr={isAr} />
 
         {/* Sources */}
         <div>
