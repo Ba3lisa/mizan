@@ -793,10 +793,246 @@ async function refreshEconomyData(
     console.warn("[dataAgent/economy] IMF seed failed");
   }
 
+  // Also refresh investment-specific rates (bank CDs, T-bill yields)
+  try {
+    const investUpdated = await refreshInvestmentRates(ctx);
+    totalUpdated += investUpdated;
+    console.log(`[dataAgent/economy] Investment rates: ${investUpdated} updated.`);
+  } catch (err) {
+    console.warn(`[dataAgent/economy] Investment rates failed: ${err}`);
+  }
+
   return {
     recordsUpdated: totalUpdated,
     sourceUrl: "https://api.worldbank.org/v2/country/EGY/indicator",
   };
+}
+
+// ─── INVESTMENT RATES REFRESH ─────────────────────────────────────────────────
+
+const CBE_TBILL_URL =
+  "https://www.cbe.org.eg/en/economic-research/statistics/egp-t-bills-secondary-market";
+const BANQUE_MISR_CD_URL =
+  "https://www.banquemisr.com/en/SMEs/Retail-Banking/Accounts-And-Deposits/Certificates";
+
+async function refreshInvestmentRates(ctx: ActionCtx): Promise<number> {
+  let updated = 0;
+  const today = new Date().toISOString().split("T")[0];
+  const year = today.slice(0, 4);
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+
+  // ── CBE T-bill rates ──────────────────────────────────────────────────────
+  try {
+    const res = await fetch(CBE_TBILL_URL, { signal: AbortSignal.timeout(15000) });
+    if (res.ok) {
+      const html = await res.text();
+
+      // Extract the first <table> block and strip to plain text (token-efficient)
+      const tableStart = html.indexOf("<table");
+      let tableText = "";
+      if (tableStart > 0) {
+        const tableEnd = html.indexOf("</table>", tableStart);
+        const tableHtml = tableEnd > 0
+          ? html.slice(tableStart, tableEnd + 8)
+          : html.slice(tableStart, tableStart + 20000);
+        tableText = tableHtml
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&#[0-9]+;/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 6000);
+      } else {
+        // No table found — fall back to a plain-text slice of the body
+        tableText = html
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 6000);
+      }
+
+      if (apiKey && tableText.length > 100) {
+        const claudeResponse = await callClaude(
+          `From this CBE T-bill secondary market page, extract the LATEST weighted average yield (percentage).
+Return ONLY a JSON object: {"yield": <number>}
+If you cannot find the yield, return {"yield": null}.
+
+Page content:
+${tableText}`,
+          "You are a financial data extraction assistant. Return only valid JSON."
+        );
+
+        if (claudeResponse) {
+          try {
+            let jsonStr = claudeResponse.trim();
+            const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (fence) jsonStr = fence[1];
+            const parsed = JSON.parse(jsonStr) as { yield?: number | null };
+            const rate = typeof parsed.yield === "number" && !isNaN(parsed.yield)
+              ? parsed.yield
+              : null;
+
+            if (rate !== null) {
+              const count: number = await ctx.runMutation(
+                internal.dataRefresh.upsertEconomicIndicator,
+                {
+                  indicator: "egypt_tbill_rate",
+                  date: today,
+                  year,
+                  value: rate,
+                  unit: "percent",
+                  sourceUrl: CBE_TBILL_URL,
+                  sourceNameEn: "Central Bank of Egypt — T-bill secondary market",
+                  sanadLevel: 1,
+                }
+              );
+              updated += count;
+              console.log(`[dataAgent/investment] CBE T-bill rate: ${rate}% (updated: ${count})`);
+            } else {
+              console.warn("[dataAgent/investment] Claude could not extract CBE T-bill yield.");
+            }
+          } catch {
+            console.warn("[dataAgent/investment] Failed to parse CBE T-bill Claude response.");
+          }
+        }
+      } else if (!apiKey) {
+        console.warn("[dataAgent/investment] Skipping CBE T-bill Claude parse — ANTHROPIC_API_KEY not set.");
+      } else {
+        console.warn("[dataAgent/investment] CBE T-bill page returned insufficient content.");
+      }
+    } else {
+      console.warn(`[dataAgent/investment] CBE T-bill page returned status ${res.status} — skipping.`);
+    }
+  } catch (err) {
+    console.warn(`[dataAgent/investment] Failed to fetch CBE T-bill rates: ${err}`);
+  }
+
+  // ── Banque Misr CD rates ──────────────────────────────────────────────────
+  try {
+    const res = await fetch(BANQUE_MISR_CD_URL, { signal: AbortSignal.timeout(15000) });
+    if (res.ok) {
+      const html = await res.text();
+
+      // Extract rate tables and strip to plain text
+      const tableStart = html.indexOf("<table");
+      let tableText = "";
+      if (tableStart > 0) {
+        const tableEnd = html.lastIndexOf("</table>");
+        const tableHtml = tableEnd > tableStart
+          ? html.slice(tableStart, tableEnd + 8)
+          : html.slice(tableStart, tableStart + 30000);
+        tableText = tableHtml
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&#[0-9]+;/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 8000);
+      } else {
+        tableText = html
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 8000);
+      }
+
+      if (apiKey && tableText.length > 100) {
+        const claudeResponse = await callClaude(
+          `From this Banque Misr certificates of deposit page, extract the annual interest rates for:
+1. 1-year fixed-rate certificate
+2. 3-year fixed-rate certificate
+
+Return ONLY a JSON object: {"cd_1yr": <number or null>, "cd_3yr": <number or null>}
+Use the highest available rate for each tenor if multiple tiers exist.
+If a rate cannot be found, use null.
+
+Page content:
+${tableText}`,
+          "You are a financial data extraction assistant. Return only valid JSON."
+        );
+
+        if (claudeResponse) {
+          try {
+            let jsonStr = claudeResponse.trim();
+            const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+            if (fence) jsonStr = fence[1];
+            const parsed = JSON.parse(jsonStr) as {
+              cd_1yr?: number | null;
+              cd_3yr?: number | null;
+            };
+
+            const rate1yr = typeof parsed.cd_1yr === "number" && !isNaN(parsed.cd_1yr)
+              ? parsed.cd_1yr
+              : null;
+            const rate3yr = typeof parsed.cd_3yr === "number" && !isNaN(parsed.cd_3yr)
+              ? parsed.cd_3yr
+              : null;
+
+            if (rate1yr !== null) {
+              const count: number = await ctx.runMutation(
+                internal.dataRefresh.upsertEconomicIndicator,
+                {
+                  indicator: "banque_misr_cd_1yr",
+                  date: today,
+                  year,
+                  value: rate1yr,
+                  unit: "percent",
+                  sourceUrl: BANQUE_MISR_CD_URL,
+                  sourceNameEn: "Banque Misr — 1-year CD rate",
+                  sanadLevel: 1,
+                }
+              );
+              updated += count;
+              console.log(`[dataAgent/investment] Banque Misr 1yr CD: ${rate1yr}% (updated: ${count})`);
+            }
+
+            if (rate3yr !== null) {
+              const count: number = await ctx.runMutation(
+                internal.dataRefresh.upsertEconomicIndicator,
+                {
+                  indicator: "banque_misr_cd_3yr",
+                  date: today,
+                  year,
+                  value: rate3yr,
+                  unit: "percent",
+                  sourceUrl: BANQUE_MISR_CD_URL,
+                  sourceNameEn: "Banque Misr — 3-year CD rate",
+                  sanadLevel: 1,
+                }
+              );
+              updated += count;
+              console.log(`[dataAgent/investment] Banque Misr 3yr CD: ${rate3yr}% (updated: ${count})`);
+            }
+
+            if (rate1yr === null && rate3yr === null) {
+              console.warn("[dataAgent/investment] Claude could not extract any Banque Misr CD rates.");
+            }
+          } catch {
+            console.warn("[dataAgent/investment] Failed to parse Banque Misr Claude response.");
+          }
+        }
+      } else if (!apiKey) {
+        console.warn("[dataAgent/investment] Skipping Banque Misr Claude parse — ANTHROPIC_API_KEY not set.");
+      } else {
+        console.warn("[dataAgent/investment] Banque Misr page returned insufficient content.");
+      }
+    } else {
+      // Site blocked or unavailable — log and skip (seed data serves as fallback)
+      console.warn(`[dataAgent/investment] Banque Misr site returned status ${res.status} — skipping.`);
+    }
+  } catch (err) {
+    // Site may block server-side fetches (CORS, bot detection) — non-fatal
+    console.warn(`[dataAgent/investment] Failed to fetch Banque Misr CD rates: ${err}`);
+  }
+
+  // NBE and CIB: these sites commonly block server-side/cloud requests.
+  // Log and skip — seed data in the DB serves as the fallback.
+  console.log("[dataAgent/investment] NBE/CIB: skipped (block server-side fetches; seed data is fallback).");
+
+  return updated;
 }
 
 // ─── STOCK MARKET REFRESH ─────────────────────────────────────────────────────

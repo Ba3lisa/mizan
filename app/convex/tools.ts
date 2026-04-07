@@ -14,11 +14,23 @@ export const getInvestmentDefaults = query({
       "cbe_cd_rate",
       "egypt_tbill_rate",
       "gold_price_egp",
+      "gold_annual_return",
       "sp500_annual_return",
       "msci_em_return",
       "egypt_mortgage_rate",
       "inflation",
       "exchange_rate",
+      // Bank CDs
+      "banque_misr_cd_1yr",
+      "banque_misr_cd_3yr",
+      "nbe_cd_1yr",
+      "nbe_cd_3yr",
+      "cib_cd_1yr",
+      "cib_cd_floating",
+      // Government Savings Certificates
+      "egypt_savings_cert_1yr",
+      "egypt_savings_cert_3yr",
+      "egypt_savings_cert_5yr",
     ];
 
     const result: Record<
@@ -168,6 +180,89 @@ export const seedInvestmentIndicators = internalMutation({
         sourceUrl: "https://www.nbe.com.eg",
         sourceNameEn: "National Bank of Egypt",
       },
+      // Bank CDs
+      {
+        indicator: "banque_misr_cd_1yr",
+        value: 16,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.banquemisr.com",
+        sourceNameEn: "Banque Misr",
+      },
+      {
+        indicator: "banque_misr_cd_3yr",
+        value: 16,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.banquemisr.com",
+        sourceNameEn: "Banque Misr",
+      },
+      {
+        indicator: "nbe_cd_1yr",
+        value: 16,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.nbe.com.eg",
+        sourceNameEn: "National Bank of Egypt",
+      },
+      {
+        indicator: "nbe_cd_3yr",
+        value: 16,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.nbe.com.eg",
+        sourceNameEn: "National Bank of Egypt",
+      },
+      {
+        indicator: "cib_cd_1yr",
+        value: 14,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.cibeg.com",
+        sourceNameEn: "Commercial International Bank (CIB)",
+      },
+      {
+        indicator: "cib_cd_floating",
+        value: 17,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.cibeg.com",
+        sourceNameEn: "Commercial International Bank (CIB)",
+      },
+      // Government Savings Certificates
+      {
+        indicator: "egypt_savings_cert_1yr",
+        value: 16,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.cbe.org.eg",
+        sourceNameEn: "Central Bank of Egypt",
+      },
+      {
+        indicator: "egypt_savings_cert_3yr",
+        value: 16,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.cbe.org.eg",
+        sourceNameEn: "Central Bank of Egypt",
+      },
+      {
+        indicator: "egypt_savings_cert_5yr",
+        value: 14,
+        unit: "percent",
+        sanadLevel: 1,
+        sourceUrl: "https://www.cbe.org.eg",
+        sourceNameEn: "Central Bank of Egypt",
+      },
+      // Gold annual return
+      {
+        indicator: "gold_annual_return",
+        value: 20,
+        unit: "percent",
+        sanadLevel: 2,
+        sourceUrl: "https://api.stlouisfed.org",
+        sourceNameEn: "FRED (St. Louis Fed)",
+      },
     ];
 
     for (const seed of seeds) {
@@ -194,5 +289,95 @@ export const seedInvestmentIndicators = internalMutation({
     }
 
     return { seeded: seeds.length, date: today };
+  },
+});
+
+type IndicatorResult = {
+  value: number;
+  sanadLevel: number;
+  sourceUrl: string;
+  sourceNameEn: string;
+};
+
+/**
+ * Fetch investment indicators grouped by asset class.
+ * Useful for the investment simulator to hydrate defaults per category.
+ */
+export const getInvestmentIndicatorsByClass = query({
+  args: {},
+  handler: async (ctx) => {
+    async function fetch(
+      indicator: string
+    ): Promise<IndicatorResult | null> {
+      const record = await ctx.db
+        .query("economicIndicators")
+        .withIndex("by_indicator_and_date", (q) =>
+          q.eq("indicator", indicator)
+        )
+        .order("desc")
+        .first();
+      if (!record) return null;
+      return {
+        value: record.value,
+        sanadLevel: record.sanadLevel,
+        sourceUrl: record.sourceUrl ?? "",
+        sourceNameEn: record.sourceNameEn ?? "",
+      };
+    }
+
+    const [
+      egx30,
+      banque_misr_cd_1yr,
+      banque_misr_cd_3yr,
+      nbe_cd_1yr,
+      nbe_cd_3yr,
+      cib_cd_1yr,
+      cib_cd_floating,
+      egypt_savings_cert_1yr,
+      egypt_savings_cert_3yr,
+      egypt_savings_cert_5yr,
+      egypt_tbill_rate,
+      egypt_real_estate_return,
+      gold_annual_return,
+      sp500_annual_return,
+      msci_em_return,
+    ] = await Promise.all([
+      fetch("egx30_annual_return"),
+      fetch("banque_misr_cd_1yr"),
+      fetch("banque_misr_cd_3yr"),
+      fetch("nbe_cd_1yr"),
+      fetch("nbe_cd_3yr"),
+      fetch("cib_cd_1yr"),
+      fetch("cib_cd_floating"),
+      fetch("egypt_savings_cert_1yr"),
+      fetch("egypt_savings_cert_3yr"),
+      fetch("egypt_savings_cert_5yr"),
+      fetch("egypt_tbill_rate"),
+      fetch("egypt_real_estate_return"),
+      fetch("gold_annual_return"),
+      fetch("sp500_annual_return"),
+      fetch("msci_em_return"),
+    ]);
+
+    return {
+      egyptianStocks: { egx30 },
+      bankCDs: {
+        banque_misr_cd_1yr,
+        banque_misr_cd_3yr,
+        nbe_cd_1yr,
+        nbe_cd_3yr,
+        cib_cd_1yr,
+        cib_cd_floating,
+      },
+      govCerts: {
+        egypt_savings_cert_1yr,
+        egypt_savings_cert_3yr,
+        egypt_savings_cert_5yr,
+        egypt_tbill_rate,
+      },
+      realEstate: { egypt_real_estate_return },
+      gold: { gold_annual_return },
+      international: { sp500_annual_return, msci_em_return },
+    };
   },
 });

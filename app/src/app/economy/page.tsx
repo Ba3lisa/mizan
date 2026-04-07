@@ -388,12 +388,24 @@ function HeroCard({ meta, record, isAr, index }: HeroCardProps) {
   const values: number[] = timelineRecords ? timelineRecords.map((r) => r.value) : [];
   const isLoading = timelineRecords === undefined;
 
-  // Find value from previous year (not just previous data point)
-  const currentYear = record?.year ?? new Date().getFullYear().toString();
-  const prevYearStr = String(parseInt(currentYear) - 1);
-  const prevYearRecord = timelineRecords?.find((r) => r.year === prevYearStr);
+  // Find value from a different year (walk backwards from current year)
+  const currentYear = parseInt(record?.year ?? new Date().getFullYear().toString());
   const latestValue = values.length > 0 ? values[values.length - 1] : null;
-  const prevYearValue = prevYearRecord?.value ?? (values.length >= 2 ? values[values.length - 2] : null);
+  let prevYearValue: number | null = null;
+  if (timelineRecords) {
+    for (let y = currentYear - 1; y >= currentYear - 5; y--) {
+      const rec = timelineRecords.find((r) => r.year === String(y));
+      if (rec) { prevYearValue = rec.value; break; }
+    }
+  }
+  // Label: which year we're comparing to
+  const comparisonYear = (() => {
+    if (!timelineRecords) return null;
+    for (let y = currentYear - 1; y >= currentYear - 5; y--) {
+      if (timelineRecords.find((r) => r.year === String(y))) return y;
+    }
+    return null;
+  })();
 
   const trend: "up" | "down" =
     latestValue !== null && prevYearValue !== null
@@ -472,7 +484,7 @@ function HeroCard({ meta, record, isAr, index }: HeroCardProps) {
                   </span>
                 )}
                 <span className="text-[0.6rem] text-muted-foreground/60">
-                  {isAr ? "من السنة الماضية" : "vs last year"} · {displayYear}
+                  {comparisonYear ? (isAr ? `مقارنة بـ ${comparisonYear}` : `vs ${comparisonYear}`) : (isAr ? "من السنة الماضية" : "vs last year")} · {displayYear}
                 </span>
               </div>
               {values.length >= 2 && (
