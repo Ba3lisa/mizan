@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { Skeleton } from "boneyard-js/react";
@@ -13,15 +14,19 @@ import {
   Database,
   ArrowRight,
   BrainCircuit,
+  ChevronDown,
 } from "lucide-react";
 import { SanadBadge } from "@/components/sanad-badge";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ResponsiveContainer,
   AreaChart,
+  BarChart,
   LineChart,
   Area,
+  Bar,
+  Cell,
   Line,
   XAxis,
   YAxis,
@@ -247,6 +252,33 @@ const IMF_FORECASTS: IndicatorMeta[] = [
     sourceEn: "IMF WEO",
     sourceAr: "صندوق النقد الدولي",
     sourceUrl: "https://www.imf.org/external/datamapper/profile/EGY",
+  },
+];
+
+const KEY_RATES: IndicatorMeta[] = [
+  {
+    key: "cbe_cd_rate",
+    nameAr: "معدل الإيداع (البنك المركزي)",
+    nameEn: "CBE CD Rate",
+    sourceEn: "Central Bank of Egypt",
+    sourceAr: "البنك المركزي المصري",
+    sourceUrl: "https://www.cbe.org.eg/en/economic-research/statistics",
+  },
+  {
+    key: "egypt_tbill_rate",
+    nameAr: "عائد أذون الخزانة",
+    nameEn: "T-Bill Rate",
+    sourceEn: "Ministry of Finance",
+    sourceAr: "وزارة المالية",
+    sourceUrl: "https://www.mof.gov.eg",
+  },
+  {
+    key: "egypt_mortgage_rate",
+    nameAr: "معدل الرهن العقاري",
+    nameEn: "Mortgage Rate",
+    sourceEn: "Central Bank of Egypt",
+    sourceAr: "البنك المركزي المصري",
+    sourceUrl: "https://www.cbe.org.eg/en/economic-research/statistics",
   },
 ];
 
@@ -511,7 +543,7 @@ function HeroCard({ meta, record, isAr, index }: HeroCardProps) {
 
 // ─── GDP & Growth Chart ───────────────────────────────────────────────────────
 
-function GdpGrowthChart({ isAr }: { isAr: boolean }) {
+function GdpGrowthChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }) {
   const gdpNominal = useQuery(api.economy.getIndicatorTimeline, { indicator: "gdp_nominal" });
   const gdpGrowth = useQuery(api.economy.getIndicatorTimeline, { indicator: "gdp_growth" });
 
@@ -528,7 +560,9 @@ function GdpGrowthChart({ isAr }: { isAr: boolean }) {
       const yr = getYearLabel(r);
       byYear[yr] = { ...byYear[yr], year: yr, growth: r.value };
     }
-    return Object.values(byYear).sort((a, b) => a.year.localeCompare(b.year));
+    return Object.values(byYear)
+      .sort((a, b) => a.year.localeCompare(b.year))
+      .filter((d) => parseInt(d.year) >= fromYear);
   })();
 
   return (
@@ -641,7 +675,7 @@ function GdpGrowthChart({ isAr }: { isAr: boolean }) {
 
 // ─── Inflation & Exchange Rate Chart ─────────────────────────────────────────
 
-function InflationExchangeChart({ isAr }: { isAr: boolean }) {
+function InflationExchangeChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }) {
   const inflation = useQuery(api.economy.getIndicatorTimeline, { indicator: "inflation" });
   const exchange = useQuery(api.economy.getIndicatorTimeline, { indicator: "exchange_rate" });
 
@@ -658,7 +692,9 @@ function InflationExchangeChart({ isAr }: { isAr: boolean }) {
       const yr = getYearLabel(r);
       byYear[yr] = { ...byYear[yr], year: yr, exchange: r.value };
     }
-    return Object.values(byYear).sort((a, b) => a.year.localeCompare(b.year));
+    return Object.values(byYear)
+      .sort((a, b) => a.year.localeCompare(b.year))
+      .filter((d) => parseInt(d.year) >= fromYear);
   })();
 
   return (
@@ -760,7 +796,7 @@ function InflationExchangeChart({ isAr }: { isAr: boolean }) {
 
 // ─── Money Flows Stacked Chart ────────────────────────────────────────────────
 
-function MoneyFlowsChart({ isAr }: { isAr: boolean }) {
+function MoneyFlowsChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }) {
   const remittances = useQuery(api.economy.getIndicatorTimeline, { indicator: "remittances" });
   const fdi = useQuery(api.economy.getIndicatorTimeline, { indicator: "fdi_inflows" });
   const tourism = useQuery(api.economy.getIndicatorTimeline, { indicator: "tourism_receipts" });
@@ -791,7 +827,9 @@ function MoneyFlowsChart({ isAr }: { isAr: boolean }) {
       const yr = getYearLabel(r);
       byYear[yr] = { ...byYear[yr], year: yr, suez: r.value };
     }
-    return Object.values(byYear).sort((a, b) => a.year.localeCompare(b.year));
+    return Object.values(byYear)
+      .sort((a, b) => a.year.localeCompare(b.year))
+      .filter((d) => parseInt(d.year) >= fromYear);
   })();
 
   return (
@@ -930,21 +968,26 @@ function EmptyChart({ isAr }: { isAr: boolean }) {
   );
 }
 
-// ─── Money Flow Card (with mini recharts area) ────────────────────────────────
+// ─── Money Flow Card (expandable with full chart) ─────────────────────────────
 
 interface MoneyFlowCardProps {
   meta: IndicatorMeta;
   record: IndicatorRecord | null;
   isAr: boolean;
   accentColor: string;
+  expanded: boolean;
+  onToggle: () => void;
 }
 
-function MoneyFlowCard({ meta, record, isAr, accentColor }: MoneyFlowCardProps) {
+function MoneyFlowCard({ meta, record, isAr, accentColor, expanded, onToggle }: MoneyFlowCardProps) {
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
     indicator: meta.key,
   });
   const values: number[] = timelineRecords ? timelineRecords.map((r) => r.value) : [];
   const chartData = values.slice(-6).map((v, i) => ({ i, v }));
+  const fullChartData = timelineRecords
+    ? timelineRecords.map((r) => ({ year: getYearLabel(r), v: r.value }))
+    : [];
 
   const trend: "up" | "down" =
     values.length >= 2
@@ -956,11 +999,24 @@ function MoneyFlowCard({ meta, record, isAr, accentColor }: MoneyFlowCardProps) 
     values.length >= 2 ? values[values.length - 1] - values[values.length - 2] : null;
 
   return (
-    <Card className="border-border/60 bg-card/50 hover:border-border/80 transition-all duration-200 overflow-hidden">
+    <Card
+      className={`border-border/60 bg-card/50 hover:border-border/80 transition-all duration-200 overflow-hidden cursor-pointer ${
+        expanded ? "border-border/80 col-span-full" : ""
+      }`}
+      onClick={onToggle}
+    >
       <CardContent className="p-4">
-        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground mb-2 truncate">
-          {isAr ? meta.nameAr : meta.nameEn}
-        </p>
+        <div className="flex items-center justify-between">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground mb-2 truncate">
+            {isAr ? meta.nameAr : meta.nameEn}
+          </p>
+          <ChevronDown
+            size={12}
+            className={`text-muted-foreground/50 transition-transform duration-200 mb-2 flex-shrink-0 ms-2 ${
+              expanded ? "rotate-180" : ""
+            }`}
+          />
+        </div>
 
         {!record ? (
           <div className="flex flex-col items-start gap-1 mt-2 mb-3">
@@ -991,7 +1047,7 @@ function MoneyFlowCard({ meta, record, isAr, accentColor }: MoneyFlowCardProps) 
               )}
             </div>
 
-            {chartData.length >= 2 && (
+            {!expanded && chartData.length >= 2 && (
               <div className="h-[52px] -mx-1 mb-1" dir="ltr">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={chartData} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
@@ -1018,11 +1074,73 @@ function MoneyFlowCard({ meta, record, isAr, accentColor }: MoneyFlowCardProps) 
           </>
         )}
 
+        <AnimatePresence>
+          {expanded && fullChartData.length >= 2 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 250 }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.35, ease: "easeInOut" }}
+              className="overflow-hidden mt-3"
+              dir="ltr"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <ResponsiveContainer width="100%" height={250}>
+                <AreaChart data={fullChartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id={`mfg-full-${meta.key}`} x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={accentColor} stopOpacity={0.4} />
+                      <stop offset="95%" stopColor={accentColor} stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#252A36" strokeOpacity={0.6} vertical={false} />
+                  <XAxis
+                    dataKey="year"
+                    tick={{ fontSize: 10, fill: "#7A8299", fontFamily: "monospace" }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fill: "#7A8299", fontFamily: "monospace" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => `$${v.toFixed(0)}B`}
+                    width={48}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--card)",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "11px",
+                      color: "hsl(var(--foreground))",
+                    }}
+                    formatter={(v) => [typeof v === "number" ? v.toFixed(2) : String(v), isAr ? meta.nameAr : meta.nameEn]}
+                    cursor={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="v"
+                    stroke={accentColor}
+                    strokeWidth={2}
+                    fill={`url(#mfg-full-${meta.key})`}
+                    dot={false}
+                    animationDuration={1200}
+                    activeDot={{ r: 4, stroke: accentColor, strokeWidth: 2, fill: "hsl(var(--background))" }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <a
           href={meta.sourceUrl}
           target="_blank"
           rel="noopener noreferrer"
           className="text-[0.55rem] uppercase tracking-wider text-muted-foreground/35 hover:text-primary/50 transition-colors no-underline block mt-1"
+          onClick={(e) => e.stopPropagation()}
         >
           {isAr ? meta.sourceAr : meta.sourceEn}
         </a>
@@ -1031,7 +1149,7 @@ function MoneyFlowCard({ meta, record, isAr, accentColor }: MoneyFlowCardProps) 
   );
 }
 
-// ─── IMF Forecast Bar Chart ───────────────────────────────────────────────────
+// ─── IMF Forecast Bar Chart (proper Recharts BarChart) ───────────────────────
 
 function ImfForecastChart({ meta, record, isAr }: { meta: IndicatorMeta; record: IndicatorRecord | null; isAr: boolean }) {
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
@@ -1040,14 +1158,16 @@ function ImfForecastChart({ meta, record, isAr }: { meta: IndicatorMeta; record:
 
   const chartData = (() => {
     if (!timelineRecords) return [];
-    return timelineRecords.map((r) => ({
-      year: getYearLabel(r),
-      value: r.value,
-      isForecast: parseInt(getYearLabel(r)) >= 2025,
-    }));
+    return timelineRecords
+      .map((r) => ({
+        year: getYearLabel(r),
+        value: r.value,
+        isForecast: parseInt(getYearLabel(r)) >= 2025,
+      }))
+      .filter((d) => parseInt(d.year) >= 2020);
   })();
 
-  const maxVal = chartData.length > 0 ? Math.max(...chartData.map((d) => Math.abs(d.value))) : 10;
+  const isLoading = timelineRecords === undefined;
 
   return (
     <Card className="border-border/60 bg-card/50 overflow-hidden">
@@ -1063,40 +1183,74 @@ function ImfForecastChart({ meta, record, isAr }: { meta: IndicatorMeta; record:
           )}
         </div>
 
-        <div className="space-y-1.5" dir="ltr">
-          {chartData.slice(-8).map((d) => {
-            const pct = maxVal > 0 ? (Math.abs(d.value) / maxVal) * 100 : 0;
-            const barColor = d.isForecast ? COLORS.blue : COLORS.gold;
-            return (
-              <div key={d.year} className="flex items-center gap-2">
-                <span className="text-[0.6rem] font-mono text-muted-foreground/60 w-8 flex-shrink-0">
-                  {d.year}
-                </span>
-                <div className="flex-1 h-4 bg-muted/15 rounded-sm overflow-hidden relative">
-                  <div
-                    className="h-full rounded-sm transition-all duration-700"
-                    style={{
-                      width: `${pct}%`,
-                      background: barColor,
-                      opacity: d.isForecast ? 0.55 : 0.85,
-                    }}
-                  />
-                </div>
-                <span
-                  className="text-[0.6rem] font-mono w-10 text-right flex-shrink-0"
-                  style={{ color: barColor }}
-                >
-                  {d.value.toFixed(1)}%
-                </span>
-                {d.isForecast && (
-                  <span className="text-[0.5rem] text-muted-foreground/40 flex-shrink-0 font-mono">
-                    {isAr ? "توقع" : "fcst"}
-                  </span>
-                )}
-              </div>
-            );
-          })}
+        <div className="flex items-center gap-3 mb-2">
+          <span className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
+            <span className="inline-block w-3 h-2 rounded-sm" style={{ background: COLORS.gold }} />
+            {isAr ? "فعلي" : "Actual"}
+          </span>
+          <span className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
+            <span className="inline-block w-3 h-2 rounded-sm opacity-55" style={{ background: COLORS.blue }} />
+            {isAr ? "توقع" : "Forecast"}
+          </span>
         </div>
+
+        <Skeleton name={`imf-${meta.key}`} loading={isLoading}>
+          {chartData.length === 0 ? (
+            <div className="h-[200px] flex items-center justify-center border border-dashed border-border/30 rounded-lg">
+              <Database size={14} className="text-muted-foreground/25" />
+            </div>
+          ) : (
+            <div className="h-[200px]" dir="ltr">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }} barCategoryGap="20%">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#252A36" strokeOpacity={0.6} vertical={false} />
+                  <XAxis
+                    dataKey="year"
+                    tick={{ fontSize: 9, fill: "#7A8299", fontFamily: "monospace" }}
+                    axisLine={false}
+                    tickLine={false}
+                    interval={0}
+                    angle={-40}
+                    textAnchor="end"
+                    height={32}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 9, fill: "#7A8299", fontFamily: "monospace" }}
+                    axisLine={false}
+                    tickLine={false}
+                    tickFormatter={(v: number) => `${v.toFixed(0)}%`}
+                    width={34}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      background: "var(--card)",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                      fontSize: "11px",
+                      color: "hsl(var(--foreground))",
+                    }}
+                    formatter={(v, _name, props) => [
+                      typeof v === "number" ? `${v.toFixed(1)}%` : String(v),
+                      (props as { payload?: { isForecast?: boolean } }).payload?.isForecast
+                        ? (isAr ? "توقع" : "Forecast")
+                        : (isAr ? "فعلي" : "Actual"),
+                    ]}
+                    cursor={{ fill: "hsl(var(--border))", fillOpacity: 0.15 }}
+                  />
+                  <Bar dataKey="value" radius={[3, 3, 0, 0]} animationDuration={1200}>
+                    {chartData.map((entry) => (
+                      <Cell
+                        key={entry.year}
+                        fill={entry.isForecast ? COLORS.blue : COLORS.gold}
+                        fillOpacity={entry.isForecast ? 0.55 : 0.85}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </Skeleton>
 
         <a
           href={meta.sourceUrl}
@@ -1111,7 +1265,7 @@ function ImfForecastChart({ meta, record, isAr }: { meta: IndicatorMeta; record:
   );
 }
 
-// ─── National Profile Stat ────────────────────────────────────────────────────
+// ─── National Profile Stat (with sparkline + YoY) ────────────────────────────
 
 function NationalStat({
   meta,
@@ -1122,6 +1276,20 @@ function NationalStat({
   record: IndicatorRecord | null;
   isAr: boolean;
 }) {
+  const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
+    indicator: meta.key,
+  });
+  const values: number[] = timelineRecords ? timelineRecords.map((r) => r.value) : [];
+  const sparkValues = values.slice(-8);
+  const yoyChange =
+    values.length >= 2 ? values[values.length - 1] - values[values.length - 2] : null;
+  const trend: "up" | "down" =
+    values.length >= 2 ? (values[values.length - 1] >= values[values.length - 2] ? "up" : "down") : "up";
+
+  const TrendIcon = trend === "up" ? TrendingUp : TrendingDown;
+  const trendColor = trend === "up" ? COLORS.green : COLORS.red;
+  const sparkColor = COLORS.blue;
+
   return (
     <div className="flex flex-col gap-1 p-4 rounded-xl border border-border/40 bg-card/30 hover:border-border/60 transition-all">
       <p className="text-[0.6rem] font-semibold uppercase tracking-wider text-muted-foreground/70 truncate">
@@ -1137,7 +1305,23 @@ function NationalStat({
               <SanadBadge sanadLevel={record.sanadLevel} sourceUrl={record.sourceUrl} />
             )}
           </p>
-          <p className="text-[0.55rem] font-mono text-muted-foreground/40">
+          {yoyChange !== null && (
+            <div className="flex items-center gap-1.5 mb-1" dir="ltr">
+              <TrendIcon size={10} style={{ color: trendColor }} />
+              <span className="text-[0.6rem] font-mono font-semibold" style={{ color: trendColor }}>
+                {yoyChange > 0 ? "+" : ""}{yoyChange.toFixed(1)}
+              </span>
+              <span className="text-[0.55rem] text-muted-foreground/40">
+                {isAr ? "مقارنة بالسنة السابقة" : "YoY"}
+              </span>
+            </div>
+          )}
+          {sparkValues.length >= 2 && (
+            <div dir="ltr" className="mt-1">
+              <Sparkline data={sparkValues} color={sparkColor} />
+            </div>
+          )}
+          <p className="text-[0.55rem] font-mono text-muted-foreground/40 mt-1">
             {record.unit} · {record.year ?? record.date.slice(0, 4)}
           </p>
         </>
@@ -1146,7 +1330,7 @@ function NationalStat({
   );
 }
 
-// ─── Indicator Card With Timeline (unchanged, kept for Markets section) ───────
+// ─── Market Card (full AreaChart for EGX30) ───────────────────────────────────
 
 interface IndicatorCardWithTimelineProps {
   meta: IndicatorMeta;
@@ -1158,8 +1342,11 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
     indicator: meta.key,
   });
+  const isLoading = timelineRecords === undefined;
   const values: number[] = timelineRecords ? timelineRecords.map((r) => r.value) : [];
-  const chartData = values.slice(-12).map((v, i) => ({ i, v }));
+  const fullChartData = timelineRecords
+    ? timelineRecords.map((r) => ({ year: getYearLabel(r), v: r.value }))
+    : [];
 
   const trend: "up" | "down" =
     values.length >= 2
@@ -1169,6 +1356,7 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
       : "up";
   const TrendIcon = trend === "up" ? TrendingUp : TrendingDown;
   const trendColor = trend === "up" ? COLORS.green : COLORS.red;
+  const chartColor = meta.highlight ? COLORS.gold : trendColor;
 
   return (
     <Card
@@ -1178,6 +1366,9 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
           : "border-border/60 bg-card/50"
       }`}
     >
+      {meta.highlight && (
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[#C9A84C]/50 to-transparent" />
+      )}
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-2">
           <div>
@@ -1227,29 +1418,64 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
             <p className="text-[0.6rem] text-muted-foreground/60 mb-3 font-mono">
               {record.unit} · {record.year ?? record.date.slice(0, 4)}
             </p>
-            {chartData.length >= 2 && (
-              <div className="h-[80px] -mx-2" dir="ltr">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 4, bottom: 4 }}>
-                    <defs>
-                      <linearGradient id={`mkt-${meta.key}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={meta.highlight ? COLORS.gold : trendColor} stopOpacity={0.3} />
-                        <stop offset="95%" stopColor={meta.highlight ? COLORS.gold : trendColor} stopOpacity={0.02} />
-                      </linearGradient>
-                    </defs>
-                    <Area
-                      type="monotone"
-                      dataKey="v"
-                      stroke={meta.highlight ? COLORS.gold : trendColor}
-                      strokeWidth={1.5}
-                      fill={`url(#mkt-${meta.key})`}
-                      dot={false}
-                      animationDuration={1200}
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            )}
+
+            <Skeleton name={`market-${meta.key}`} loading={isLoading}>
+              {fullChartData.length >= 2 && (
+                <div className="h-[200px] -mx-2 mt-1" dir="ltr">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={fullChartData} margin={{ top: 6, right: 6, left: 0, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id={`mkt-${meta.key}`} x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={chartColor} stopOpacity={0.35} />
+                          <stop offset="95%" stopColor={chartColor} stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#252A36" strokeOpacity={0.6} vertical={false} />
+                      <XAxis
+                        dataKey="year"
+                        tick={{ fontSize: 9, fill: "#7A8299", fontFamily: "monospace" }}
+                        axisLine={false}
+                        tickLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        tick={{ fontSize: 9, fill: "#7A8299", fontFamily: "monospace" }}
+                        axisLine={false}
+                        tickLine={false}
+                        tickFormatter={(v: number) =>
+                          v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v.toFixed(0)
+                        }
+                        width={38}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          background: "var(--card)",
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "8px",
+                          fontSize: "11px",
+                          color: "hsl(var(--foreground))",
+                        }}
+                        formatter={(v) => [
+                          typeof v === "number" ? v.toLocaleString(undefined, { maximumFractionDigits: 0 }) : String(v),
+                          isAr ? meta.nameAr : meta.nameEn,
+                        ]}
+                        cursor={{ stroke: "hsl(var(--border))", strokeWidth: 1 }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="v"
+                        stroke={chartColor}
+                        strokeWidth={2}
+                        fill={`url(#mkt-${meta.key})`}
+                        dot={false}
+                        animationDuration={1200}
+                        activeDot={{ r: 4, stroke: chartColor, strokeWidth: 2, fill: "hsl(var(--background))" }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </Skeleton>
           </>
         )}
 
@@ -1258,6 +1484,70 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
           target="_blank"
           rel="noopener noreferrer"
           className="mt-3 text-[0.55rem] uppercase tracking-wider text-muted-foreground/35 hover:text-primary/50 transition-colors no-underline block"
+        >
+          {isAr ? meta.sourceAr : meta.sourceEn}
+        </a>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Key Rate Card (CBE, T-Bill, Mortgage) ────────────────────────────────────
+
+function KeyRateCard({ meta, record, isAr }: { meta: IndicatorMeta; record: IndicatorRecord | null; isAr: boolean }) {
+  const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
+    indicator: meta.key,
+  });
+  const values: number[] = timelineRecords ? timelineRecords.map((r) => r.value) : [];
+  const sparkValues = values.slice(-8);
+  const yoyChange =
+    values.length >= 2 ? values[values.length - 1] - values[values.length - 2] : null;
+  const trend: "up" | "down" =
+    values.length >= 2 ? (values[values.length - 1] >= values[values.length - 2] ? "up" : "down") : "up";
+  const TrendIcon = trend === "up" ? TrendingUp : TrendingDown;
+  const trendColor = trend === "up" ? COLORS.red : COLORS.green; // for rates: up = bad
+  const sparkColor = COLORS.purple;
+
+  return (
+    <Card className="border-border/60 bg-card/50 hover:border-border/80 transition-all duration-200 overflow-hidden">
+      <CardContent className="p-4">
+        <p className="text-[0.65rem] font-semibold uppercase tracking-wider text-muted-foreground mb-2 truncate">
+          {isAr ? meta.nameAr : meta.nameEn}
+        </p>
+        {!record ? (
+          <div className="flex items-center gap-2 py-2">
+            <Database size={14} className="text-muted-foreground/25" />
+            <p className="text-[0.6rem] text-muted-foreground/40">{isAr ? "لا توجد بيانات" : "No data"}</p>
+          </div>
+        ) : (
+          <>
+            <p className="text-2xl font-black font-mono text-foreground mb-1" dir="ltr">
+              {formatValue(record.value, record.unit)}
+            </p>
+            {yoyChange !== null && (
+              <div className="flex items-center gap-1.5 mb-2" dir="ltr">
+                <TrendIcon size={10} style={{ color: trendColor }} />
+                <span className="text-[0.6rem] font-mono font-semibold" style={{ color: trendColor }}>
+                  {yoyChange > 0 ? "+" : ""}{yoyChange.toFixed(1)}
+                </span>
+                <span className="text-[0.55rem] text-muted-foreground/40">
+                  {isAr ? "من السنة الماضية" : "vs last year"}
+                </span>
+              </div>
+            )}
+            {sparkValues.length >= 2 && (
+              <div dir="ltr">
+                <Sparkline data={sparkValues} color={sparkColor} />
+              </div>
+            )}
+          </>
+        )}
+        <a
+          href={meta.sourceUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-2 text-[0.55rem] uppercase tracking-wider text-muted-foreground/35 hover:text-primary/50 transition-colors no-underline block"
+          onClick={(e) => e.stopPropagation()}
         >
           {isAr ? meta.sourceAr : meta.sourceEn}
         </a>
@@ -1397,17 +1687,41 @@ const MONEY_FLOW_COLORS: Record<string, string> = {
   current_account: COLORS.blue,
 };
 
+type TimeRange = "5y" | "10y" | "all";
+
+function getFromYear(range: TimeRange): number {
+  const currentYear = new Date().getFullYear();
+  if (range === "5y") return currentYear - 5;
+  if (range === "10y") return currentYear - 10;
+  return 1990;
+}
+
 export default function EconomyPage() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
+  const [timeRange, setTimeRange] = useState<TimeRange>("all");
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+
   const allLatest = useQuery(api.economy.getAllLatest);
   const isLoading = allLatest === undefined;
+
+  const fromYear = getFromYear(timeRange);
 
   function getRecord(key: string): IndicatorRecord | null {
     if (!allLatest) return null;
     return (allLatest as Record<string, IndicatorRecord | null>)[key] ?? null;
   }
+
+  function toggleCard(key: string) {
+    setExpandedCard((prev) => (prev === key ? null : key));
+  }
+
+  const TIME_RANGE_OPTIONS: Array<{ value: TimeRange; labelEn: string; labelAr: string }> = [
+    { value: "5y", labelEn: "5Y", labelAr: "5 سنوات" },
+    { value: "10y", labelEn: "10Y", labelAr: "10 سنوات" },
+    { value: "all", labelEn: "All", labelAr: "الكل" },
+  ];
 
   return (
     <div className="page-content" dir={dir}>
@@ -1469,12 +1783,32 @@ export default function EconomyPage() {
           accentColor={COLORS.green}
         />
 
+        {/* Time range selector */}
+        <div className={`flex items-center gap-2 mb-4 ${isAr ? "justify-end" : "justify-start"}`}>
+          <span className="text-[0.6rem] uppercase tracking-wider text-muted-foreground/60 me-1">
+            {isAr ? "الفترة الزمنية:" : "Time range:"}
+          </span>
+          {TIME_RANGE_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => setTimeRange(opt.value)}
+              className={`px-3 py-1 rounded-full text-[0.65rem] font-semibold font-mono transition-all duration-150 border ${
+                timeRange === opt.value
+                  ? "border-[#C9A84C] text-[#C9A84C] bg-[#C9A84C]/10"
+                  : "border-border/40 text-muted-foreground hover:border-border/70 hover:text-foreground bg-transparent"
+              }`}
+            >
+              {isAr ? opt.labelAr : opt.labelEn}
+            </button>
+          ))}
+        </div>
+
         <div className="space-y-2">
           <Card className="border-border/50 bg-card/40 backdrop-blur-sm overflow-hidden">
             <CardContent className="p-5 pb-6">
-              <GdpGrowthChart isAr={isAr} />
-              <InflationExchangeChart isAr={isAr} />
-              <MoneyFlowsChart isAr={isAr} />
+              <GdpGrowthChart isAr={isAr} fromYear={fromYear} />
+              <InflationExchangeChart isAr={isAr} fromYear={fromYear} />
+              <MoneyFlowsChart isAr={isAr} fromYear={fromYear} />
             </CardContent>
           </Card>
         </div>
@@ -1486,6 +1820,9 @@ export default function EconomyPage() {
           isAr={isAr}
           accentColor={COLORS.purple}
         />
+        <p className="text-[0.65rem] text-muted-foreground/50 mb-3 -mt-2">
+          {isAr ? "انقر على أي بطاقة لعرض الرسم البياني الكامل" : "Click any card to expand its full chart"}
+        </p>
         <Skeleton name="economy-money-flows" loading={isLoading}>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-2">
             {MONEY_FLOWS.map((meta) => (
@@ -1495,6 +1832,8 @@ export default function EconomyPage() {
                 record={getRecord(meta.key)}
                 isAr={isAr}
                 accentColor={MONEY_FLOW_COLORS[meta.key] ?? COLORS.gold}
+                expanded={expandedCard === meta.key}
+                onToggle={() => toggleCard(meta.key)}
               />
             ))}
           </div>
@@ -1511,6 +1850,26 @@ export default function EconomyPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
             {MARKETS.map((meta) => (
               <MarketCard
+                key={meta.key}
+                meta={meta}
+                record={getRecord(meta.key)}
+                isAr={isAr}
+              />
+            ))}
+          </div>
+        </Skeleton>
+
+        {/* ── Key Rates ────────────────────────────────────────────────────── */}
+        <SectionLabel
+          en="Key Interest Rates"
+          ar="أسعار الفائدة الرئيسية"
+          isAr={isAr}
+          accentColor={COLORS.purple}
+        />
+        <Skeleton name="economy-key-rates" loading={isLoading}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+            {KEY_RATES.map((meta) => (
+              <KeyRateCard
                 key={meta.key}
                 meta={meta}
                 record={getRecord(meta.key)}
@@ -1556,6 +1915,8 @@ export default function EconomyPage() {
                 record={getRecord(meta.key)}
                 isAr={isAr}
                 accentColor={COLORS.red}
+                expanded={expandedCard === meta.key}
+                onToggle={() => toggleCard(meta.key)}
               />
             ))}
             <Link href="/debt" className="no-underline">

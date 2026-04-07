@@ -33,8 +33,9 @@ interface Asset {
   nameEn: string;
   nameAr: string;
   convexKey: string;
-  defaultReturn: number;
+  defaultReturn: number; // Price appreciation only
   volatility: number;
+  yieldPct?: number; // Income yield (rent, dividends) — added to total return
 }
 
 interface AssetGroup {
@@ -76,7 +77,7 @@ const ASSET_GROUPS: AssetGroup[] = [
     nameAr: "الأسهم المصرية",
     color: "#C9A84C",
     assets: [
-      { key: "egx30", nameEn: "EGX 30 Index", nameAr: "مؤشر البورصة EGX 30", convexKey: "egx30_annual_return", defaultReturn: 18.5, volatility: 25 },
+      { key: "egx30", nameEn: "EGX 30 Index", nameAr: "مؤشر البورصة EGX 30", convexKey: "egx30_annual_return", defaultReturn: 18.5, volatility: 25, yieldPct: 2.5 },
     ],
   },
   {
@@ -111,7 +112,7 @@ const ASSET_GROUPS: AssetGroup[] = [
     nameAr: "العقارات",
     color: "#2EC4B6",
     assets: [
-      { key: "realEstate", nameEn: "Egyptian Real Estate", nameAr: "العقارات المصرية", convexKey: "egypt_real_estate_return", defaultReturn: 15, volatility: 12 },
+      { key: "realEstate", nameEn: "Egyptian Real Estate", nameAr: "العقارات المصرية", convexKey: "egypt_real_estate_return", defaultReturn: 15, volatility: 12, yieldPct: 4 },
     ],
   },
   {
@@ -129,7 +130,7 @@ const ASSET_GROUPS: AssetGroup[] = [
     nameAr: "أسواق دولية",
     color: "#8B5CF6",
     assets: [
-      { key: "sp500", nameEn: "S&P 500 (USD)", nameAr: "S&P 500", convexKey: "sp500_annual_return", defaultReturn: 10, volatility: 15 },
+      { key: "sp500", nameEn: "S&P 500 (USD)", nameAr: "S&P 500", convexKey: "sp500_annual_return", defaultReturn: 10, volatility: 15, yieldPct: 1.5 },
       { key: "msciEm", nameEn: "MSCI Emerging Markets", nameAr: "الأسواق الناشئة", convexKey: "msci_em_return", defaultReturn: 7.5, volatility: 20 },
     ],
   },
@@ -433,13 +434,16 @@ export default function InvestPage() {
   const capital = CAPITAL_STEPS[capitalIdx] ?? 1_000_000;
 
   // Build effective returns: prefer Convex, fallback to ALL_ASSETS defaults
+  // Build effective returns: price appreciation (from Convex or default) + yield (dividends/rent)
   const effectiveReturns = useMemo<Record<string, number>>(() => {
     const r: Record<string, number> = {};
     for (const asset of ALL_ASSETS) {
       const convexRecord = asset.convexKey ? convexDefaults?.[asset.convexKey] : undefined;
       // Guard: values >100 are prices not rates (e.g., gold_price_egp = 4850)
       const convexValue = convexRecord?.value;
-      r[asset.key] = (convexValue !== undefined && convexValue <= 100) ? convexValue : asset.defaultReturn;
+      const priceReturn = (convexValue !== undefined && convexValue <= 100) ? convexValue : asset.defaultReturn;
+      // Total return = price appreciation + income yield (dividends, rent)
+      r[asset.key] = priceReturn + (asset.yieldPct ?? 0);
     }
     return r;
   }, [convexDefaults]);
