@@ -181,9 +181,11 @@ function calcWeightedVolatility(allocation: AllocationMap): number {
 
 function InputTooltip({ text }: { text: string }) {
   return (
-    <div className="group relative inline-flex">
+    <div className="group/tip relative inline-flex">
       <Info size={12} className="text-muted-foreground/40 cursor-help" />
-      <div className="absolute bottom-full start-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-lg bg-popover border border-border shadow-lg text-[0.65rem] text-muted-foreground leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
+      {/* Bridge element so tooltip stays visible when hovering to it */}
+      <div className="absolute bottom-full start-1/2 -translate-x-1/2 h-3 w-56 opacity-0 group-hover/tip:opacity-100 pointer-events-none group-hover/tip:pointer-events-auto" />
+      <div className="absolute bottom-full start-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-lg bg-popover border border-border shadow-xl text-[0.65rem] text-muted-foreground leading-relaxed opacity-0 pointer-events-none group-hover/tip:opacity-100 group-hover/tip:pointer-events-auto transition-opacity z-[200]">
         {text}
       </div>
     </div>
@@ -264,7 +266,7 @@ function RaceTooltip({ active, payload, label, isAr }: RaceTipProps) {
 export default function InvestPage() {
   const { lang, dir } = useLanguage();
   const isAr = lang === "ar";
-  const { symbol, fromEGP, fmt } = useCurrency();
+  const { symbol, currency } = useCurrency();
 
   // Convex data
   const convexDefaults = useQuery(api.tools.getInvestmentDefaults);
@@ -399,9 +401,9 @@ export default function InvestPage() {
                     {fmtNumber(capital)}
                     <span className="text-sm text-muted-foreground ms-1">{symbol}</span>
                   </p>
-                  {fromEGP(capital) !== capital && (
+                  {currency === "USD" && exchangeRate > 0 && (
                     <p className="text-xs text-muted-foreground font-mono" dir="ltr">
-                      ≈ {fmt(fromEGP(capital), { compact: true })}
+                      = {fmtCompact(capital / exchangeRate)} USD
                     </p>
                   )}
                 </div>

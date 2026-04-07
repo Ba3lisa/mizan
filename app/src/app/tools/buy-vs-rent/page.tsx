@@ -233,9 +233,10 @@ function SliderRow({
           {label}
         </label>
         {tooltip && (
-          <div className="group relative">
+          <div className="group/tip relative">
             <Info size={12} className="text-muted-foreground/40 cursor-help" />
-            <div className="absolute bottom-full start-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-lg bg-popover border border-border shadow-lg text-[0.65rem] text-muted-foreground leading-relaxed opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50">
+            <div className="absolute bottom-full start-1/2 -translate-x-1/2 h-3 w-56 opacity-0 group-hover/tip:opacity-100 pointer-events-none group-hover/tip:pointer-events-auto" />
+            <div className="absolute bottom-full start-1/2 -translate-x-1/2 mb-2 w-56 p-2.5 rounded-lg bg-popover border border-border shadow-xl text-[0.65rem] text-muted-foreground leading-relaxed opacity-0 pointer-events-none group-hover/tip:opacity-100 group-hover/tip:pointer-events-auto transition-opacity z-[200]">
               {tooltip}
             </div>
           </div>
