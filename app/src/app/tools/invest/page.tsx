@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { SanadBadge } from "@/components/sanad-badge";
 import { DataSourceFooter } from "@/components/data-source";
 import { motion } from "framer-motion";
+import { DesktopNotice } from "@/components/desktop-notice";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -394,6 +395,8 @@ export default function InvestPage() {
   return (
     <div className="page-content" dir={dir}>
       <div className="container-page">
+
+        <DesktopNotice />
 
         {/* Header */}
         <div className="mb-10">

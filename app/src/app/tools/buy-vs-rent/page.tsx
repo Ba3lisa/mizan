@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { DataSourceFooter } from "@/components/data-source";
 import { SanadBadge } from "@/components/sanad-badge";
+import { DesktopNotice } from "@/components/desktop-notice";
 import {
   Scale,
   Home,
@@ -520,6 +521,8 @@ export default function BuyVsRentPage() {
   return (
     <div className="page-content" dir={dir}>
       <div className="container-page">
+        <DesktopNotice />
+
         {/* ─── Header ─────────────────────────────────────────────────────── */}
         <div className="mb-10">
           <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">

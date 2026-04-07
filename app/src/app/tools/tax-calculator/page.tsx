@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
+import { DesktopNotice } from "@/components/desktop-notice";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -160,6 +161,8 @@ export default function TaxCalculatorPage() {
   return (
     <div className="page-content" dir={dir}>
       <div className="container-page">
+        <DesktopNotice />
+
         {/* Header */}
         <div className="mb-10">
           <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">
