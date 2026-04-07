@@ -10,7 +10,7 @@
 import { internalAction, ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
-import { callClaude } from "./providers/anthropic";
+import { callLLM as callClaude } from "./providers/registry";
 
 const WIKI_URL =
   "https://en.wikipedia.org/wiki/2025_Egyptian_parliamentary_election";

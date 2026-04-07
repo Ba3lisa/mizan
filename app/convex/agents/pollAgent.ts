@@ -6,7 +6,7 @@
 
 import { internalAction, ActionCtx } from "../_generated/server";
 import { internal, api } from "../_generated/api";
-import { callClaudeStructured } from "./providers/anthropic";
+import { callLLMStructured as callClaudeStructured } from "./providers/registry";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 

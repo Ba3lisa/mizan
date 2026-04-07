@@ -14,7 +14,7 @@ import {
   parseWorldBankResponse,
   validateDebtRecord,
 } from "./validators";
-import { callClaude, callClaudeStructured } from "./providers/anthropic";
+import { callLLM as callClaude, callLLMStructured as callClaudeStructured } from "./providers/registry";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 

@@ -1,38 +1,40 @@
 "use node";
-// Shared Anthropic Claude API caller for the Mizan agentic layer.
-// Extracted from dataAgent.ts to be reusable across agents and council votes.
+// Anthropic Claude provider for the Mizan agentic layer.
+// Uses raw fetch (no SDK) for minimal dependencies.
 
 import { extractClaudeText } from "../validators";
+import type { LLMProvider, ToolSchema, CouncilEvaluationContext, CouncilVoteResult } from "./types";
+import { COUNCIL_SYSTEM_PROMPT, buildCouncilPrompt, parseCouncilVote } from "./councilPrompt";
 
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
+const API_URL = "https://api.anthropic.com/v1/messages";
 
-/**
- * Calls the Claude API using raw fetch (no SDK dependency).
- * Returns the assistant's text response, or null if the API key is absent
- * or the request fails.
- */
+function getApiKey(): string | null {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key) {
+    console.warn("[anthropic] ANTHROPIC_API_KEY not set — skipping.");
+    return null;
+  }
+  return key;
+}
+
+// ─── TEXT COMPLETION ─────────────────────────────────────────────────────────
+
 export async function callClaude(
   prompt: string,
   systemPrompt?: string
 ): Promise<string | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.warn(
-      "[anthropic] ANTHROPIC_API_KEY is not set — skipping Claude call."
-    );
-    return null;
-  }
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
 
   const body: Record<string, unknown> = {
     model: CLAUDE_MODEL,
     max_tokens: 4096,
     messages: [{ role: "user", content: prompt }],
   };
-  if (systemPrompt) {
-    body.system = systemPrompt;
-  }
+  if (systemPrompt) body.system = systemPrompt;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch(API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -44,9 +46,7 @@ export async function callClaude(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `Claude API request failed (${response.status}): ${errorText}`
-    );
+    throw new Error(`Claude API failed (${response.status}): ${errorText}`);
   }
 
   const json: unknown = await response.json();
@@ -55,29 +55,13 @@ export async function callClaude(
 
 // ─── STRUCTURED OUTPUT (tool_use) ────────────────────────────────────────────
 
-interface ToolSchema {
-  name: string;
-  description: string;
-  input_schema: Record<string, unknown>;
-}
-
-/**
- * Calls Claude with a tool definition to force structured JSON output.
- * Uses Claude's tool_use feature: the model MUST call the tool, and the
- * tool's input_schema acts as an output validator.
- *
- * Returns the parsed tool input (guaranteed to match the schema), or null.
- */
 export async function callClaudeStructured<T>(
   prompt: string,
   schema: ToolSchema,
   systemPrompt?: string,
 ): Promise<T | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.warn("[anthropic] ANTHROPIC_API_KEY not set — skipping structured call.");
-    return null;
-  }
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
 
   const body: Record<string, unknown> = {
     model: CLAUDE_MODEL,
@@ -86,11 +70,9 @@ export async function callClaudeStructured<T>(
     tools: [schema],
     tool_choice: { type: "tool", name: schema.name },
   };
-  if (systemPrompt) {
-    body.system = systemPrompt;
-  }
+  if (systemPrompt) body.system = systemPrompt;
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+  const response = await fetch(API_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -109,103 +91,29 @@ export async function callClaudeStructured<T>(
   const json = await response.json() as {
     content?: Array<{ type: string; input?: unknown }>;
   };
-
-  // Extract the tool_use block
   const toolUse = json.content?.find((block) => block.type === "tool_use");
   if (!toolUse?.input) {
     console.warn("[anthropic] No tool_use block in structured response.");
     return null;
   }
-
   return toolUse.input as T;
 }
 
 // ─── COUNCIL EVALUATION ─────────────────────────────────────────────────────
 
-export interface CouncilEvaluationContext {
-  category: string;
-  tableName: string;
-  fieldName?: string;
-  currentValue?: string;
-  proposedValue?: string;
-  sourceUrl?: string;
-  sourceContent?: string;
-  issueBody?: string;
-}
-
-export interface CouncilVoteResult {
-  vote: "approve" | "reject" | "abstain";
-  confidence: "high" | "medium" | "low";
-  reasoning: string;
-  sourceVerified: boolean;
-}
-
-/**
- * Asks Claude to evaluate a proposed data change and return a structured vote.
- * Used by the LLM council system.
- */
 export async function evaluateDataChange(
   context: CouncilEvaluationContext
 ): Promise<CouncilVoteResult | null> {
-  const systemPrompt = `You are a data verification council member for Mizan, Egypt's government transparency platform.
-Your job is to evaluate proposed data changes and vote on whether they should be accepted.
-
-You MUST respond with valid JSON only — no markdown, no prose.
-
-Voting guidelines:
-- "approve" if the data appears correct and the source is credible
-- "reject" if the data appears incorrect, the source is unreliable, or the change is suspicious
-- "abstain" if you cannot determine correctness (e.g., source is inaccessible)
-
-Confidence levels:
-- "high" for .gov.eg sources or well-known international organizations with direct data
-- "medium" for reputable sources with indirect data
-- "low" for unverifiable or questionable sources
-
-Keep reasoning under 500 characters.`;
-
-  const prompt = `Evaluate this proposed data change for the Egyptian government transparency platform:
-
-Category: ${context.category}
-Table: ${context.tableName}
-${context.fieldName ? `Field: ${context.fieldName}` : ""}
-${context.currentValue ? `Current value: ${context.currentValue}` : ""}
-${context.proposedValue ? `Proposed value: ${context.proposedValue}` : ""}
-${context.sourceUrl ? `Source URL: ${context.sourceUrl}` : "No source URL provided"}
-${context.sourceContent ? `Source page content (truncated):\n${context.sourceContent.slice(0, 4000)}` : ""}
-${context.issueBody ? `Original issue:\n${context.issueBody}` : ""}
-
-Respond with JSON: {"vote": "approve|reject|abstain", "confidence": "high|medium|low", "reasoning": "<max 500 chars>", "sourceVerified": true|false}`;
-
-  const response = await callClaude(prompt, systemPrompt);
+  const response = await callClaude(buildCouncilPrompt(context), COUNCIL_SYSTEM_PROMPT);
   if (!response) return null;
-
-  try {
-    const parsed = JSON.parse(response) as Record<string, unknown>;
-    const vote =
-      parsed.vote === "approve" ||
-      parsed.vote === "reject" ||
-      parsed.vote === "abstain"
-        ? parsed.vote
-        : "abstain";
-    const confidence =
-      parsed.confidence === "high" ||
-      parsed.confidence === "medium" ||
-      parsed.confidence === "low"
-        ? parsed.confidence
-        : "low";
-    const reasoning =
-      typeof parsed.reasoning === "string"
-        ? parsed.reasoning.slice(0, 500)
-        : "No reasoning provided";
-    const sourceVerified =
-      typeof parsed.sourceVerified === "boolean"
-        ? parsed.sourceVerified
-        : false;
-
-    return { vote, confidence, reasoning, sourceVerified };
-  } catch {
-    console.error("[anthropic] Failed to parse council vote response");
-    return null;
-  }
+  return parseCouncilVote(response);
 }
+
+// ─── PROVIDER INTERFACE ─────────────────────────────────────────────────────
+
+export const anthropicProvider: LLMProvider = {
+  name: "anthropic",
+  callLLM: callClaude,
+  callLLMStructured: callClaudeStructured,
+  evaluateDataChange,
+};

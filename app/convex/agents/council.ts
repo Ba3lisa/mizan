@@ -6,10 +6,7 @@
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
-import {
-  evaluateDataChange,
-  type CouncilEvaluationContext,
-} from "./providers/anthropic";
+import type { CouncilEvaluationContext } from "./providers/types";
 import { getActiveProviders } from "./providers/registry";
 
 // ─── SOURCE CLASSIFICATION ──────────────────────────────────────────────────
@@ -41,7 +38,6 @@ async function fetchSourceContent(url: string): Promise<string | null> {
     });
     if (!res.ok) return null;
     const text = await res.text();
-    // Truncate to keep prompt size manageable
     return text.slice(0, 8000);
   } catch {
     return null;
@@ -83,43 +79,37 @@ export const runCouncilReview = internalAction({
       issueBody: args.issueBody,
     };
 
-    // Run each provider sequentially (currently only Anthropic)
+    // Run each available provider — every configured model gets a vote
     const providers = getActiveProviders();
+    console.log(`[council] ${providers.length} provider(s) active: ${providers.map((p) => p.name).join(", ")}`);
 
-    for (const provider of providers) {
-      console.log(
-        `[council] Requesting vote from ${provider.name} (${provider.model})`
-      );
+    for (const entry of providers) {
+      console.log(`[council] Requesting vote from ${entry.name} (${entry.model})`);
 
-      // Currently all providers use the Anthropic evaluator.
-      // When adding new providers, dispatch based on provider.name here.
-      const result = await evaluateDataChange(evalContext);
+      const result = await entry.provider.evaluateDataChange(evalContext);
 
       if (result) {
         await ctx.runMutation(internal.council.submitVote, {
           sessionId: args.sessionId,
-          model: provider.model,
-          provider: provider.name,
+          model: entry.model,
+          provider: entry.name,
           vote: result.vote,
           confidence: result.confidence,
           reasoning: result.reasoning,
           sourceVerified: result.sourceVerified,
         });
-        console.log(
-          `[council] ${provider.name} voted: ${result.vote} (${result.confidence})`
-        );
+        console.log(`[council] ${entry.name} voted: ${result.vote} (${result.confidence})`);
       } else {
-        // If provider fails, record an abstain
         await ctx.runMutation(internal.council.submitVote, {
           sessionId: args.sessionId,
-          model: provider.model,
-          provider: provider.name,
+          model: entry.model,
+          provider: entry.name,
           vote: "abstain" as const,
           confidence: "low" as const,
           reasoning: "Provider failed to return a vote",
           sourceVerified: false,
         });
-        console.warn(`[council] ${provider.name} failed to vote, recorded abstain`);
+        console.warn(`[council] ${entry.name} failed to vote, recorded abstain`);
       }
     }
 
