@@ -13,3 +13,4 @@ __pycache__/
 *.tfstate.backup
 *.tfvars
 .DS_Store
+backups/
