@@ -23,8 +23,13 @@ def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess[str]:
 
 
 def _get_latest_tag() -> str | None:
-    result = _run(["git", "describe", "--tags", "--abbrev=0"])
-    return result.stdout.strip() if result.returncode == 0 else None
+    """Get the latest semver tag across ALL branches, not just reachable from HEAD."""
+    # Fetch remote tags first to avoid stale local state
+    _run(["git", "fetch", "--tags", "--quiet"])
+    result = _run(["git", "tag", "--sort=-v:refname", "--list", "v*"])
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    return result.stdout.strip().split("\n")[0]
 
 
 def _get_commits_since(tag: str | None) -> list[str]:
