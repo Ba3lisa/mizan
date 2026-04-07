@@ -455,18 +455,30 @@ export default function InvestPage() {
     return projectPortfolio(capital, horizon, allocation, effectiveReturns, inflation, exchangeRate, depreciationPct);
   }, [capital, horizon, allocation, effectiveReturns, inflation, exchangeRate, depreciationPct]);
 
-  // Asset race data (100% each asset)
+  // Asset race data — one representative per group (not all 14)
+  const RACE_ASSETS = useMemo(() => {
+    // Pick the first asset from each group as representative
+    return ASSET_GROUPS.map((g) => ({
+      key: g.assets[0].key,
+      nameEn: g.nameEn,
+      nameAr: g.nameAr,
+      color: g.color,
+      convexKey: g.assets[0].convexKey,
+      defaultReturn: g.assets[0].defaultReturn,
+    }));
+  }, []);
+
   const raceData = useMemo(() => {
     const years = Array.from({ length: horizon + 1 }, (_, i) => i);
     return years.map((year) => {
       const point: Record<string, number> = { year };
-      for (const asset of ALL_ASSETS) {
-        const rate = effectiveReturns[asset.key] ?? 0;
+      for (const asset of RACE_ASSETS) {
+        const rate = effectiveReturns[asset.key] ?? asset.defaultReturn;
         point[asset.key] = capital * Math.pow(1 + rate / 100, year);
       }
       return point;
     });
-  }, [capital, horizon, effectiveReturns]);
+  }, [capital, horizon, effectiveReturns, RACE_ASSETS]);
 
   // Totals
   const totalAllocation = Object.values(allocation).reduce((s, v) => s + v, 0);
@@ -1101,13 +1113,13 @@ export default function InvestPage() {
                         wrapperStyle={{ fontSize: 10, color: "#888" }}
                         formatter={(value: string) => <span style={{ color: "#888", fontSize: 10 }}>{value}</span>}
                       />
-                      {ALL_ASSETS.map((asset) => (
+                      {RACE_ASSETS.map((asset) => (
                         <Line
                           key={asset.key}
                           type="monotone"
                           dataKey={asset.key}
                           name={isAr ? asset.nameAr : asset.nameEn}
-                          stroke={asset.groupColor}
+                          stroke={asset.color}
                           strokeWidth={2}
                           dot={false}
                           animationDuration={1500}
