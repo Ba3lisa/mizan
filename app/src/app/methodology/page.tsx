@@ -188,83 +188,30 @@ export default function MethodologyPage() {
               : "Every data point on Mizan carries a Sanad level indicating its source and confidence. When sources disagree, we show all values."}
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 mb-6">
+          <div className="space-y-1.5 mb-6">
             {[
-              {
-                level: 1,
-                labelAr: "حكومي رسمي",
-                labelEn: "Official Government",
-                descAr: "مباشر من مصادر حكومية رسمية (.gov.eg) — الجهاز المركزي للإحصاء، الوزارات",
-                descEn: "Direct from gov.eg sources — CAPMAS, ministries",
-                color: "border-emerald-500/30 bg-emerald-500/5",
-                dot: "bg-emerald-500",
-                textColor: "text-emerald-600 dark:text-emerald-400",
-              },
-              {
-                level: 2,
-                labelAr: "منظمة دولية",
-                labelEn: "International Org",
-                descAr: "البنك الدولي، صندوق النقد الدولي، برنامج الأمم المتحدة الإنمائي",
-                descEn: "World Bank, IMF, UNDP",
-                color: "border-blue-500/30 bg-blue-500/5",
-                dot: "bg-blue-500",
-                textColor: "text-blue-600 dark:text-blue-400",
-              },
-              {
-                level: 3,
-                labelAr: "إعلام",
-                labelEn: "News & Media",
-                descAr: "الأهرام، الهيئة العامة للاستعلامات، إيجيبت توداي",
-                descEn: "Ahram Online, SIS, EgyptToday",
-                color: "border-amber-500/30 bg-amber-500/5",
-                dot: "bg-amber-500",
-                textColor: "text-amber-600 dark:text-amber-400",
-              },
-              {
-                level: 4,
-                labelAr: "مصادر أخرى",
-                labelEn: "Other Sources",
-                descAr: "ويكيبيديا، بيانات مجتمعية",
-                descEn: "Wikipedia, community-submitted",
-                color: "border-border bg-muted/30",
-                dot: "bg-muted-foreground",
-                textColor: "text-muted-foreground",
-              },
-              {
-                level: 5,
-                labelAr: "محسوب",
-                labelEn: "Derived/Calculated",
-                descAr: "محسوب أو مشتق من بيانات أخرى",
-                descEn: "Computed from other data",
-                color: "border-violet-500/30 bg-violet-500/5",
-                dot: "bg-violet-500",
-                textColor: "text-violet-600 dark:text-violet-400",
-              },
-              {
-                level: 0,
-                labelAr: "إجماع",
-                labelEn: "Consensus",
-                descAr: "مصادر متعددة تتفق على نفس القيمة — أعلى مستوى ثقة (مرجّح بوزن السند)",
-                descEn: "Multiple sources agree on the same value — highest confidence (weighted by Sanad level)",
-                color: "border-teal-500/30 bg-teal-500/5",
-                dot: "bg-teal-500",
-                textColor: "text-teal-600 dark:text-teal-400",
-              },
+              { level: "✓", labelAr: "إجماع", labelEn: "Consensus", descAr: "مصادر متعددة تتفق على نفس القيمة — أعلى مستوى ثقة (مرجّح بوزن السند)", descEn: "Multiple sources agree — highest confidence (weighted by Sanad level)", dot: "bg-teal-500", textColor: "text-teal-600 dark:text-teal-400" },
+              { level: "1", labelAr: "حكومي رسمي", labelEn: "Official Government", descAr: "مباشر من مصادر حكومية رسمية (.gov.eg) — الجهاز المركزي للإحصاء، الوزارات", descEn: "Direct from gov.eg sources — CAPMAS, ministries", dot: "bg-emerald-500", textColor: "text-emerald-600 dark:text-emerald-400" },
+              { level: "2", labelAr: "منظمة دولية", labelEn: "International Org", descAr: "البنك الدولي، صندوق النقد الدولي، برنامج الأمم المتحدة الإنمائي", descEn: "World Bank, IMF, UNDP", dot: "bg-blue-500", textColor: "text-blue-600 dark:text-blue-400" },
+              { level: "3", labelAr: "إعلام", labelEn: "News & Media", descAr: "الأهرام، الهيئة العامة للاستعلامات، إيجيبت توداي", descEn: "Ahram Online, SIS, EgyptToday", dot: "bg-amber-500", textColor: "text-amber-600 dark:text-amber-400" },
+              { level: "4", labelAr: "مصادر أخرى", labelEn: "Other Sources", descAr: "ويكيبيديا، بيانات مجتمعية", descEn: "Wikipedia, community-submitted", dot: "bg-muted-foreground", textColor: "text-muted-foreground" },
+              { level: "5", labelAr: "محسوب", labelEn: "Derived/Calculated", descAr: "محسوب أو مشتق من بيانات أخرى", descEn: "Computed from other data", dot: "bg-violet-500", textColor: "text-violet-600 dark:text-violet-400" },
             ].map((lvl) => (
-              <Card key={lvl.level} className={cn("border", lvl.color)}>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[0.6rem] font-mono text-muted-foreground/60">{lvl.level === 0 ? "✓" : lvl.level}</span>
-                    <span className={cn("w-2 h-2 rounded-full", lvl.dot)} />
-                    <span className={cn("text-xs font-bold", lvl.textColor)}>
-                      {isAr ? lvl.labelAr : lvl.labelEn}
-                    </span>
-                  </div>
-                  <p className="text-[0.65rem] text-muted-foreground leading-relaxed">
-                    {isAr ? lvl.descAr : lvl.descEn}
-                  </p>
-                </CardContent>
-              </Card>
+              <div
+                key={lvl.level}
+                className="flex items-center gap-3 rounded-lg border border-border/40 bg-card/40 px-4 py-2.5"
+              >
+                <span className="text-[0.65rem] font-mono text-muted-foreground/60 w-4 text-center shrink-0">
+                  {lvl.level}
+                </span>
+                <span className={cn("w-2 h-2 rounded-full shrink-0", lvl.dot)} />
+                <span className={cn("text-xs font-bold w-32 shrink-0", lvl.textColor)}>
+                  {isAr ? lvl.labelAr : lvl.labelEn}
+                </span>
+                <span className="text-[0.65rem] text-muted-foreground">
+                  {isAr ? lvl.descAr : lvl.descEn}
+                </span>
+              </div>
             ))}
           </div>
 

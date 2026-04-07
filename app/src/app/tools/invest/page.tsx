@@ -597,14 +597,14 @@ export default function InvestPage() {
                         </div>
                         <input
                           dir="ltr"
-                  type="range"
+                          type="range"
                           min={0}
                           max={100}
                           step={5}
                           value={pct}
                           onChange={(e) => handleAllocationChange(asset.key, parseInt(e.target.value))}
-                          className="w-full h-1.5 cursor-pointer rounded-full appearance-none"
-                          style={{ accentColor: asset.color }}
+                          className="w-full h-1.5 cursor-pointer accent-current"
+                          style={{ color: asset.color }}
                         />
                       </div>
                     );

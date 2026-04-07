@@ -198,7 +198,7 @@ export const createPoll = internalMutation({
     }
 
     const now = Date.now();
-    const expiresAt = now + 24 * 60 * 60 * 1000; // 24 hours from now
+    const expiresAt = now + 7 * 24 * 60 * 60 * 1000; // 7 days from now
 
     // Create new poll with zero votes
     const pollId = await ctx.db.insert("polls", {

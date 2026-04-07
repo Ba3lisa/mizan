@@ -147,7 +147,7 @@ export function DailyPoll() {
               <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
             </div>
             <span className="text-xs font-bold text-primary tracking-wide uppercase">
-              {isAr ? "استطلاع اليوم" : "Daily Poll"}
+              {isAr ? "استطلاع الأسبوع" : "Weekly Poll"}
             </span>
             <span className={`text-[0.6rem] px-1.5 py-0.5 rounded-full font-medium ${catConfig.bgColor} ${catConfig.color}`}>
               {isAr ? catConfig.labelAr : catConfig.labelEn}

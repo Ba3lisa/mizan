@@ -135,8 +135,8 @@ export default function PollsPage() {
           </div>
           <p className="text-sm text-muted-foreground max-w-2xl">
             {isAr
-              ? "استطلاع يومي جديد يُنشأ تلقائياً بواسطة الذكاء الاصطناعي بناءً على البيانات الحية. صوّت بشكل مجهول — النتائج تُحدّث لحظياً."
-              : "A new daily poll is AI-generated from live platform data. Vote anonymously — results update in real-time."}
+              ? "استطلاع أسبوعي جديد يُنشأ تلقائياً بواسطة الذكاء الاصطناعي بناءً على البيانات الحية. صوّت بشكل مجهول — النتائج تُحدّث لحظياً."
+              : "A new weekly poll is AI-generated from live platform data. Vote anonymously — results update in real-time."}
           </p>
         </div>
 

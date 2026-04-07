@@ -19,10 +19,10 @@ crons.interval(
   {}
 );
 
-// Generate a new daily poll every 24 hours using AI.
+// Generate a new weekly poll using AI.
 crons.interval(
-  "generate-daily-poll",
-  { hours: 24 },
+  "generate-weekly-poll",
+  { hours: 168 },
   internal.agents.pollAgent.generateDailyPoll,
   {}
 );
