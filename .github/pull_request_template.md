@@ -9,6 +9,7 @@
 - [ ] Agent/automation change
 - [ ] Documentation
 - [ ] Infrastructure
+- [ ] UI change
 
 ## Checklist
 

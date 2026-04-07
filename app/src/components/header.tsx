@@ -3,22 +3,26 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Scale, Moon, Sun, Menu, ChevronDown } from "lucide-react";
+import { Scale, Moon, Sun, Menu } from "lucide-react";
 import { useTheme, useLanguage, useCurrency } from "@/components/providers";
 import { cn } from "@/lib/utils";
+import { NAV_GROUPS } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu";
 
 export function Header() {
   const { theme, toggleTheme } = useTheme();
   const { t, toggleLang, lang, dir } = useLanguage();
+  const isAr = lang === "ar";
   const { currency, toggleCurrency } = useCurrency();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
@@ -29,64 +33,15 @@ export function Header() {
     return () => window.removeEventListener("scroll", h);
   }, []);
 
-  const directNav = [
-    { href: "/", label: t.navHome },
-  ];
-
-  const govNav = [
-    { href: "/government", label: t.navGovernment },
-    { href: "/constitution", label: t.navConstitution },
-    { href: "/governorate", label: t.navGovernorate },
-  ];
-
-  const dataNav = [
-    { href: "/economy", label: t.navEconomy },
-    { href: "/budget", label: t.navBudget },
-    { href: "/debt", label: t.navDebt },
-    { href: "/elections", label: t.navElections },
-  ];
-
-  const toolsNav = [
-    { href: "/tools/tax-calculator", label: t.navTaxCalculator },
-    { href: "/tools/buy-vs-rent", label: t.navBuyVsRent },
-    { href: "/tools/invest", label: t.navInvest },
-  ];
-
-  const aboutNav = [
-    { href: "/methodology", label: t.navMethodology },
-    { href: "/transparency", label: t.navTransparency },
-  ];
-
-  const extraNav = [
-    { href: "/funding", label: t.navFunding },
-  ];
-
+  // --- Grouped Navigation (from shared config) ---
+  const navGroups = NAV_GROUPS.map((g) => ({
+    label: isAr ? g.ar : g.en,
+    items: g.items.map((item) => ({
+      href: item.href,
+      label: isAr ? item.ar : item.en,
+    })),
+  }));
   const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
-
-  const renderDropdown = (label: string, items: { href: string; label: string }[]) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className={cn(
-          "text-[0.8125rem] font-medium transition-colors whitespace-nowrap relative py-1 flex items-center gap-1 cursor-pointer",
-          items.some(n => isActive(n.href)) ? "text-primary" : "text-muted-foreground hover:text-foreground"
-        )}>
-          {label} <ChevronDown size={12} />
-          {items.some(n => isActive(n.href)) && (
-            <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-48">
-        {items.map((n) => (
-          <DropdownMenuItem key={n.href} asChild>
-            <Link href={n.href} className={cn("no-underline w-full", isActive(n.href) && "text-primary")}>
-              {n.label}
-            </Link>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
 
   return (
     <header className={cn(
@@ -95,7 +50,7 @@ export function Header() {
         ? "bg-background/80 backdrop-blur-xl border-border shadow-lg shadow-background/20"
         : "bg-background border-transparent"
     )}>
-      <div className="container-page h-full flex items-center gap-6 lg:gap-10">
+      <div className="container-page h-full flex items-center gap-6 lg:gap-8">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2.5 flex-shrink-0 no-underline group">
           <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center transition-transform group-hover:scale-105">
@@ -104,44 +59,61 @@ export function Header() {
           <span className="font-black text-lg tracking-tight">{lang === "ar" ? "ميزان" : "Mizan"}</span>
         </Link>
 
-        {/* Desktop Nav */}
-        <nav className="hidden lg:flex items-center gap-6 flex-1" dir={dir}>
-          {/* Direct links: Home */}
-          {directNav.map((n) => (
-            <Link key={n.href} href={n.href}
-              className={cn(
-                "text-[0.8125rem] font-medium no-underline transition-colors whitespace-nowrap relative py-1",
-                isActive(n.href) ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}>
-              {n.label}
-              {isActive(n.href) && <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />}
-            </Link>
-          ))}
+        {/* Desktop Nav — NavigationMenu for smooth hover-intent UX */}
+        <NavigationMenu className="hidden lg:flex flex-1" dir={dir} viewport={false}>
+          <NavigationMenuList className="gap-1">
+            {/* Home — standalone link */}
+            <NavigationMenuItem>
+              <NavigationMenuLink asChild active={pathname === "/"}>
+                <Link
+                  href="/"
+                  className={cn(
+                    "inline-flex h-9 items-center justify-center rounded-md px-3 py-2 text-[0.8125rem] font-medium transition-colors outline-none",
+                    "hover:bg-accent hover:text-accent-foreground",
+                    "focus:bg-accent focus:text-accent-foreground",
+                    pathname === "/" && "text-primary"
+                  )}
+                >
+                  {t.navHome}
+                </Link>
+              </NavigationMenuLink>
+            </NavigationMenuItem>
 
-          {/* Government dropdown */}
-          {renderDropdown(t.navGovernment, govNav)}
-
-          {/* Data dropdown */}
-          {renderDropdown(t.navData, dataNav)}
-
-          {/* Tools dropdown */}
-          {renderDropdown(t.navTools, toolsNav)}
-
-          {/* About dropdown */}
-          {renderDropdown(t.navAbout, aboutNav)}
-
-          {/* Funding (standalone) */}
-          {extraNav.map((n) => (
-            <Link key={n.href} href={n.href}
-              className={cn(
-                "text-[0.8125rem] font-medium no-underline transition-colors whitespace-nowrap relative py-1",
-                isActive(n.href) ? "text-primary" : "text-muted-foreground hover:text-foreground"
-              )}>
-              {n.label}
-              {isActive(n.href) && <span className="absolute -bottom-[1.125rem] inset-x-0 h-[2px] bg-primary rounded-full" />}
-            </Link>
-          ))}
-        </nav>
+            {/* Dropdown groups */}
+            {navGroups.map((group) => (
+              <NavigationMenuItem key={group.label}>
+                <NavigationMenuTrigger
+                  className={cn(
+                    "text-[0.8125rem] font-medium bg-transparent hover:bg-accent",
+                    group.items.some(n => isActive(n.href)) && "text-primary"
+                  )}
+                >
+                  {group.label}
+                </NavigationMenuTrigger>
+                <NavigationMenuContent className="min-w-[180px]">
+                  <ul className="flex flex-col gap-0.5 p-1.5">
+                    {group.items.map((n) => (
+                      <li key={n.href}>
+                        <NavigationMenuLink asChild active={isActive(n.href)}>
+                          <Link
+                            href={n.href}
+                            className={cn(
+                              "block select-none rounded-md px-3 py-2 text-sm font-medium no-underline transition-colors",
+                              "hover:bg-accent hover:text-accent-foreground",
+                              isActive(n.href) && "text-primary bg-accent/50"
+                            )}
+                          >
+                            {n.label}
+                          </Link>
+                        </NavigationMenuLink>
+                      </li>
+                    ))}
+                  </ul>
+                </NavigationMenuContent>
+              </NavigationMenuItem>
+            ))}
+          </NavigationMenuList>
+        </NavigationMenu>
 
         {/* Controls */}
         <div className="flex items-center gap-1.5 ms-auto">
@@ -168,50 +140,22 @@ export function Header() {
               <Separator className="my-3" />
               <nav className="flex flex-col gap-0.5 overflow-y-auto max-h-[calc(100vh-8rem)] pb-6" dir={dir}>
                 {/* Home */}
-                {directNav.map((n) => (
-                  <SheetClose asChild key={n.href}>
-                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
-                  </SheetClose>
-                ))}
+                <SheetClose asChild>
+                  <Link href="/" className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive("/") ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{t.navHome}</Link>
+                </SheetClose>
 
-                {/* Government group */}
-                <p className="px-3 pt-3 pb-1 text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-widest">{t.navGovernment}</p>
-                {govNav.map((n) => (
-                  <SheetClose asChild key={n.href}>
-                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
-                  </SheetClose>
-                ))}
-
-                {/* Data group */}
-                <p className="px-3 pt-3 pb-1 text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-widest">{t.navData}</p>
-                {dataNav.map((n) => (
-                  <SheetClose asChild key={n.href}>
-                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
-                  </SheetClose>
-                ))}
-
-                {/* Tools group */}
-                <p className="px-3 pt-3 pb-1 text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-widest">{t.navTools}</p>
-                {toolsNav.map((n) => (
-                  <SheetClose asChild key={n.href}>
-                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
-                  </SheetClose>
-                ))}
-
-                {/* About group */}
-                <p className="px-3 pt-3 pb-1 text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-widest">{t.navAbout}</p>
-                {aboutNav.map((n) => (
-                  <SheetClose asChild key={n.href}>
-                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
-                  </SheetClose>
-                ))}
-
-                {/* Funding */}
-                <Separator className="my-2" />
-                {extraNav.map((n) => (
-                  <SheetClose asChild key={n.href}>
-                    <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
-                  </SheetClose>
+                {/* Grouped sections */}
+                {navGroups.map((group) => (
+                  <div key={group.label} className="mt-3">
+                    <span className="px-3 text-xs font-semibold text-muted-foreground uppercase tracking-wider">{group.label}</span>
+                    <div className="flex flex-col gap-0.5 mt-1">
+                      {group.items.map((n) => (
+                        <SheetClose asChild key={n.href}>
+                          <Link href={n.href} className={cn("px-3 py-2.5 rounded-lg text-sm font-medium no-underline transition-colors", isActive(n.href) ? "text-primary bg-primary/10" : "text-foreground hover:bg-muted")}>{n.label}</Link>
+                        </SheetClose>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </nav>
             </SheetContent>

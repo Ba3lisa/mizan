@@ -7,7 +7,7 @@ export const getHomeStats = query({
   args: {},
   handler: async (ctx) => {
     // Parliament members count — use bounded take, house ~568, senate ~300
-    const [houseMembers, senateMembers, governorates, articles, latestDebt] =
+    const [houseMembers, senateMembers, governorates, articles] =
       await Promise.all([
         ctx.db
           .query("parliamentMembers")
@@ -27,31 +27,77 @@ export const getHomeStats = query({
         // by reading only what we need for the count (all fields are fetched, but
         // the take bound prevents unbounded growth from triggering re-reads).
         ctx.db.query("constitutionArticles").take(300),
-        // Latest external debt record
-        ctx.db
-          .query("debtRecords")
-          .withIndex("by_date")
-          .order("desc")
-          .first(),
       ]);
 
     const parliamentarians = houseMembers.length + senateMembers.length;
+
+    // Ministry count and recent debt
+    const [ministries, recentDebtRecords, latestFiscalYear] = await Promise.all([
+      ctx.db.query("ministries").collect(),
+      ctx.db.query("debtRecords").withIndex("by_date").order("desc").take(10),
+      ctx.db.query("fiscalYears").withIndex("by_year").order("desc").first()
+    ]);
+
+
+
+    // Find latest non-null value for each field
+    let latestExternal: number | null = null;
+    let latestDomestic: number | null = null;
+    let latestDebtToGdp: number | null = null;
+    let debtSourceUrl = "https://data.worldbank.org";
+    let debtSanadLevel = 2;
+
+    for (const r of recentDebtRecords) {
+      if (latestExternal === null && r.totalExternalDebt != null) {
+        latestExternal = r.totalExternalDebt;
+        debtSourceUrl = r.sourceUrl ?? debtSourceUrl;
+        debtSanadLevel = r.sanadLevel ?? debtSanadLevel;
+      }
+      if (latestDomestic === null && r.totalDomesticDebt != null) {
+        latestDomestic = r.totalDomesticDebt;
+      }
+      if (latestDebtToGdp === null && r.debtToGdpRatio != null) {
+        latestDebtToGdp = r.debtToGdpRatio;
+      }
+      if (latestExternal !== null && latestDomestic !== null && latestDebtToGdp !== null) break;
+    }
+
+    const hasDebt = latestExternal !== null || latestDomestic !== null;
+
+
 
     return {
       parliamentarians: { value: parliamentarians, source: "parliament.gov.eg", sourceUrl: "https://www.parliament.gov.eg", sanadLevel: 1 },
       governorates: { value: governorates.length, source: "capmas.gov.eg", sourceUrl: "https://www.capmas.gov.eg", sanadLevel: 1 },
       constitutionArticles: { value: articles.length, source: "presidency.eg", sourceUrl: "https://www.presidency.eg", sanadLevel: 1 },
-      externalDebt: latestDebt ? {
-        value: latestDebt.totalExternalDebt ?? 0,
+      ministries: { value: ministries.length, source: "cabinet.gov.eg", sourceUrl: "https://www.cabinet.gov.eg", sanadLevel: 1 },
+      externalDebt: hasDebt ? {
+        value: latestExternal ?? 0,
         source: "worldbank.org",
-        sourceUrl: latestDebt.sourceUrl ?? "https://data.worldbank.org",
-        sanadLevel: latestDebt.sanadLevel ?? 2,
+        sourceUrl: debtSourceUrl,
+        sanadLevel: debtSanadLevel,
       } : null,
-      domesticDebt: latestDebt ? {
-        value: latestDebt.totalDomesticDebt ?? 0,
+      domesticDebt: hasDebt ? {
+        value: latestDomestic ?? 0,
+        source: "mof.gov.eg",
+        sourceUrl: debtSourceUrl,
+        sanadLevel: debtSanadLevel,
+      } : null,
+      totalDebt: hasDebt ? {
+        value: (latestExternal ?? 0) + (latestDomestic ?? 0),
+        debtToGdpRatio: latestDebtToGdp,
         source: "worldbank.org",
-        sourceUrl: latestDebt.sourceUrl ?? "https://data.worldbank.org",
-        sanadLevel: latestDebt.sanadLevel ?? 2,
+        sourceUrl: debtSourceUrl,
+        sanadLevel: debtSanadLevel,
+      } : null,
+      budget: latestFiscalYear ? {
+        year: latestFiscalYear.year,
+        totalRevenue: latestFiscalYear.totalRevenue ?? 0,
+        totalExpenditure: latestFiscalYear.totalExpenditure ?? 0,
+        deficit: latestFiscalYear.deficit ?? 0,
+        source: "mof.gov.eg",
+        sourceUrl: latestFiscalYear.sourceUrl ?? "https://mof.gov.eg",
+        sanadLevel: latestFiscalYear.sanadLevel ?? 1,
       } : null,
     };
   },

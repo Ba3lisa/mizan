@@ -34,6 +34,10 @@ const translations = {
     navMore: "المزيد",
     navAdmin: "الإدارة",
     navMethodology: "المنهجية",
+    navStateInstitutions: "مؤسسات الدولة",
+    navEconomyFinance: "الاقتصاد والمالية",
+    navDataTools: "بيانات وأدوات",
+    navAboutMizan: "عن ميزان",
 
     // Theme/Language
     toggleTheme: "تبديل السمة",
@@ -205,6 +209,10 @@ const translations = {
     navMore: "More",
     navAdmin: "Admin",
     navMethodology: "Methodology",
+    navStateInstitutions: "State Institutions",
+    navEconomyFinance: "Economy & Finance",
+    navDataTools: "Data & Tools",
+    navAboutMizan: "About Mizan",
 
     // Theme/Language
     toggleTheme: "Toggle Theme",
