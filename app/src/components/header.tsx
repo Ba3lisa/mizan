@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { Scale, Moon, Sun, Menu } from "lucide-react";
 import { useTheme, useLanguage, useCurrency } from "@/components/providers";
 import { cn } from "@/lib/utils";
+import { NAV_GROUPS } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -21,6 +22,7 @@ import {
 export function Header() {
   const { theme, toggleTheme } = useTheme();
   const { t, toggleLang, lang, dir } = useLanguage();
+  const isAr = lang === "ar";
   const { currency, toggleCurrency } = useCurrency();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
@@ -31,38 +33,14 @@ export function Header() {
     return () => window.removeEventListener("scroll", h);
   }, []);
 
-  // --- Grouped Navigation ---
-  const stateNav = [
-    { href: "/government", label: t.navGovernment },
-    { href: "/constitution", label: t.navConstitution },
-    { href: "/elections", label: t.navElections },
-  ];
-
-  const economyNav = [
-    { href: "/economy", label: t.navEconomy },
-    { href: "/budget", label: t.navBudget },
-    { href: "/debt", label: t.navDebt },
-  ];
-
-  const dataToolsNav = [
-    { href: "/budget/your-share", label: t.navTaxCalculator },
-    { href: "/tools/buy-vs-rent", label: t.navBuyVsRent },
-    { href: "/tools/invest", label: t.navInvest },
-    { href: "/governorate", label: t.navGovernorate },
-  ];
-
-  const aboutNav = [
-    { href: "/transparency", label: t.navTransparency },
-    { href: "/methodology", label: t.navMethodology },
-    { href: "/funding", label: t.navFunding },
-  ];
-
-  const navGroups = [
-    { label: t.navStateInstitutions, items: stateNav },
-    { label: t.navEconomyFinance, items: economyNav },
-    { label: t.navDataTools, items: dataToolsNav },
-    { label: t.navAboutMizan, items: aboutNav },
-  ];
+  // --- Grouped Navigation (from shared config) ---
+  const navGroups = NAV_GROUPS.map((g) => ({
+    label: isAr ? g.ar : g.en,
+    items: g.items.map((item) => ({
+      href: item.href,
+      label: isAr ? item.ar : item.en,
+    })),
+  }));
   const isActive = (href: string) => href === "/" ? pathname === "/" : pathname.startsWith(href);
 
   return (

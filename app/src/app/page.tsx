@@ -5,10 +5,8 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
-  Building2, BookOpen, BarChart3, TrendingDown, Landmark,
   ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
-  LineChart, Heart, MapPin, Calculator, Bot, BookMarked,
-  ArrowRight, ArrowLeft, Users, TrendingUp, Home,
+  ArrowRight, ArrowLeft, Bot, TrendingDown, BarChart3,
 } from "lucide-react";
 import { DailyPoll } from "@/components/daily-poll";
 import { useLanguage, useCurrency } from "@/components/providers";
@@ -47,47 +45,8 @@ function Stat({ value, label, source, sourceUrl, currencyUnit, sanadLevel, symbo
   );
 }
 
-/* ─── Feature card groups ─── */
-const featureGroups = [
-  {
-    titleAr: "مؤسسات الدولة",
-    titleEn: "State Institutions",
-    items: [
-      { icon: Building2, href: "/government", ar: "الحكومة", en: "Government", descAr: "الرئيس · الوزراء · المحافظات", descEn: "President · Ministers · Governorates" },
-      { icon: Users, href: "/parliament", ar: "البرلمان", en: "Parliament", descAr: "٥٩٦ نائب · ٣٠٠ شيوخ · الأحزاب", descEn: "596 House · 300 Senate · Parties" },
-      { icon: BookOpen, href: "/constitution", ar: "الدستور", en: "Constitution", descAr: "٢٤٧ مادة · تعديلات ٢٠١٩", descEn: "247 Articles · 2019 Amendments" },
-      { icon: Landmark, href: "/elections", ar: "الانتخابات", en: "Elections", descAr: "نتائج رئاسية وبرلمانية", descEn: "Presidential & parliamentary results" },
-    ],
-  },
-  {
-    titleAr: "الاقتصاد والمالية",
-    titleEn: "Economy & Finance",
-    items: [
-      { icon: LineChart, href: "/economy", ar: "المؤشرات الاقتصادية", en: "Economy", descAr: "الناتج المحلي · التضخم · سعر الصرف", descEn: "GDP · Inflation · Exchange Rate" },
-      { icon: BarChart3, href: "/budget", ar: "الموازنة العامة", en: "Budget", descAr: "إيرادات · مصروفات · عجز", descEn: "Revenue · Expenditure · Deficit" },
-      { icon: TrendingDown, href: "/debt", ar: "الدين العام", en: "Debt", descAr: "الدين الخارجي والداخلي", descEn: "External & domestic debt" },
-    ],
-  },
-  {
-    titleAr: "بيانات وأدوات",
-    titleEn: "Data & Tools",
-    items: [
-      { icon: Calculator, href: "/tools/tax-calculator", ar: "حاسبة الضريبة", en: "Tax Calculator", descAr: "أين تذهب ضرائبك؟ — تقدير تفاعلي", descEn: "Where do your taxes go? — Interactive breakdown" },
-      { icon: Home, href: "/tools/buy-vs-rent", ar: "شراء أم إيجار؟", en: "Buy vs Rent", descAr: "حاسبة القرار العقاري في مصر", descEn: "Real estate decision calculator for Egypt" },
-      { icon: TrendingUp, href: "/tools/invest", ar: "محاكي الاستثمار", en: "Investment Simulator", descAr: "قارن بين الذهب · الدولار · العقار · البورصة", descEn: "Gold · USD · Real Estate · Stocks — compare returns" },
-      { icon: MapPin, href: "/governorate", ar: "بيانات المحافظات", en: "Governorates", descAr: "المحافظ · النواب · الإحصاءات", descEn: "Governor · MPs · Local stats" },
-    ],
-  },
-  {
-    titleAr: "عن ميزان",
-    titleEn: "About Mizan",
-    items: [
-      { icon: Bot, href: "/transparency", ar: "الشفافية", en: "Transparency", descAr: "سجل تحديث البيانات", descEn: "AI audit log · Data refresh reports" },
-      { icon: BookMarked, href: "/methodology", ar: "المنهجية", en: "Methodology", descAr: "كيف نجمع البيانات", descEn: "How we gather & verify data" },
-      { icon: Heart, href: "/funding", ar: "التمويل", en: "Funding", descAr: "التمويل الشفاف", descEn: "Transparent funding" },
-    ],
-  },
-];
+/* ─── Feature card groups — derived from shared navigation config ─── */
+import { NAV_GROUPS } from "@/lib/navigation";
 
 const sources = [
   { ar: "مجلس النواب — قائمة الأعضاء", en: "Parliament — Members List", url: "https://www.parliament.gov.eg/en/MPs", domain: "parliament.gov.eg" },
@@ -309,10 +268,10 @@ export default function HomePage() {
 
       {/* ════════ GROUPED FEATURES ════════ */}
       <section className="container-page py-16 md:py-24">
-        {featureGroups.map((group, gi) => (
-          <div key={group.titleEn} className={gi > 0 ? "mt-10" : ""}>
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={group.en} className={gi > 0 ? "mt-10" : ""}>
             <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">
-              {isAr ? group.titleAr : group.titleEn}
+              {isAr ? group.ar : group.en}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {group.items.map((f, i) => {

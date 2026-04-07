@@ -3,30 +3,7 @@
 import Link from "next/link";
 import { Scale, ExternalLink, Github } from "lucide-react";
 import { useLanguage } from "@/components/providers";
-
-const stateNav = [
-  { href: "/government", ar: "الحكومة", en: "Government" },
-  { href: "/parliament", ar: "البرلمان", en: "Parliament" },
-  { href: "/constitution", ar: "الدستور", en: "Constitution" },
-  { href: "/elections", ar: "الانتخابات", en: "Elections" },
-];
-
-const economyNav = [
-  { href: "/economy", ar: "المؤشرات الاقتصادية", en: "Economy" },
-  { href: "/budget", ar: "الموازنة العامة", en: "Budget" },
-  { href: "/debt", ar: "الدين العام", en: "Debt" },
-];
-
-const dataToolsNav = [
-  { href: "/budget/your-share", ar: "حاسبة الضريبة", en: "Tax Calculator" },
-  { href: "/governorate", ar: "بيانات المحافظات", en: "Governorates" },
-];
-
-const aboutNav = [
-  { href: "/transparency", ar: "الشفافية", en: "Transparency" },
-  { href: "/methodology", ar: "المنهجية", en: "Methodology" },
-  { href: "/funding", ar: "التمويل", en: "Funding" },
-];
+import { NAV_GROUPS } from "@/lib/navigation";
 
 const srcs = [
   { name: "parliament.gov.eg", url: "https://www.parliament.gov.eg" },
@@ -36,7 +13,7 @@ const srcs = [
   { name: "imf.org", url: "https://www.imf.org/en/Countries/EGY" },
 ];
 
-const NavColumn = ({ title, items, isAr }: { title: string; items: typeof stateNav; isAr: boolean }) => (
+const NavColumn = ({ title, items, isAr }: { title: string; items: Array<{ href: string; ar: string; en: string }>; isAr: boolean }) => (
   <div>
     <h4 className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{title}</h4>
     <nav className="flex flex-col gap-1.5">
@@ -68,11 +45,10 @@ export function Footer() {
           </a>
         </div>
 
-        {/* Nav columns */}
-        <NavColumn title={isAr ? "مؤسسات الدولة" : "State Institutions"} items={stateNav} isAr={isAr} />
-        <NavColumn title={isAr ? "الاقتصاد والمالية" : "Economy & Finance"} items={economyNav} isAr={isAr} />
-        <NavColumn title={isAr ? "بيانات وأدوات" : "Data & Tools"} items={dataToolsNav} isAr={isAr} />
-        <NavColumn title={isAr ? "عن ميزان" : "About Mizan"} items={aboutNav} isAr={isAr} />
+        {/* Nav columns — from shared navigation config */}
+        {NAV_GROUPS.map((group) => (
+          <NavColumn key={group.en} title={isAr ? group.ar : group.en} items={group.items} isAr={isAr} />
+        ))}
 
         {/* Sources */}
         <div>
@@ -87,6 +63,10 @@ export function Footer() {
           {isAr ? "ميزان — منصة شفافية مدنية." : "Mizan — civic transparency."}{" "}
           {isAr ? "بناء" : "Built by"}{" "}
           <a href="https://egouda.xyz/" target="_blank" rel="noopener noreferrer" className="text-primary no-underline hover:underline">Essam Gouda</a>
+          {" & "}
+          <a href="https://www.linkedin.com/in/youssof-elessawy/" target="_blank" rel="noopener noreferrer" className="text-primary no-underline hover:underline">Youssof Elessawy</a>
+          {" & "}
+          <a href="https://claude.ai/code" target="_blank" rel="noopener noreferrer" className="text-primary no-underline hover:underline">Claude Code</a>
         </p>
         <div className="flex items-center gap-3">
           <a
