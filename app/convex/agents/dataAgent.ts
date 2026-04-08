@@ -14,7 +14,51 @@ import {
   parseWorldBankResponse,
   validateDebtRecord,
 } from "./validators";
-import { callLLM as callClaude, callLLMStructured as callClaudeStructured } from "./providers/registry";
+import { callLLMStructured as callClaudeStructured } from "./providers/registry";
+import { callClaudeWithUsage } from "./providers/anthropic";
+
+// ─── COST TRACKING ───────────────────────────────────────────────────────────
+
+// Haiku pricing: $0.80/MTok input, $4/MTok output
+const COST_PER_INPUT_TOKEN = 0.80 / 1_000_000;
+const COST_PER_OUTPUT_TOKEN = 4.0 / 1_000_000;
+
+/**
+ * Call Claude and log usage to apiUsageLog for the funding page.
+ * Drop-in replacement for callClaude that adds cost tracking.
+ */
+async function callClaude(
+  ctx: ActionCtx,
+  prompt: string,
+  systemPrompt?: string,
+  purpose = "data_pipeline"
+): Promise<string | null> {
+  const result = await callClaudeWithUsage(prompt, systemPrompt);
+
+  // Log usage if we got a response
+  if (result.usage) {
+    const { inputTokens, outputTokens, model, durationMs } = result.usage;
+    const costUsd = inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN;
+    try {
+      await ctx.runMutation(internal.usage.logApiUsage, {
+        provider: "anthropic",
+        model,
+        purpose,
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        costUsd,
+        durationMs,
+        success: result.text !== null,
+        timestamp: Date.now(),
+      });
+    } catch (err) {
+      console.warn("[dataAgent] Failed to log API usage:", err);
+    }
+  }
+
+  return result.text;
+}
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 
@@ -150,7 +194,7 @@ Return a JSON object with these fields (use null for missing values):
 Page content:
 ${pageText || "(page content unavailable)"}`;
 
-  const claudeResponse = await callClaude(prompt, systemPrompt);
+  const claudeResponse = await callClaude(ctx, prompt, systemPrompt);
 
   if (!claudeResponse) {
     console.warn("[dataAgent] Claude returned no budget data.");
@@ -272,7 +316,7 @@ ${pageText || "(page content unavailable)"}`;
   }
 
   console.log(`[dataAgent] Government: sending ${pageText.length} chars to Claude for ministers...`);
-  const claudeResponse = await callClaude(prompt, systemPrompt);
+  const claudeResponse = await callClaude(ctx, prompt, systemPrompt);
 
   if (!claudeResponse) {
     console.warn("[dataAgent] Claude returned no government data (null response).");
@@ -332,7 +376,7 @@ ${pageText || "(page content unavailable)"}`;
   // Step 2: Extract governors separately (different source)
   if (governorText.length > 200) {
     console.log(`[dataAgent] Government: extracting governors from ${governorText.length} chars...`);
-    const govResponse = await callClaude(
+    const govResponse = await callClaude(ctx,
       `Extract ALL 27 Egyptian governors from this text.
 Return a JSON array: [{"nameEn": "...", "titleEn": "Governor of [Governorate]", "nameAr": "", "titleAr": "", "role": "governor"}]
 Egypt has 27 governorates. Extract every governor mentioned.
@@ -571,7 +615,7 @@ async function _refreshIMFData(
   }
 
   if (imfText.length > 500) {
-    const imfResponse = await callClaude(
+    const imfResponse = await callClaude(ctx,
       `Extract IMF economic projections for Egypt from this Wikipedia article.
 Return JSON: {"indicators": [{"indicator": "imf_gdp_growth_forecast", "data": {"2024": 2.4, "2025": 4.3, ...}}, ...]}
 
@@ -865,7 +909,7 @@ async function refreshInvestmentRates(ctx: ActionCtx): Promise<number> {
       }
 
       if (apiKey && tableText.length > 100) {
-        const claudeResponse = await callClaude(
+        const claudeResponse = await callClaude(ctx,
           `From this CBE T-bill secondary market page, extract the LATEST weighted average yield (percentage).
 Return ONLY a JSON object: {"yield": <number>}
 If you cannot find the yield, return {"yield": null}.
@@ -951,7 +995,7 @@ ${tableText}`,
       }
 
       if (apiKey && tableText.length > 100) {
-        const claudeResponse = await callClaude(
+        const claudeResponse = await callClaude(ctx,
           `From this Banque Misr certificates of deposit page, extract the annual interest rates for:
 1. 1-year fixed-rate certificate
 2. 3-year fixed-rate certificate
@@ -1301,7 +1345,7 @@ async function refreshStockMarket(
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (apiKey) {
       const snippet = pageText.slice(0, 10000);
-      const claudeResponse = await callClaude(
+      const claudeResponse = await callClaude(ctx,
         `Extract the current EGX 30 (Egyptian Stock Exchange index) value from this page.
 Return only the number as plain text, no units, no commas, no prose.
 If you cannot find the value, return null.
@@ -1660,7 +1704,7 @@ Only include indicators actually present in the source pages.
 Egypt has 27 governorates. Extract data for ALL of them.
 For HDI, some frontier governorates are grouped — skip those that don't have individual values.`;
 
-  const claudeResponse = await callClaude(prompt, systemPrompt);
+  const claudeResponse = await callClaude(ctx, prompt, systemPrompt);
 
   if (!claudeResponse) {
     console.warn("[dataAgent/govStats] Claude returned no data.");
