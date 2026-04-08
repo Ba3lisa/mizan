@@ -10,6 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { AlertTriangle } from "lucide-react";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+} from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,18 +35,24 @@ interface SpendingCategory {
 }
 
 const SECTOR_COLORS: Record<string, string> = {
-  "Debt Service": "#E5484D",
-  "Wages & Compensation": "#C9A84C",
-  "Wages": "#C9A84C",
-  "Subsidies": "#F76B15",
-  "Subsidies & Social Benefits": "#F76B15",
-  "Infrastructure": "#2EC4B6",
-  "Investment": "#2EC4B6",
-  "Education": "#6C8EEF",
-  "Health": "#3FC380",
-  "Defence": "#8E8E93",
-  "Defense": "#8E8E93",
+  "Debt Service": "#ef4444",
+  "Wages & Compensation": "#f59e0b",
+  "Wages": "#f59e0b",
+  "Subsidies": "#8b5cf6",
+  "Subsidies & Social Benefits": "#8b5cf6",
+  "Infrastructure": "#06b6d4",
+  "Investment": "#06b6d4",
+  "Education": "#3b82f6",
+  "Health": "#10b981",
+  "Defence": "#64748b",
+  "Defense": "#64748b",
 };
+
+// Fallback palette for sectors not in the map — distinct, high-contrast
+const FALLBACK_COLORS = [
+  "#f43f5e", "#a855f7", "#0ea5e9", "#14b8a6",
+  "#eab308", "#f97316", "#6366f1", "#ec4899",
+];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -61,39 +74,121 @@ function fmtEGP(n: number): string {
   return n.toFixed(0);
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Pie Chart ───────────────────────────────────────────────────────────────
 
-function SpendingBar({
-  category,
+interface PiePayloadItem {
+  name: string;
+  value: number;
+  payload: { color: string; pct: number; nameAr: string; nameEn: string };
+}
+
+function TaxPieTooltip({
+  active,
+  payload,
+  isAr,
+}: {
+  active?: boolean;
+  payload?: readonly PiePayloadItem[];
+  isAr: boolean;
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+  const p = payload[0];
+  return (
+    <div className="bg-popover border border-border rounded-lg px-3 py-2 shadow-xl text-xs">
+      <p className="font-semibold mb-0.5">{isAr ? p.payload.nameAr : p.payload.nameEn}</p>
+      <p className="font-mono text-primary">{fmtEGP(p.value)} EGP</p>
+      <p className="text-muted-foreground">{p.payload.pct}% {isAr ? "من ضرائبك" : "of your tax"}</p>
+    </div>
+  );
+}
+
+function TaxPieChart({
+  spending,
   taxPaid,
   isAr,
 }: {
-  category: SpendingCategory;
+  spending: SpendingCategory[];
   taxPaid: number;
   isAr: boolean;
 }) {
-  const amount = (taxPaid * category.pct) / 100;
+  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+
+  const data = spending.map((cat) => ({
+    name: isAr ? cat.nameAr : cat.nameEn,
+    nameAr: cat.nameAr,
+    nameEn: cat.nameEn,
+    value: Math.round((taxPaid * cat.pct) / 100),
+    color: cat.color,
+    pct: cat.pct,
+  }));
+
   return (
-    <div className="flex items-center gap-3">
-      <div className="w-32 flex-shrink-0 text-right" dir="ltr">
-        <span className="text-xs text-muted-foreground whitespace-nowrap">
-          {isAr ? category.nameAr : category.nameEn}
-        </span>
+    <div className="flex flex-col md:flex-row items-center gap-6">
+      {/* Pie */}
+      <div className="w-full md:w-1/2 aspect-square max-w-[280px]" dir="ltr">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie
+              data={data}
+              cx="50%"
+              cy="50%"
+              innerRadius="45%"
+              outerRadius="80%"
+              paddingAngle={2}
+              dataKey="value"
+              stroke="none"
+              onMouseEnter={(_, idx) => setActiveIdx(idx)}
+              onMouseLeave={() => setActiveIdx(null)}
+              animationDuration={800}
+            >
+              {data.map((entry, idx) => (
+                <Cell
+                  key={entry.name}
+                  fill={entry.color}
+                  opacity={activeIdx === null || activeIdx === idx ? 1 : 0.3}
+                  style={{ cursor: "pointer", transition: "opacity 0.2s" }}
+                />
+              ))}
+            </Pie>
+            <Tooltip
+              content={(props) => (
+                <TaxPieTooltip
+                  active={props.active}
+                  payload={props.payload as unknown as readonly PiePayloadItem[] | undefined}
+                  isAr={isAr}
+                />
+              )}
+            />
+          </PieChart>
+        </ResponsiveContainer>
       </div>
-      <div className="flex-1 relative h-7 bg-muted rounded overflow-hidden">
-        <div
-          className="absolute inset-y-0 start-0 rounded transition-all duration-700"
-          style={{ width: `${category.pct}%`, background: category.color }}
-        />
-        <span className="absolute inset-y-0 start-2 flex items-center text-[0.65rem] font-mono font-bold text-white/90 mix-blend-plus-lighter">
-          {category.pct}%
-        </span>
-      </div>
-      <div className="w-28 flex-shrink-0 text-end">
-        <span className="font-mono text-sm font-bold text-foreground">
-          {fmtEGP(amount)}{" "}
-          <span className="text-[0.625rem] text-muted-foreground font-normal">EGP</span>
-        </span>
+
+      {/* Legend */}
+      <div className="flex-1 w-full space-y-1.5">
+        {data.map((entry, idx) => (
+          <button
+            key={entry.name}
+            className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-start transition-all ${
+              activeIdx === idx ? "bg-muted/60 scale-[1.02]" : "hover:bg-muted/30"
+            }`}
+            onMouseEnter={() => setActiveIdx(idx)}
+            onMouseLeave={() => setActiveIdx(null)}
+          >
+            <span
+              className="w-3 h-3 rounded-sm flex-shrink-0"
+              style={{ background: entry.color }}
+            />
+            <span className="flex-1 text-xs font-medium truncate">
+              {isAr ? entry.nameAr : entry.nameEn}
+            </span>
+            <span className="text-xs font-mono font-bold text-muted-foreground">
+              {entry.pct}%
+            </span>
+            <span className="text-xs font-mono font-bold" style={{ color: entry.color }}>
+              {fmtEGP(entry.value)}
+            </span>
+          </button>
+        ))}
       </div>
     </div>
   );
@@ -134,7 +229,7 @@ export default function TaxCalculatorPage() {
         nameAr: item.sectorAr,
         nameEn: item.sectorEn,
         pct: item.percentageOfTotal,
-        color: SECTOR_COLORS[item.sectorEn] ?? `hsl(${i * 45}, 60%, 55%)`,
+        color: SECTOR_COLORS[item.sectorEn] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length],
       }))
     : [];
 
@@ -208,7 +303,7 @@ export default function TaxCalculatorPage() {
                     step={5000}
                     value={Math.min(Math.max(salary, MIN_SALARY), MAX_SALARY)}
                     onChange={handleSlider}
-                    className="w-full accent-[#C9A84C] cursor-pointer"
+                    className="w-full accent-primary cursor-pointer"
                   />
                   <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono" dir="ltr">
                     <span>10K</span>
@@ -306,14 +401,10 @@ export default function TaxCalculatorPage() {
               <>
                 <Card className="border-border/60 bg-card/60 backdrop-blur-sm">
                   <CardContent className="p-6">
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-5">
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4">
                       {isAr ? "كيف تُوزَّع ضرائبك" : "How Your Taxes Are Distributed"}
                     </p>
-                    <div className="space-y-3">
-                      {SPENDING.map((cat) => (
-                        <SpendingBar key={cat.key} category={cat} taxPaid={taxPaid} isAr={isAr} />
-                      ))}
-                    </div>
+                    <TaxPieChart spending={SPENDING} taxPaid={taxPaid} isAr={isAr} />
                   </CardContent>
                 </Card>
 
