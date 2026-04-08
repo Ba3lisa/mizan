@@ -151,7 +151,7 @@ function calculateBuyCosts(params: CalcParams, years: number): CostBreakdown {
 function calculateRentCosts(params: CalcParams, years: number): CostBreakdown {
   const {
     monthlyRent, rentGrowthPct, investmentReturnPct,
-    homePrice, closingCostsPct, downPaymentPct, securityDepositMonths,
+    homePrice, closingCostsPct, securityDepositMonths,
     brokerFeePct, rentersInsurancePct, monthlyUtilities,
     inflationPct,
   } = params;
