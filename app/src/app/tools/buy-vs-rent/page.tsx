@@ -91,6 +91,7 @@ function calculateBuyCosts(params: CalcParams, years: number): CostBreakdown {
     installDownPaymentPct, installPeriod, installAnnualIncreasePct,
     homePriceGrowthPct, investmentReturnPct, closingCostsPct, sellingCostsPct,
     maintenancePct, insurancePct, propertyTaxPct, monthlyFees, monthlyUtilities,
+    inflationPct,
   } = params;
 
   // ── Initial Costs ──
@@ -99,6 +100,8 @@ function calculateBuyCosts(params: CalcParams, years: number): CostBreakdown {
     downPayment = homePrice * (downPaymentPct / 100);
   } else if (financingType === "installments") {
     downPayment = homePrice * (installDownPaymentPct / 100);
+  } else if (financingType === "cash") {
+    downPayment = homePrice;
   }
   const closingCosts = homePrice * (closingCostsPct / 100);
   const initialCosts = downPayment + closingCosts;
@@ -121,11 +124,12 @@ function calculateBuyCosts(params: CalcParams, years: number): CostBreakdown {
   // Annual property costs accumulate over holding years
   for (let y = 1; y <= years; y++) {
     const propVal = homePrice * Math.pow(1 + homePriceGrowthPct / 100, y);
+    const inflationFactor = Math.pow(1 + inflationPct / 100, y);
     recurringCosts += propVal * (maintenancePct / 100);
     recurringCosts += propVal * (insurancePct / 100);
     recurringCosts += propVal * (propertyTaxPct / 100);
-    recurringCosts += monthlyFees * 12;
-    recurringCosts += monthlyUtilities * 12;
+    recurringCosts += (monthlyFees * 12) * inflationFactor;
+    recurringCosts += (monthlyUtilities * 12) * inflationFactor;
   }
 
   // ── Opportunity Cost on Initial Outlay ──
@@ -147,12 +151,21 @@ function calculateBuyCosts(params: CalcParams, years: number): CostBreakdown {
 function calculateRentCosts(params: CalcParams, years: number): CostBreakdown {
   const {
     monthlyRent, rentGrowthPct, investmentReturnPct,
-    homePrice, closingCostsPct, downPaymentPct, securityDepositMonths,
+    homePrice, closingCostsPct, securityDepositMonths,
     brokerFeePct, rentersInsurancePct, monthlyUtilities,
+    inflationPct,
   } = params;
 
   // What the buyer spent as initial costs — renter invests this instead
-  const buyerInitial = homePrice * (downPaymentPct / 100) + homePrice * (closingCostsPct / 100);
+  let buyerDownPayment = 0;
+  if (params.financingType === "mortgage") {
+    buyerDownPayment = homePrice * (params.downPaymentPct / 100);
+  } else if (params.financingType === "installments") {
+    buyerDownPayment = homePrice * (params.installDownPaymentPct / 100);
+  } else if (params.financingType === "cash") {
+    buyerDownPayment = homePrice;
+  }
+  const buyerInitial = buyerDownPayment + homePrice * (closingCostsPct / 100);
 
   // ── Initial Costs ──
   const securityDeposit = monthlyRent * securityDepositMonths;
@@ -163,9 +176,10 @@ function calculateRentCosts(params: CalcParams, years: number): CostBreakdown {
   let recurringCosts = 0;
   let annualRent = monthlyRent * 12;
   for (let y = 1; y <= years; y++) {
+    const inflationFactor = Math.pow(1 + inflationPct / 100, y);
     recurringCosts += annualRent;
     recurringCosts += annualRent * (rentersInsurancePct / 100);
-    recurringCosts += monthlyUtilities * 12;
+    recurringCosts += (monthlyUtilities * 12) * inflationFactor;
     annualRent *= 1 + rentGrowthPct / 100;
   }
 
@@ -349,6 +363,7 @@ function SummaryRow({
   buy,
   rent,
   highlight,
+  tooltip,
 }: {
   label: string;
   buy: number;
@@ -356,6 +371,7 @@ function SummaryRow({
   symbol?: string;
   fromEGP?: (v: number) => number;
   highlight?: boolean;
+  tooltip?: string;
 }) {
   return (
     <div
@@ -363,7 +379,10 @@ function SummaryRow({
         highlight ? "font-bold text-foreground" : "text-muted-foreground"
       }`}
     >
-      <span className="flex-1">{label}</span>
+      <div className="flex items-center gap-1.5 flex-1">
+        <span>{label}</span>
+        {tooltip && <InputTooltip text={tooltip} />}
+      </div>
       <span
         className={`w-24 text-end font-mono ${
           highlight ? "text-[#E5484D]" : ""
@@ -412,19 +431,18 @@ export default function BuyVsRentPage() {
 
   // Tools always work in EGP — USD shown as context only
   const exchangeRate = investmentData?.["exchange_rate"]?.value ?? 50;
-  const toUsd = (egp: number) => exchangeRate > 0 ? egp / exchangeRate : 0;
-
+  
   const [showMethodology, setShowMethodology] = useState(false);
-
+  
   // ─── Convex-derived defaults ────────────────────────────────────────────────
   const convexMortgageRate = mortgageData?.value;
   const convexInflation = investmentData?.["inflation"]?.value;
-
+  
   // ─── Section 1: Basics ─────────────────────────────────────────────────────
   const [homePrice, setHomePrice] = usePersistedState("bvr-homePrice", 3_000_000);
   const [monthlyRent, setMonthlyRent] = usePersistedState("bvr-monthlyRent", 10_000);
   const [years, setYears] = usePersistedState("bvr-years", 10);
-
+  
   // ─── Section 2: Financing ──────────────────────────────────────────────────
   const [financingType, setFinancingType] = usePersistedState<FinancingType>("bvr-financingType", "mortgage");
   const [mortgageRatePct, setMortgageRatePct] = usePersistedState("bvr-mortgageRatePct", 20);
@@ -433,13 +451,19 @@ export default function BuyVsRentPage() {
   const [installDownPaymentPct, setInstallDownPaymentPct] = usePersistedState("bvr-installDownPaymentPct", 10);
   const [installPeriod, setInstallPeriod] = usePersistedState("bvr-installPeriod", 5);
   const [installAnnualIncreasePct, setInstallAnnualIncreasePct] = usePersistedState("bvr-installAnnualIncreasePct", 5);
-
+  
   // ─── Section 3: Future ─────────────────────────────────────────────────────
   const [homePriceGrowthPct, setHomePriceGrowthPct] = usePersistedState("bvr-homePriceGrowthPct", 12);
   const [rentGrowthPct, setRentGrowthPct] = usePersistedState("bvr-rentGrowthPct", 10);
   const [investmentReturnPct, setInvestmentReturnPct] = usePersistedState("bvr-investmentReturnPct", 18);
   const [inflationPct, setInflationPct] = usePersistedState("bvr-inflationPct", 28);
   const [egpDepreciationPct, setEgpDepreciationPct] = usePersistedState("bvr-egpDepreciationPct", 7);
+  
+  const toUsd = (egp: number) => {
+    // Project final exchange rate based on annual depreciation over 'years'
+    const projectedRate = exchangeRate * Math.pow(1 + egpDepreciationPct / 100, years);
+    return projectedRate > 0 ? egp / projectedRate : 0;
+  };
 
   // ─── Section 4: Buy Costs ──────────────────────────────────────────────────
   const [closingCostsPct, setClosingCostsPct] = usePersistedState("bvr-closingCostsPct", 3);
@@ -613,21 +637,37 @@ export default function BuyVsRentPage() {
                   label={t("التكاليف الأولية", "Initial Costs")}
                   buy={buyCosts.initialCosts}
                   rent={rentCosts.initialCosts}
+                  tooltip={t(
+                    "إجمالي ما ستدفعه نقدًا في اليوم الأول: المقدم + رسوم التسجيل + المصاريف الإدارية",
+                    "Total cash paid on Day 1: Down payment + closing fees + registration"
+                  )}
                 />
                 <SummaryRow
                   label={t("التكاليف المتكررة", "Recurring Costs")}
                   buy={buyCosts.recurringCosts}
                   rent={rentCosts.recurringCosts}
+                  tooltip={t(
+                    "إجمالي كل ما ستدفعه خلال المدة: الصيانة + الخدمات + الأقساط (مع مراعاة زيادة الأسعار سنوياً)",
+                    "Total of every payment made over the term: Maintenance + utilities + fees + mortgage (inflated over time)"
+                  )}
                 />
                 <SummaryRow
                   label={t("تكلفة الفرصة", "Opportunity Cost")}
                   buy={buyCosts.opportunityCosts}
                   rent={rentCosts.opportunityCosts}
+                  tooltip={t(
+                    "العائد المفقود (للمشتري) أو المكتسب (للمستأجر) من استثمار مبلغ المقدم والرسوم",
+                    "Foreground investment returns lost (Buyer) or gained (Renter) on the initial capital"
+                  )}
                 />
                 <SummaryRow
                   label={t("صافي العائد من البيع", "Net Sale Proceeds")}
                   buy={buyCosts.netProceeds}
                   rent={rentCosts.netProceeds}
+                  tooltip={t(
+                    "المبلغ المتوقع استرداده عند بيع العقار في نهاية المدة (بعد خصم عمولة البيع وتصفية القرض)",
+                    "The projected money returned upon selling the home at the end (minus selling costs and remaining loan)"
+                  )}
                 />
 
                 <Separator className="my-3" />
@@ -637,6 +677,10 @@ export default function BuyVsRentPage() {
                   buy={buyCosts.total}
                   rent={rentCosts.total}
                   highlight
+                  tooltip={t(
+                    "مجموع كل التكاليف والفوائد (بالقيمة الاسمية المستقلبية). يعبر عن صافي التكلفة الحقيقية لكل اختيار.",
+                    "The sum of all costs and returns (in future nominal EGP). Represents the true net cost."
+                  )}
                 />
 
                 {/* Monthly mortgage pill */}
