@@ -164,6 +164,86 @@ export async function callClaudeStructured<T>(
   return result;
 }
 
+// ─── SERVER TOOLS (web_search + web_fetch) ─────────────────────────────────
+
+export interface ServerToolDef {
+  type: string;        // e.g. "web_search_20250305", "web_fetch_20250910"
+  name: string;        // e.g. "web_search", "web_fetch"
+  max_uses?: number;
+  allowed_domains?: string[];
+  blocked_domains?: string[];
+  max_content_tokens?: number;  // web_fetch only: limit fetched content size
+}
+
+/**
+ * Call Claude with server-side tools (web_search, web_fetch).
+ * Anthropic executes the tools — we just parse Claude's final text response.
+ * Returns the final text plus usage metadata (tokens + search request count).
+ */
+export async function callClaudeWithServerTools(
+  prompt: string,
+  serverTools: ServerToolDef[],
+  systemPrompt?: string,
+): Promise<LLMCallResult & { searchRequests?: number }> {
+  const apiKey = getApiKey();
+  if (!apiKey) return { text: null, usage: null };
+
+  const body: Record<string, unknown> = {
+    model: CLAUDE_MODEL,
+    max_tokens: 8192,
+    messages: [{ role: "user", content: prompt }],
+    tools: serverTools,
+  };
+  if (systemPrompt) body.system = systemPrompt;
+
+  const startMs = Date.now();
+
+  const response = await fetch(API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const durationMs = Date.now() - startMs;
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Claude API (server tools) failed (${response.status}): ${errorText}`);
+  }
+
+  const json = await response.json() as {
+    content?: Array<{ type: string; text?: string }>;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      server_tool_use?: { web_search_requests?: number; web_fetch_requests?: number };
+    };
+  };
+
+  // Extract text blocks from the response. Claude interleaves text with tool
+  // results — the final text block typically contains the actual answer/JSON.
+  const textBlocks = json.content
+    ?.filter((block) => block.type === "text" && block.text)
+    .map((block) => block.text!)
+    ?? [];
+  // Prefer the last text block (the answer) but join all for context
+  const text = textBlocks.length > 0 ? textBlocks[textBlocks.length - 1] : null;
+
+  const inputTokens = json.usage?.input_tokens ?? 0;
+  const outputTokens = json.usage?.output_tokens ?? 0;
+  const searchRequests = json.usage?.server_tool_use?.web_search_requests ?? 0;
+
+  return {
+    text,
+    usage: { inputTokens, outputTokens, model: CLAUDE_MODEL, durationMs },
+    searchRequests,
+  };
+}
+
 // ─── COUNCIL EVALUATION ─────────────────────────────────────────────────────
 
 export async function evaluateDataChange(

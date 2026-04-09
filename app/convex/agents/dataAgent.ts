@@ -15,7 +15,7 @@ import {
   validateDebtRecord,
 } from "./validators";
 import { callLLMStructured as callClaudeStructured } from "./providers/registry";
-import { callClaudeWithUsage } from "./providers/anthropic";
+import { callClaudeWithUsage, callClaudeWithServerTools, callClaudeStructuredWithUsage } from "./providers/anthropic";
 
 // ─── COST TRACKING ───────────────────────────────────────────────────────────
 
@@ -84,7 +84,8 @@ const CATEGORY_SOURCES: Record<string, SourceEntry[]> = {
     { nameEn: "World Bank — Debt Service Payments", nameAr: "البنك الدولي — مدفوعات خدمة الدين", url: "https://api.worldbank.org/v2/country/EGY/indicator/DT.TDS.DECT.CD", type: "international_org" },
   ],
   budget: [
-    { nameEn: "Ministry of Finance — Open Data", nameAr: "وزارة المالية — البيانات المفتوحة", url: "https://www.mof.gov.eg/en/open-data", type: "official_government" },
+    { nameEn: "Ministry of Finance — Financial Monthly", nameAr: "وزارة المالية — النشرة المالية الشهرية", url: "https://www.mof.gov.eg", type: "official_government" },
+    { nameEn: "Wikipedia — Economy of Egypt", nameAr: "ويكيبيديا — اقتصاد مصر", url: "https://en.wikipedia.org/wiki/Economy_of_Egypt", type: "media" },
   ],
   government: [
     { nameEn: "Ahram Online — Cabinet Composition", nameAr: "الأهرام — تشكيل مجلس الوزراء", url: "https://english.ahram.org.eg/News/562168.aspx", type: "media" },
@@ -198,94 +199,232 @@ async function refreshBudgetData(
 ): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.warn(
-      "[dataAgent] Skipping budget AI refresh — ANTHROPIC_API_KEY not set."
-    );
+    console.warn("[dataAgent] Skipping budget refresh — ANTHROPIC_API_KEY not set.");
     return { recordsUpdated: 0 };
   }
 
-  // Fetch the Ministry of Finance open-data summary page (best-effort)
-  const MOF_URL = "https://www.mof.gov.eg/en/open-data";
-  let pageText = "";
+  // ── Level 1: MOF Financial Monthly PDF via Claude web_search + web_fetch ──
+  // Claude searches for the latest PDF on assets.mof.gov.eg, fetches it, and
+  // extracts fiscal data from Section 4 (Fiscal Sector). Anthropic executes
+  // the search/fetch server-side — no headless browser needed.
   try {
-    const response = await fetch(MOF_URL);
-    if (response.ok) {
-      pageText = await response.text();
-      // Keep only a manageable slice for the prompt
-      pageText = pageText.slice(0, 8000);
-    } else {
-      console.warn(
-        `[dataAgent] MOF page returned status ${response.status}; using empty context.`
-      );
-    }
-  } catch (fetchErr) {
-    console.warn(
-      `[dataAgent] Failed to fetch MOF page: ${String(fetchErr)}; using empty context.`
-    );
-  }
+    console.log("[dataAgent/budget] Attempting MOF PDF via Claude web_search + web_fetch...");
 
-  const systemPrompt = `You are a data extraction assistant for Mizan, Egypt's government transparency platform.
-Extract structured budget data from Egyptian government sources.
-Always respond with valid JSON only — no markdown, no prose.`;
+    const result = await callClaudeWithServerTools(
+      `Search for the latest Egypt government budget data. Try these searches:
+1. "Egypt Ministry of Finance Financial Monthly 2025 revenue expenditure deficit EGP billions"
+2. "Egypt budget fiscal year 2024/2025 total revenue total expenditure"
 
-  const prompt = `Extract the most recent Egyptian national budget figures from the following page content.
-Return a JSON object with these fields (use null for missing values):
+From the search results, extract the most recent Egyptian national budget figures.
+
+RESPOND WITH ONLY THIS JSON — no explanation, no preamble:
 {
-  "fiscalYear": "<e.g. 2024/2025>",
-  "totalRevenue": <number in EGP billions or null>,
-  "totalExpenditure": <number in EGP billions or null>,
-  "deficit": <number in EGP billions, negative means deficit, or null>
+  "fiscalYear": "2024/2025",
+  "totalRevenue": <cumulative revenue in EGP billions — e.g. 1442 not 1.442>,
+  "totalExpenditure": <cumulative expenditure in EGP billions — e.g. 2308 not 2.308>,
+  "deficit": <overall deficit in EGP billions, negative means deficit — e.g. -879 not -0.879>,
+  "gdp": <GDP in EGP billions — e.g. 17000 not 17>,
+  "sourceUrl": "<URL of the source with the data>",
+  "period": "<e.g. July-October 2025>"
 }
 
-Page content:
-${pageText || "(page content unavailable)"}`;
-
-  const claudeResponse = await callClaude(ctx, prompt, systemPrompt);
-
-  if (!claudeResponse) {
-    console.warn("[dataAgent] Claude returned no budget data.");
-    return { recordsUpdated: 0 };
-  }
-
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(claudeResponse) as Record<string, unknown>;
-  } catch {
-    console.warn(
-      `[dataAgent] Could not parse Claude budget response as JSON: ${claudeResponse}`
+CRITICAL: All monetary values MUST be in EGP BILLIONS (not trillions). If a source says "EGP 1.442 trillion", convert to 1442 billion. If it says "EGP 879.3 billion", use 879.3.
+totalRevenue and totalExpenditure are REQUIRED. Use the most recent figures available.`,
+      [
+        {
+          type: "web_search_20250305",
+          name: "web_search",
+          max_uses: 3,
+        },
+      ],
+      "You are a data extraction assistant. Return ONLY valid JSON. No prose, no explanations, no markdown fences.",
     );
-    return { recordsUpdated: 0 };
-  }
 
-  const fiscalYear =
-    typeof parsed.fiscalYear === "string" ? parsed.fiscalYear : null;
-  if (!fiscalYear) {
-    console.warn("[dataAgent] Claude did not return a fiscalYear.");
-    return { recordsUpdated: 0 };
-  }
-
-  const totalRevenue =
-    typeof parsed.totalRevenue === "number" ? parsed.totalRevenue : undefined;
-  const totalExpenditure =
-    typeof parsed.totalExpenditure === "number"
-      ? parsed.totalExpenditure
-      : undefined;
-  const deficit =
-    typeof parsed.deficit === "number" ? parsed.deficit : undefined;
-
-  const recordsUpdated: number = await ctx.runMutation(
-    internal.dataRefresh.upsertFiscalYear,
-    {
-      year: fiscalYear,
-      totalRevenue,
-      totalExpenditure,
-      deficit,
-      sourceUrl: MOF_URL,
-      sanadLevel: 1,
+    // Log usage (tokens + search costs)
+    if (result.usage) {
+      const { inputTokens, outputTokens, model, durationMs } = result.usage;
+      const costUsd = inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN;
+      try {
+        await ctx.runMutation(internal.usage.logApiUsage, {
+          provider: "anthropic",
+          model,
+          purpose: "data_pipeline_budget",
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+          costUsd,
+          durationMs,
+          success: result.text !== null,
+          timestamp: Date.now(),
+        });
+      } catch (err) {
+        console.warn("[dataAgent/budget] Failed to log API usage:", err);
+      }
     }
-  );
 
-  return { recordsUpdated, sourceUrl: MOF_URL };
+    if (result.text) {
+      const mofResult = parseBudgetJson(result.text);
+      if (mofResult?.fiscalYear) {
+        const srcUrl = mofResult.sourceUrl ?? "https://www.mof.gov.eg";
+        // Determine sanadLevel from source domain
+        const isMof = srcUrl.includes("mof.gov.eg");
+        const isIntlOrg = srcUrl.includes("worldbank.org") || srcUrl.includes("imf.org");
+        const sanadLevel = isMof ? 1 : isIntlOrg ? 2 : 3;
+
+        const recordsUpdated: number = await ctx.runMutation(
+          internal.dataRefresh.upsertFiscalYear,
+          {
+            year: mofResult.fiscalYear,
+            totalRevenue: mofResult.totalRevenue,
+            totalExpenditure: mofResult.totalExpenditure,
+            deficit: mofResult.deficit,
+            gdp: mofResult.gdp,
+            sourceUrl: srcUrl,
+            sanadLevel,
+          }
+        );
+        console.log(`[dataAgent/budget] Web search: ${recordsUpdated} records updated (sanad ${sanadLevel}, source: ${srcUrl}).`);
+        return { recordsUpdated, sourceUrl: srcUrl };
+      }
+    }
+    console.warn("[dataAgent/budget] MOF PDF extraction returned no usable data — falling back to Wikipedia.");
+  } catch (err) {
+    console.warn(`[dataAgent/budget] MOF PDF approach failed: ${err instanceof Error ? err.message : String(err)} — falling back to Wikipedia.`);
+  }
+
+  // ── Level 2: Wikipedia Economy of Egypt infobox ───────────────────────────
+  // The infobox has structured fields like: | revenue = $60.671 billion (2025)
+  try {
+    console.log("[dataAgent/budget] Fetching Wikipedia Economy of Egypt infobox...");
+    const wikiUrl = "https://en.wikipedia.org/w/api.php?action=parse&page=Economy_of_Egypt&prop=wikitext&section=0&format=json";
+    const wikiRes = await fetch(wikiUrl, { signal: AbortSignal.timeout(15000) });
+
+    if (!wikiRes.ok) {
+      console.warn(`[dataAgent/budget] Wikipedia returned ${wikiRes.status}`);
+      return { recordsUpdated: 0 };
+    }
+
+    const wikiData = await wikiRes.json() as { parse?: { wikitext?: { "*"?: string } } };
+    const wikitext = wikiData?.parse?.wikitext?.["*"] ?? "";
+
+    if (wikitext.length < 500) {
+      console.warn("[dataAgent/budget] Wikipedia infobox too short.");
+      return { recordsUpdated: 0 };
+    }
+
+    // Extract with Claude — wikitext is structured template data, very reliable
+    const wikiResponse = await callClaude(ctx,
+      `Extract Egyptian government budget data from this Wikipedia infobox wikitext.
+The infobox contains fields like: | revenue = $XX billion (YYYY) | expenses = $XX billion (YYYY)
+
+Return JSON (no markdown fences):
+{
+  "fiscalYear": "2024/2025",
+  "revenueUsd": <number in USD billions>,
+  "expenditureUsd": <number in USD billions>,
+  "deficitUsd": <number in USD billions, negative = deficit>,
+  "gdpNominalUsd": <number in USD billions>,
+  "year": "2025"
+}
+
+Wikitext (first 6000 chars):
+${wikitext.slice(0, 6000)}`,
+      "Extract fiscal data from Wikipedia infobox. JSON only, no markdown."
+    );
+
+    if (!wikiResponse) {
+      console.warn("[dataAgent/budget] Claude returned no data from Wikipedia.");
+      return { recordsUpdated: 0 };
+    }
+
+    const wikiBudget = parseBudgetJson(wikiResponse);
+    if (!wikiBudget?.fiscalYear && !wikiBudget?.revenueUsd) {
+      console.warn("[dataAgent/budget] Could not parse Wikipedia budget data.");
+      return { recordsUpdated: 0 };
+    }
+
+    // Convert USD → EGP using latest exchange rate from economicIndicators
+    let usdToEgp = 50; // Conservative fallback
+    try {
+      const fxRecords = await ctx.runQuery(api.economy.getIndicator, { indicator: "exchange_rate", limit: 1 }) as Array<{ value: number }>;
+      if (fxRecords.length > 0 && fxRecords[0].value > 0) {
+        usdToEgp = fxRecords[0].value;
+      }
+    } catch {
+      console.warn("[dataAgent/budget] Could not fetch exchange rate, using fallback.");
+    }
+
+    const fiscalYear = wikiBudget.fiscalYear ?? `${wikiBudget.year ?? "2025"}`;
+    const totalRevenue = wikiBudget.revenueUsd ? wikiBudget.revenueUsd * usdToEgp : wikiBudget.totalRevenue;
+    const totalExpenditure = wikiBudget.expenditureUsd ? wikiBudget.expenditureUsd * usdToEgp : wikiBudget.totalExpenditure;
+    const deficit = wikiBudget.deficitUsd ? wikiBudget.deficitUsd * usdToEgp : wikiBudget.deficit;
+    const gdp = wikiBudget.gdpNominalUsd ? wikiBudget.gdpNominalUsd * usdToEgp : wikiBudget.gdp;
+
+    const recordsUpdated: number = await ctx.runMutation(
+      internal.dataRefresh.upsertFiscalYear,
+      {
+        year: fiscalYear,
+        totalRevenue,
+        totalExpenditure,
+        deficit,
+        gdp,
+        sourceUrl: "https://en.wikipedia.org/wiki/Economy_of_Egypt",
+        sanadLevel: 3, // Wikipedia citing IMF
+      }
+    );
+
+    console.log(`[dataAgent/budget] Wikipedia fallback: ${recordsUpdated} records updated.`);
+    return { recordsUpdated, sourceUrl: "https://en.wikipedia.org/wiki/Economy_of_Egypt" };
+  } catch (err) {
+    console.warn(`[dataAgent/budget] Wikipedia fallback failed: ${err instanceof Error ? err.message : String(err)}`);
+    return { recordsUpdated: 0 };
+  }
+}
+
+interface BudgetParseResult {
+  fiscalYear?: string;
+  totalRevenue?: number;
+  totalExpenditure?: number;
+  deficit?: number;
+  gdp?: number;
+  sourceUrl?: string;
+  revenueUsd?: number;
+  expenditureUsd?: number;
+  deficitUsd?: number;
+  gdpNominalUsd?: number;
+  year?: string;
+}
+
+/** Parse budget JSON from Claude response, handling markdown fences and prose. */
+function parseBudgetJson(text: string): BudgetParseResult | null {
+  try {
+    let jsonStr = text;
+    // Strip markdown fences
+    const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fence) jsonStr = fence[1];
+    // If still not valid JSON, try extracting a JSON object from prose
+    if (!jsonStr.trim().startsWith("{")) {
+      const objMatch = jsonStr.match(/\{[\s\S]*"fiscalYear"[\s\S]*\}/);
+      if (objMatch) jsonStr = objMatch[0];
+    }
+    const raw = JSON.parse(jsonStr.trim()) as Record<string, unknown>;
+    return {
+      fiscalYear: typeof raw.fiscalYear === "string" ? raw.fiscalYear : undefined,
+      totalRevenue: typeof raw.totalRevenue === "number" ? raw.totalRevenue : undefined,
+      totalExpenditure: typeof raw.totalExpenditure === "number" ? raw.totalExpenditure : undefined,
+      deficit: typeof raw.deficit === "number" ? raw.deficit : undefined,
+      gdp: typeof raw.gdp === "number" ? raw.gdp : undefined,
+      sourceUrl: typeof raw.sourceUrl === "string" ? raw.sourceUrl : undefined,
+      revenueUsd: typeof raw.revenueUsd === "number" ? raw.revenueUsd : undefined,
+      expenditureUsd: typeof raw.expenditureUsd === "number" ? raw.expenditureUsd : undefined,
+      deficitUsd: typeof raw.deficitUsd === "number" ? raw.deficitUsd : undefined,
+      gdpNominalUsd: typeof raw.gdpNominalUsd === "number" ? raw.gdpNominalUsd : undefined,
+      year: typeof raw.year === "string" ? raw.year : undefined,
+    };
+  } catch {
+    console.warn("[dataAgent/budget] JSON parse failed:", text.slice(0, 200));
+    return null;
+  }
 }
 
 // ─── GOVERNMENT REFRESH ───────────────────────────────────────────────────────
@@ -1724,10 +1863,6 @@ async function refreshGovernorateStatsData(
     return { recordsUpdated: 0 };
   }
 
-  const systemPrompt = `You are a data extraction assistant for Mizan, Egypt's government transparency platform.
-Extract structured governorate statistics from Wikipedia pages.
-Always respond with valid JSON only — no markdown, no prose.`;
-
   const prompt = `Extract governorate statistics from these Wikipedia pages about Egyptian governorates.
 
 PAGE 1 (Governorates of Egypt — plain text):
@@ -1736,56 +1871,80 @@ ${page1Text || "(unavailable)"}
 PAGE 2 (HDI by governorate — plain text):
 ${page2Text || "(unavailable)"}
 
-Return a JSON array where each element is:
-{
-  "governorateNameEn": "Cairo",
-  "indicators": [
-    { "indicator": "population", "year": "2023", "value": 10456284, "unit": "people" },
-    { "indicator": "area_km2", "year": "2023", "value": 3085, "unit": "km2" },
-    { "indicator": "density_per_km2", "year": "2023", "value": 3389, "unit": "per_km2" },
-    { "indicator": "hdi", "year": "2023", "value": 0.803, "unit": "index" }
-  ]
-}
-Only include indicators actually present in the source pages.
-Egypt has 27 governorates. Extract data for ALL of them.
+Extract data for all 27 Egyptian governorates. For each, include population, area_km2, density_per_km2, and hdi if available.
 For HDI, some frontier governorates are grouped — skip those that don't have individual values.`;
 
-  const claudeResponse = await callClaude(ctx, prompt, systemPrompt);
+  const govStatsSchema = {
+    name: "extract_governorate_stats",
+    description: "Extract governorate statistics from Wikipedia tables about Egyptian governorates",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        governorates: {
+          type: "array" as const,
+          items: {
+            type: "object" as const,
+            properties: {
+              governorateNameEn: { type: "string" as const },
+              indicators: {
+                type: "array" as const,
+                items: {
+                  type: "object" as const,
+                  properties: {
+                    indicator: { type: "string" as const },
+                    year: { type: "string" as const },
+                    value: { type: "number" as const },
+                    unit: { type: "string" as const },
+                  },
+                  required: ["indicator", "year", "value", "unit"],
+                },
+              },
+            },
+            required: ["governorateNameEn", "indicators"],
+          },
+        },
+      },
+      required: ["governorates"],
+    },
+  };
 
-  if (!claudeResponse) {
-    console.warn("[dataAgent/govStats] Claude returned no data.");
+  // Use structured output (tool_use) to guarantee valid JSON
+  const structuredResult = await callClaudeStructuredWithUsage<{
+    governorates: Array<{
+      governorateNameEn: string;
+      indicators: Array<{ indicator: string; year: string; value: number; unit: string }>;
+    }>;
+  }>(prompt, govStatsSchema, "Extract governorate statistics from Wikipedia. Be thorough — include all 27 governorates.");
+
+  // Log usage
+  if (structuredResult.usage) {
+    const { inputTokens, outputTokens, model, durationMs } = structuredResult.usage;
+    const costUsd = inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN;
+    try {
+      await ctx.runMutation(internal.usage.logApiUsage, {
+        provider: "anthropic",
+        model,
+        purpose: "data_pipeline_governorate_stats",
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        costUsd,
+        durationMs,
+        success: structuredResult.result !== null,
+        timestamp: Date.now(),
+      });
+    } catch (err) {
+      console.warn("[dataAgent/govStats] Failed to log API usage:", err);
+    }
+  }
+
+  if (!structuredResult.result?.governorates?.length) {
+    console.warn("[dataAgent/govStats] Structured extraction returned no governorates.");
     return { recordsUpdated: 0 };
   }
 
-  let parsed: Array<{
-    governorateNameEn: string;
-    indicators: Array<{ indicator: string; year: string; value: number; unit: string }>;
-  }>;
-  try {
-    let jsonStr = claudeResponse;
-    const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fence) jsonStr = fence[1];
-    let raw = JSON.parse(jsonStr.trim()) as unknown;
-    // Handle cases where Claude wraps array in an object like { governorates: [...] }
-    if (!Array.isArray(raw) && typeof raw === "object" && raw !== null) {
-      const values = Object.values(raw as Record<string, unknown>);
-      const arr = values.find((v) => Array.isArray(v));
-      if (arr) {
-        console.log("[dataAgent/govStats] Extracted array from nested object.");
-        raw = arr;
-      }
-    }
-    if (!Array.isArray(raw)) {
-      console.warn("[dataAgent/govStats] Claude response is not an array.");
-      return { recordsUpdated: 0 };
-    }
-    parsed = raw as typeof parsed;
-  } catch {
-    console.warn("[dataAgent/govStats] Could not parse Claude governorate stats response as JSON.");
-    return { recordsUpdated: 0 };
-  }
-
-  console.log(`[dataAgent/govStats] Claude returned data for ${parsed.length} governorates`);
+  const parsed = structuredResult.result.governorates;
+  console.log(`[dataAgent/govStats] Structured extraction returned ${parsed.length} governorates`);
 
   // Build a lookup map: normalized nameEn -> governorate _id
   // Include common Wikipedia name variants for fuzzy matching
