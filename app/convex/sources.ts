@@ -11,6 +11,7 @@ const categoryValidator = v.union(
   v.literal("elections"),
   v.literal("economy"),
   v.literal("governorate_stats"),
+  v.literal("industry"),
   v.literal("general")
 );
 
@@ -45,7 +46,7 @@ type UpsertArgs = {
   nameEn: string;
   nameAr: string;
   url: string;
-  category: "government" | "parliament" | "constitution" | "budget" | "debt" | "elections" | "economy" | "governorate_stats" | "general";
+  category: "government" | "parliament" | "constitution" | "budget" | "debt" | "elections" | "economy" | "governorate_stats" | "industry" | "general";
   type: "official_government" | "international_org" | "academic" | "media" | "other";
   notes?: string;
 };

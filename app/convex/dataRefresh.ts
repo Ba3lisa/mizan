@@ -16,6 +16,7 @@ const categoryValidator = v.union(
   v.literal("debt"),
   v.literal("economy"),
   v.literal("governorate_stats"),
+  v.literal("industry"),
   v.literal("all")
 );
 
@@ -111,6 +112,8 @@ export const checkEmptyTables = internalQuery({
     const econ = await ctx.db.query("economicIndicators").take(1);
     const govStats = await ctx.db.query("governorateStats").take(1);
 
+    const industry = await ctx.db.query("investmentOpportunities").take(1);
+
     return {
       government: govOfficials.length === 0,
       budget: budgetItems.length === 0,
@@ -118,6 +121,7 @@ export const checkEmptyTables = internalQuery({
       parliament: members.length === 0,
       economy: econ.length === 0,
       governorate_stats: govStats.length === 0,
+      industry: industry.length === 0,
     };
   },
 });
@@ -668,7 +672,8 @@ const changeCategoryValidator = v.union(
   v.literal("debt"),
   v.literal("elections"),
   v.literal("economy"),
-  v.literal("governorate_stats")
+  v.literal("governorate_stats"),
+  v.literal("industry")
 );
 
 const changeActionValidator = v.union(
@@ -757,7 +762,8 @@ export const insertAiResearchReport = internalMutation({
       v.literal("budget"),
       v.literal("debt"),
       v.literal("elections"),
-      v.literal("economy")
+      v.literal("economy"),
+      v.literal("industry")
     ),
     summaryEn: v.string(),
     summaryAr: v.string(),
@@ -879,6 +885,7 @@ export const manualRefresh = internalAction({
         v.literal("budget"),
         v.literal("debt"),
         v.literal("economy"),
+        v.literal("industry"),
         v.literal("all")
       )
     ),
@@ -1107,5 +1114,155 @@ export const backfillEgx30History = internalMutation({
 
     console.log(`[backfillEgx30History] Inserted ${inserted} EGX 30 historical records.`);
     return inserted;
+  },
+});
+
+// ─── INVESTMENT OPPORTUNITY UPSERTS ─────────────────────────────────────────
+
+/**
+ * Upserts an investment opportunity by (source, externalId). Creates if new,
+ * patches changed fields if existing. Returns 0 or 1.
+ */
+export const upsertInvestmentOpportunity = internalMutation({
+  args: {
+    externalId: v.string(),
+    source: v.union(v.literal("ida"), v.literal("gafi")),
+    nameAr: v.string(),
+    nameEn: v.string(),
+    descriptionAr: v.optional(v.string()),
+    descriptionEn: v.optional(v.string()),
+    sector: v.string(),
+    sectorAr: v.optional(v.string()),
+    sectorEn: v.optional(v.string()),
+    governorate: v.optional(v.string()),
+    governorateAr: v.optional(v.string()),
+    type: v.union(
+      v.literal("industrial_unit"),
+      v.literal("land_plot"),
+      v.literal("major_opportunity"),
+      v.literal("free_zone"),
+      v.literal("investment_zone"),
+      v.literal("sme_program")
+    ),
+    costEgp: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    unitAreaSqm: v.optional(v.number()),
+    landAreaSqm: v.optional(v.number()),
+    pricePerSqmEgp: v.optional(v.number()),
+    status: v.optional(
+      v.union(
+        v.literal("available"),
+        v.literal("under_development"),
+        v.literal("reserved"),
+        v.literal("unknown")
+      )
+    ),
+    sourceUrl: v.string(),
+    sanadLevel: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("investmentOpportunities")
+      .withIndex("by_source_and_externalId", (q) =>
+        q.eq("source", args.source).eq("externalId", args.externalId)
+      )
+      .unique();
+
+    if (!existing) {
+      await ctx.db.insert("investmentOpportunities", {
+        ...args,
+        lastScrapedAt: Date.now(),
+      });
+      return 1;
+    }
+
+    const patch: Record<string, unknown> = {};
+    const fields = [
+      "nameAr", "nameEn", "descriptionAr", "descriptionEn",
+      "sector", "sectorAr", "sectorEn", "governorate", "governorateAr",
+      "type", "costEgp", "costUsd", "unitAreaSqm", "landAreaSqm",
+      "pricePerSqmEgp", "status", "sourceUrl", "sanadLevel",
+    ] as const;
+
+    for (const field of fields) {
+      if (args[field] !== undefined && args[field] !== existing[field]) {
+        patch[field] = args[field];
+      }
+    }
+
+    // Always update lastScrapedAt
+    patch.lastScrapedAt = Date.now();
+
+    if (Object.keys(patch).length > 1) {
+      // More than just lastScrapedAt changed
+      await ctx.db.patch(existing._id, patch);
+      return 1;
+    }
+
+    // Only lastScrapedAt changed — still patch it but report 0 data changes
+    await ctx.db.patch(existing._id, patch);
+    return 0;
+  },
+});
+
+/**
+ * Upserts project detail (cost breakdown) by opportunityId.
+ * Creates if new, patches changed fields if existing. Returns 0 or 1.
+ */
+export const upsertInvestmentProjectDetail = internalMutation({
+  args: {
+    opportunityId: v.id("investmentOpportunities"),
+    landCostEgp: v.optional(v.number()),
+    constructionCostEgp: v.optional(v.number()),
+    equipmentCostEgp: v.optional(v.number()),
+    laborCostEgp: v.optional(v.number()),
+    licensingFeesEgp: v.optional(v.number()),
+    workingCapitalEgp: v.optional(v.number()),
+    expectedRevenueEgp: v.optional(v.number()),
+    expectedProfitMarginPct: v.optional(v.number()),
+    paybackPeriodYears: v.optional(v.number()),
+    employeesNeeded: v.optional(v.number()),
+    incentivesAr: v.optional(v.string()),
+    incentivesEn: v.optional(v.string()),
+    licensingStepsAr: v.optional(v.string()),
+    licensingStepsEn: v.optional(v.string()),
+    rawDataJson: v.optional(v.string()),
+    sourceUrl: v.string(),
+    sanadLevel: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query("investmentProjectDetails")
+      .withIndex("by_opportunityId", (q) =>
+        q.eq("opportunityId", args.opportunityId)
+      )
+      .unique();
+
+    if (!existing) {
+      await ctx.db.insert("investmentProjectDetails", args);
+      return 1;
+    }
+
+    const patch: Record<string, unknown> = {};
+    const fields = [
+      "landCostEgp", "constructionCostEgp", "equipmentCostEgp",
+      "laborCostEgp", "licensingFeesEgp", "workingCapitalEgp",
+      "expectedRevenueEgp", "expectedProfitMarginPct", "paybackPeriodYears",
+      "employeesNeeded", "incentivesAr", "incentivesEn",
+      "licensingStepsAr", "licensingStepsEn", "rawDataJson",
+      "sourceUrl", "sanadLevel",
+    ] as const;
+
+    for (const field of fields) {
+      if (args[field] !== undefined && args[field] !== existing[field]) {
+        patch[field] = args[field];
+      }
+    }
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(existing._id, patch);
+      return 1;
+    }
+    return 0;
   },
 });

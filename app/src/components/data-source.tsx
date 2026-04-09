@@ -5,7 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
 
-type SourceCategory = "government" | "parliament" | "constitution" | "budget" | "debt" | "elections" | "economy" | "general";
+type SourceCategory = "government" | "parliament" | "constitution" | "budget" | "debt" | "elections" | "economy" | "industry" | "general";
 
 export function DataSourceFooter({ category }: { category: SourceCategory }) {
   const { lang } = useLanguage();

@@ -20,6 +20,7 @@ import {
   BookMarked,
   Home as HomeIcon,
   Vote,
+  Factory,
   type LucideIcon,
 } from "lucide-react";
 
@@ -81,6 +82,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: "/tools/tax-calculator", labelKey: "navTaxCalculator", en: "Tax Calculator", ar: "حاسبة الضريبة", icon: Calculator, descEn: "Where do your taxes go? — Interactive breakdown", descAr: "أين تذهب ضرائبك؟ — تقدير تفاعلي" },
       { href: "/tools/buy-vs-rent", labelKey: "navBuyVsRent", en: "Buy vs Rent", ar: "شراء أم إيجار؟", icon: HomeIcon, descEn: "Real estate decision calculator for Egypt", descAr: "حاسبة القرار العقاري في مصر" },
       { href: "/tools/invest", labelKey: "navInvest", en: "Investment Simulator", ar: "محاكي الاستثمار", icon: TrendingUp, descEn: "Gold · USD · Real Estate · Stocks — compare returns", descAr: "قارن بين الذهب · الدولار · العقار · البورصة" },
+      { href: "/tools/mashroaak", labelKey: "navMashroaak", en: "Mashrou'ak", ar: "مشروعك", icon: Factory, descEn: "Find your next investment project", descAr: "ابحث عن مشروعك الاستثماري القادم" },
       { href: "/polls", labelKey: "navPolls", en: "Polls", ar: "استطلاعات الرأي", icon: Vote, descEn: "Weekly polls & community opinion", descAr: "استطلاعات أسبوعية ورأي المجتمع" },
     ],
   },

@@ -11,6 +11,7 @@ const PIPELINE_STEPS = [
   "debt",
   "economy",
   "governorate_stats",
+  "industry",
   "constitution",
   "github_issues",
   "narrative",

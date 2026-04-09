@@ -334,6 +334,7 @@ export default defineSchema({
       v.literal("elections"),
       v.literal("economy"),
       v.literal("governorate_stats"),
+      v.literal("industry"),
       v.literal("general")
     )),
     sanadLevel: v.number(), // 1=official_gov, 2=intl_org, 3=news, 4=other, 5=derived
@@ -384,7 +385,8 @@ export default defineSchema({
       v.literal("debt"),
       v.literal("elections"),
       v.literal("economy"),
-      v.literal("governorate_stats")
+      v.literal("governorate_stats"),
+      v.literal("industry")
     ),
     action: v.union(
       v.literal("created"),
@@ -459,7 +461,8 @@ export default defineSchema({
       v.literal("debt"),
       v.literal("elections"),
       v.literal("economy"),
-      v.literal("governorate_stats")
+      v.literal("governorate_stats"),
+      v.literal("industry")
     ),
     summaryAr: v.string(),
     summaryEn: v.string(),
@@ -488,6 +491,7 @@ export default defineSchema({
       v.literal("debt"),
       v.literal("economy"),
       v.literal("governorate_stats"),
+      v.literal("industry"),
       v.literal("all")
     ),
     status: v.union(
@@ -766,6 +770,78 @@ export default defineSchema({
   })
     .index("by_runId", ["runId"])
     .index("by_runId_and_step", ["runId", "step"]),
+
+  // INVESTMENT OPPORTUNITIES (IDA + GAFI, refreshed every 12h)
+  investmentOpportunities: defineTable({
+    externalId: v.string(), // unique slug from source
+    source: v.union(v.literal("ida"), v.literal("gafi")),
+    nameAr: v.string(),
+    nameEn: v.string(),
+    descriptionAr: v.optional(v.string()),
+    descriptionEn: v.optional(v.string()),
+    sector: v.string(), // normalized key: "food_processing", "chemicals", etc.
+    sectorAr: v.optional(v.string()),
+    sectorEn: v.optional(v.string()),
+    governorate: v.optional(v.string()), // English name
+    governorateAr: v.optional(v.string()),
+    type: v.union(
+      v.literal("industrial_unit"),
+      v.literal("land_plot"),
+      v.literal("major_opportunity"),
+      v.literal("free_zone"),
+      v.literal("investment_zone"),
+      v.literal("sme_program")
+    ),
+    costEgp: v.optional(v.number()),
+    costUsd: v.optional(v.number()),
+    unitAreaSqm: v.optional(v.number()),
+    landAreaSqm: v.optional(v.number()),
+    pricePerSqmEgp: v.optional(v.number()),
+    status: v.optional(
+      v.union(
+        v.literal("available"),
+        v.literal("under_development"),
+        v.literal("reserved"),
+        v.literal("unknown")
+      )
+    ),
+    sourceUrl: v.string(),
+    sanadLevel: v.number(), // 1=official_gov
+    lastScrapedAt: v.number(),
+  })
+    .index("by_source_and_externalId", ["source", "externalId"])
+    .index("by_sector", ["sector"])
+    .index("by_governorate", ["governorate"])
+    .index("by_type", ["type"])
+    .index("by_source", ["source"])
+    .index("by_costEgp", ["costEgp"])
+    .searchIndex("search_opportunities", {
+      searchField: "nameEn",
+      filterFields: ["sector", "governorate", "type", "source"],
+    }),
+
+  // INVESTMENT PROJECT DETAILS (cost breakdown, 1:1 with investmentOpportunities)
+  investmentProjectDetails: defineTable({
+    opportunityId: v.id("investmentOpportunities"),
+    landCostEgp: v.optional(v.number()),
+    constructionCostEgp: v.optional(v.number()),
+    equipmentCostEgp: v.optional(v.number()),
+    laborCostEgp: v.optional(v.number()), // annual estimate
+    licensingFeesEgp: v.optional(v.number()),
+    workingCapitalEgp: v.optional(v.number()),
+    expectedRevenueEgp: v.optional(v.number()), // annual
+    expectedProfitMarginPct: v.optional(v.number()),
+    paybackPeriodYears: v.optional(v.number()),
+    employeesNeeded: v.optional(v.number()),
+    incentivesAr: v.optional(v.string()),
+    incentivesEn: v.optional(v.string()),
+    licensingStepsAr: v.optional(v.string()), // JSON string of step array
+    licensingStepsEn: v.optional(v.string()),
+    rawDataJson: v.optional(v.string()), // full scraped data for audit
+    sourceUrl: v.string(),
+    sanadLevel: v.number(),
+  })
+    .index("by_opportunityId", ["opportunityId"]),
 
   // NEWS HEADLINES (GDELT cache)
   newsHeadlines: defineTable({
