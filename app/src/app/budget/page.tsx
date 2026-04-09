@@ -43,112 +43,10 @@ interface BudgetCategory {
   subItems?: BudgetSubItem[];
 }
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
-// TODO: Replace revenue/spending/chartData arrays with Convex queries once
-// getBudgetBreakdown (requires fiscalYearId) and getBudgetSankeyData are wired up.
-// The flat budgetItems schema needs restructuring to match BudgetCategory with subItems.
-
-const revenue: BudgetCategory[] = [
-  {
-    nameAr: "الضرائب على الدخل",
-    nameEn: "Income Tax",
-    amount: 420,
-    subItems: [
-      { nameAr: "ضريبة الدخل الشخصي", nameEn: "Personal Income Tax", amount: 180 },
-      { nameAr: "ضريبة أرباح الشركات", nameEn: "Corporate Tax", amount: 155 },
-      { nameAr: "ضرائب أخرى على الدخل", nameEn: "Other Income Tax", amount: 85 },
-    ],
-  },
-  {
-    nameAr: "ضريبة القيمة المضافة",
-    nameEn: "VAT",
-    amount: 380,
-    subItems: [
-      { nameAr: "ضريبة القيمة المضافة المحلية", nameEn: "Domestic VAT", amount: 250 },
-      { nameAr: "ضريبة القيمة المضافة على الواردات", nameEn: "Import VAT", amount: 130 },
-    ],
-  },
-  {
-    nameAr: "البترول والغاز",
-    nameEn: "Petroleum & Gas",
-    amount: 245,
-    subItems: [
-      { nameAr: "صادرات البترول", nameEn: "Oil Exports", amount: 145 },
-      { nameAr: "الغاز الطبيعي", nameEn: "Natural Gas", amount: 100 },
-    ],
-  },
-  { nameAr: "قناة السويس", nameEn: "Suez Canal", amount: 120 },
-  { nameAr: "الجمارك والرسوم", nameEn: "Customs & Duties", amount: 95 },
-  { nameAr: "منح وإيرادات أخرى", nameEn: "Grants & Other", amount: 214 },
-];
-
-const spending: BudgetCategory[] = [
-  {
-    nameAr: "خدمة الدين",
-    nameEn: "Debt Service",
-    amount: 580,
-    subItems: [
-      { nameAr: "فوائد الدين المحلي", nameEn: "Domestic Debt Interest", amount: 420 },
-      { nameAr: "فوائد الدين الخارجي", nameEn: "External Debt Interest", amount: 95 },
-      { nameAr: "أقساط الدين", nameEn: "Principal Repayments", amount: 65 },
-    ],
-  },
-  {
-    nameAr: "الأجور والرواتب",
-    nameEn: "Wages & Salaries",
-    amount: 470,
-    subItems: [
-      { nameAr: "الجهاز الإداري", nameEn: "Civil Service", amount: 280 },
-      { nameAr: "الهيئات العامة", nameEn: "Public Authorities", amount: 120 },
-      { nameAr: "الإدارة المحلية", nameEn: "Local Admin", amount: 70 },
-    ],
-  },
-  {
-    nameAr: "الدعم والمنح الاجتماعية",
-    nameEn: "Subsidies & Social",
-    amount: 350,
-    subItems: [
-      { nameAr: "دعم المواد البترولية", nameEn: "Fuel Subsidies", amount: 120 },
-      { nameAr: "دعم الخبز والغذاء", nameEn: "Bread & Food", amount: 90 },
-      { nameAr: "تكافل وكرامة", nameEn: "Takaful & Karama", amount: 40 },
-      { nameAr: "دعم الكهرباء", nameEn: "Electricity Subsidy", amount: 55 },
-      { nameAr: "منح اجتماعية أخرى", nameEn: "Other Social", amount: 45 },
-    ],
-  },
-  {
-    nameAr: "البنية التحتية والاستثمارات",
-    nameEn: "Infrastructure",
-    amount: 250,
-    subItems: [
-      { nameAr: "الطرق والنقل", nameEn: "Roads & Transport", amount: 95 },
-      { nameAr: "العاصمة الإدارية", nameEn: "New Capital", amount: 65 },
-      { nameAr: "المياه والصرف", nameEn: "Water & Sanitation", amount: 45 },
-      { nameAr: "مشروعات أخرى", nameEn: "Other Projects", amount: 45 },
-    ],
-  },
-  {
-    nameAr: "التعليم",
-    nameEn: "Education",
-    amount: 180,
-    subItems: [
-      { nameAr: "التعليم الأساسي", nameEn: "Basic Education", amount: 110 },
-      { nameAr: "التعليم العالي", nameEn: "Higher Education", amount: 50 },
-      { nameAr: "الأزهر", nameEn: "Al-Azhar", amount: 20 },
-    ],
-  },
-  { nameAr: "الصحة", nameEn: "Health", amount: 120 },
-  { nameAr: "الدفاع والأمن", nameEn: "Defence & Security", amount: 95 },
-  { nameAr: "أخرى", nameEn: "Other", amount: 520 },
-];
+// ─── Data — all from Convex, no hardcoded values ──────────────────────────────
 
 const FISCAL_YEARS = ["2024-2025", "2023-2024", "2022-2023"] as const;
 type FiscalYear = (typeof FISCAL_YEARS)[number];
-
-const _FISCAL_YEAR_GDP: Record<FiscalYear, number> = {
-  "2024-2025": 12100,
-  "2023-2024": 10800,
-  "2022-2023": 9100,
-};
 
 // Population fetched live from Convex economy indicators (World Bank)
 
@@ -1084,7 +982,7 @@ export default function BudgetPage() {
               {t.revenueBreakdown}
             </p>
             <BreakdownTable
-              items={revenue}
+              items={activeRevenue}
               total={totalRevenue}
               gdp={gdp}
               labelHeader={isAr ? "المصدر" : "Source"}
@@ -1096,7 +994,7 @@ export default function BudgetPage() {
               {t.expenditureBreakdown}
             </p>
             <BreakdownTable
-              items={spending}
+              items={activeSpending}
               total={totalSpending}
               gdp={gdp}
               labelHeader={isAr ? "البند" : "Item"}
