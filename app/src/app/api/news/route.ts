@@ -1,9 +1,15 @@
 import { NextResponse } from "next/server";
 
 // Egyptian news RSS feeds — accessible from any server, no API key needed
+// egyptOnly: false means we filter for Egypt-related headlines
 const RSS_FEEDS = [
-  { url: "https://www.dailynewsegypt.com/feed/", language: "English", domain: "dailynewsegypt.com" },
-  { url: "https://www.al-monitor.com/rss", language: "English", domain: "al-monitor.com" },
+  // Egyptian outlets (all content is Egypt-related)
+  { url: "https://www.dailynewsegypt.com/feed/", language: "English", domain: "dailynewsegypt.com", egyptOnly: true },
+  { url: "https://egyptindependent.com/feed/", language: "English", domain: "egyptindependent.com", egyptOnly: true },
+  // Regional / international (filter for Egypt mentions)
+  { url: "https://www.al-monitor.com/rss", language: "English", domain: "al-monitor.com", egyptOnly: false },
+  { url: "https://feeds.bbci.co.uk/news/world/middle_east/rss.xml", language: "English", domain: "bbc.co.uk", egyptOnly: false },
+  { url: "https://rss.nytimes.com/services/xml/rss/nyt/MiddleEast.xml", language: "English", domain: "nytimes.com", egyptOnly: false },
 ];
 
 interface ParsedArticle {
@@ -18,6 +24,7 @@ async function parseRssFeed(
   feedUrl: string,
   language: string,
   domain: string,
+  egyptOnly: boolean,
 ): Promise<ParsedArticle[]> {
   try {
     const res = await fetch(feedUrl, {
@@ -39,8 +46,8 @@ async function parseRssFeed(
       const pubDate = extractTag(itemXml, "pubDate");
 
       if (title && link) {
-        // Filter for Egypt-related content from al-monitor (it covers whole MENA)
-        if (domain === "al-monitor.com" && !isEgyptRelated(title)) continue;
+        // Filter for Egypt-related content from non-Egyptian outlets
+        if (!egyptOnly && !isEgyptRelated(title)) continue;
 
         articles.push({
           title: decodeEntities(title),
@@ -86,14 +93,14 @@ function decodeEntities(text: string): string {
 }
 
 function isEgyptRelated(title: string): boolean {
-  const keywords = /egypt|cairo|suez|sinai|nile|sisi|madbouly|egp|egyptian/i;
+  const keywords = /egypt|cairo|suez|sinai|nile|sisi|madbouly|egp|egyptian|giza|alexandria|aswan|luxor|sharm|hurghada/i;
   return keywords.test(title);
 }
 
 export async function GET() {
   try {
     const results = await Promise.allSettled(
-      RSS_FEEDS.map((feed) => parseRssFeed(feed.url, feed.language, feed.domain))
+      RSS_FEEDS.map((feed) => parseRssFeed(feed.url, feed.language, feed.domain, feed.egyptOnly))
     );
 
     const articles = results
