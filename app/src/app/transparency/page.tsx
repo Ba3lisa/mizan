@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Skeleton } from "boneyard-js/react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   CheckCircle2,
   AlertTriangle,

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { type Id } from "../../../../convex/_generated/dataModel";
-import { Skeleton } from "boneyard-js/react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useLanguage } from "@/components/providers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

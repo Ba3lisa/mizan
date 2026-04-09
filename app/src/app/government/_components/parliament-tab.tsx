@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Skeleton } from "boneyard-js/react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Search, X, ChevronDown, ChevronUp } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";

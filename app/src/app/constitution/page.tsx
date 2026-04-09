@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Skeleton } from "boneyard-js/react";
+import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
 import Fuse from "fuse.js";
 import { Search, X, ChevronRight, ChevronDown } from "lucide-react";
 import { useQuery } from "convex/react";
@@ -172,6 +173,14 @@ function ArticleRow({
                 )}
               </div>
             )}
+
+            {/* Link to full article page */}
+            <Link
+              href={`/constitution/article/${article.number}`}
+              className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+            >
+              {isAr ? `عرض المادة ${article.number} كاملة ←` : `View Article ${article.number} →`}
+            </Link>
 
             {/* Cross-references */}
             {article.crossRefs.length > 0 && (

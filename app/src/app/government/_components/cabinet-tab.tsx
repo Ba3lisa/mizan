@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Search, Users, Building2 } from "lucide-react";
 import { DataSourceFooter } from "@/components/data-source";
 import { useQuery } from "convex/react";
@@ -12,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Skeleton } from "boneyard-js/react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,10 +56,12 @@ function OfficialCard({ official, size = "md" }: { official: Official; size?: "l
   const { lang } = useLanguage();
   const isAr = lang === "ar";
   const isLg = size === "lg";
+  const slug = official.nameEn.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   return (
+    <Link href={slug ? `/government/official/${slug}` : "#"} className="no-underline block">
     <Card className={cn(
-      "border-border/80 transition-all hover:border-primary/40",
+      "border-border/80 transition-all hover:border-primary/40 cursor-pointer",
       isLg ? "bg-card" : "bg-card/80"
     )}>
       <CardContent className={cn("flex items-center gap-4", isLg ? "p-5" : "p-4")}>
@@ -85,6 +88,7 @@ function OfficialCard({ official, size = "md" }: { official: Official; size?: "l
         </div>
       </CardContent>
     </Card>
+    </Link>
   );
 }
 
