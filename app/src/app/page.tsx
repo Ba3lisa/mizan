@@ -184,8 +184,8 @@ export default function HomePage() {
       <section className="relative overflow-hidden">
         <div className="container-page relative" style={{ zIndex: 1 }}>
           <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr_320px] gap-6 items-start pt-4 md:pt-8 pb-12 md:pb-16" style={{ direction: "ltr" }}>
-            {/* News — hidden on mobile, fixed height */}
-            <div className="hidden lg:block lg:order-1 w-full h-[480px]">
+            {/* News — shorter on mobile, full on desktop */}
+            <div className="order-2 lg:order-1 w-full h-[280px] lg:h-[480px]">
               <NewsTicker />
             </div>
 
