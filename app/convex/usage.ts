@@ -83,7 +83,14 @@ export const getDailyUsage = query({
       byDay[key].calls += 1;
     }
 
-    return Object.entries(byDay).map(([day, stats]) => ({ day, ...stats }));
+    return Object.entries(byDay).map(([date, stats]) => ({
+      date,
+      inputTokens: stats.inputTokens,
+      outputTokens: stats.outputTokens,
+      totalTokens: stats.totalTokens,
+      costUsd: stats.costUsd,
+      callCount: stats.calls,
+    }));
   },
 });
 
@@ -138,7 +145,14 @@ export const getUsageByProvider = query({
       byProvider[row.provider].calls += 1;
     }
 
-    return Object.entries(byProvider).map(([provider, stats]) => ({ provider, ...stats }));
+    return Object.entries(byProvider).map(([provider, stats]) => ({
+      provider,
+      inputTokens: stats.inputTokens,
+      outputTokens: stats.outputTokens,
+      totalTokens: stats.totalTokens,
+      costUsd: stats.costUsd,
+      callCount: stats.calls,
+    }));
   },
 });
 
@@ -226,7 +240,7 @@ export const getRunwaySummary = query({
       apiCostThisMonthUsd += row.costUsd;
     }
 
-    const FIXED_COST_USD = 38; // hosting + infra per month
+    const FIXED_COST_USD = 22; // Convex $10 + DigitalOcean $12 per month
     const totalMonthlyBurnUsd = FIXED_COST_USD + apiCostThisMonthUsd;
     const monthsRemaining =
       totalMonthlyBurnUsd > 0 ? balanceUsd / totalMonthlyBurnUsd : null;
