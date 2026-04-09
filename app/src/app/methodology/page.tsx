@@ -153,17 +153,41 @@ export default function MethodologyPage() {
           </p>
 
           <div className="flex flex-col gap-4">
-            <Button asChild className="w-fit gap-2">
-              <a
-                href="https://github.com/Ba3lisa/mizan/issues/new?template=data-correction.md&labels=data-correction"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <GitBranch size={14} />
-                {isAr ? "الإبلاغ عن خطأ في البيانات" : "Report a Data Error on GitHub"}
-                <ExternalLink size={12} />
-              </a>
-            </Button>
+            <div className="flex flex-wrap gap-3">
+              <Button asChild className="w-fit gap-2">
+                <a
+                  href="https://github.com/Ba3lisa/mizan/issues/new?template=data-issue.md&labels=data-correction"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <GitBranch size={14} />
+                  {isAr ? "الإبلاغ عن خطأ في البيانات" : "Report a Data Error"}
+                  <ExternalLink size={12} />
+                </a>
+              </Button>
+              <Button asChild variant="outline" className="w-fit gap-2">
+                <a
+                  href="https://github.com/Ba3lisa/mizan/issues/new?template=bug-report.md&labels=bug"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <AlertTriangle size={14} />
+                  {isAr ? "الإبلاغ عن خلل" : "Report a Bug"}
+                  <ExternalLink size={12} />
+                </a>
+              </Button>
+              <Button asChild variant="outline" className="w-fit gap-2">
+                <a
+                  href="https://github.com/Ba3lisa/mizan/issues/new?template=feature-request.md&labels=enhancement"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  <ThumbsUp size={14} />
+                  {isAr ? "اقتراح ميزة جديدة" : "Request a Feature"}
+                  <ExternalLink size={12} />
+                </a>
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground max-w-lg">
               {isAr
                 ? "سيتم مراجعة التقرير تلقائياً من قبل مجلس الذكاء الاصطناعي (LLM Council) الخاص بميزان. المصادر الحكومية (.gov.eg) لها الأولوية القصوى."

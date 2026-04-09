@@ -1,6 +1,6 @@
 # Mizan (ميزان)
 
-[![Deploy](https://github.com/Ba3lisa/mizan/actions/workflows/deploy.yml/badge.svg)](https://github.com/Ba3lisa/mizan/actions/workflows/deploy.yml)
+[![Deploy](https://github.com/Ba3lisa/mizan/actions/workflows/deploy.yml/badge.svg?event=release)](https://github.com/Ba3lisa/mizan/actions/workflows/deploy.yml)
 [![Lint](https://github.com/Ba3lisa/mizan/actions/workflows/lint.yml/badge.svg)](https://github.com/Ba3lisa/mizan/actions/workflows/lint.yml)
 [![Codex Review](https://github.com/Ba3lisa/mizan/actions/workflows/codex-review.yml/badge.svg)](https://github.com/Ba3lisa/mizan/actions/workflows/codex-review.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
