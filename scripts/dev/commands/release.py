@@ -113,7 +113,7 @@ def create(
 
     # Bump package.json version
     import json
-    pkg_path = APP_DIR / "package.json"
+    pkg_path = ROOT / "app" / "package.json"
     pkg = json.loads(pkg_path.read_text())
     pkg["version"] = f"{major}.{minor}.{patch}"
     pkg_path.write_text(json.dumps(pkg, indent=2, ensure_ascii=False) + "\n")
