@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import {
-  ExternalLink, Clock, Scale, ChevronLeft, ChevronRight,
+  ExternalLink, Scale, ChevronLeft, ChevronRight,
   ArrowRight, ArrowLeft, Bot, TrendingDown, BarChart3,
 } from "lucide-react";
 import { DailyPoll } from "@/components/daily-poll";
@@ -48,13 +48,6 @@ function Stat({ value, label, source, sourceUrl, currencyUnit, sanadLevel, symbo
 /* ─── Feature card groups — derived from shared navigation config ─── */
 import { NAV_GROUPS } from "@/lib/navigation";
 
-const sources = [
-  { ar: "مجلس النواب — قائمة الأعضاء", en: "Parliament — Members List", url: "https://www.parliament.gov.eg/en/MPs", domain: "parliament.gov.eg" },
-  { ar: "وزارة المالية — البيانات المالية", en: "MOF — Financial Statements", url: "https://www.mof.gov.eg/en/posts/statementsAndReports/5", domain: "mof.gov.eg" },
-  { ar: "البنك المركزي — النشرة الإحصائية", en: "CBE — Statistical Bulletin", url: "https://www.cbe.org.eg/en/economic-research/statistics", domain: "cbe.org.eg" },
-  { ar: "البنك الدولي — بيانات مصر", en: "World Bank — Egypt Data", url: "https://data.worldbank.org/country/egypt-arab-rep", domain: "worldbank.org" },
-  { ar: "صندوق النقد الدولي — تقارير مصر", en: "IMF — Egypt Reports", url: "https://www.imf.org/en/Countries/EGY", domain: "imf.org" },
-];
 
 export default function HomePage() {
   const { lang, dir } = useLanguage();
@@ -367,37 +360,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ════════ SOURCES ════════ */}
-      <section className="container-page pb-16">
-        <div className="flex items-end justify-between mb-6 gap-4 flex-wrap">
-          <div>
-            <h2 className="text-sm font-bold mb-1">{isAr ? "مصادر البيانات" : "Data Sources"}</h2>
-            <p className="text-xs text-muted-foreground">{isAr ? "جميع البيانات من منشورات رسمية موثقة." : "All data from official, verifiable publications."}</p>
-          </div>
-          <span className="last-updated"><span className="pulse-dot" /> {isAr ? "أبريل ٢٠٢٦" : "Apr 2026"}</span>
-        </div>
-        <Card className="overflow-hidden border-border/60 bg-card/60 backdrop-blur-sm">
-          <CardContent className="p-0 divide-y divide-border">
-            {sources.map((s) => (
-              <div key={s.domain} className="flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors">
-                <span className="text-sm">{isAr ? s.ar : s.en}</span>
-                <a href={s.url} target="_blank" rel="noopener noreferrer"
-                  className="text-sm text-primary no-underline hover:underline inline-flex items-center gap-1.5 flex-shrink-0">
-                  {s.domain} <ExternalLink size={12} />
-                </a>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        <div className="flex items-center justify-between mt-3 flex-wrap gap-3">
-          <p className="text-xs text-muted-foreground/60 inline-flex items-center gap-1.5">
-            <Clock size={11} /> {isAr ? "تحديث تلقائي كل ٦ ساعات" : "Auto-refreshed every 6 hours"}
-          </p>
-          <Link href="/methodology" className="text-xs text-primary no-underline hover:underline inline-flex items-center gap-1 font-medium">
-            {isAr ? "تعرف على منهجيتنا ←" : "Learn more about our methodology →"}
-          </Link>
-        </div>
-      </section>
+
+
     </div>
   );
 }

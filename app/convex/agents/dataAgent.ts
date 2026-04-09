@@ -66,6 +66,52 @@ type RefreshCategory = "government" | "parliament" | "budget" | "debt" | "econom
 
 const STALE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 hours (matches cron interval)
 
+// ─── SOURCE REGISTRY ─────────────────────────────────────────────────────────
+// Every URL the pipeline fetches, grouped by category.
+// On each successful refresh, all sources for that category are upserted into
+// the `dataSources` table so the /transparency page stays in sync automatically.
+
+type SourceEntry = {
+  nameEn: string;
+  nameAr: string;
+  url: string;
+  type: "official_government" | "international_org" | "academic" | "media" | "other";
+};
+
+const CATEGORY_SOURCES: Record<string, SourceEntry[]> = {
+  debt: [
+    { nameEn: "World Bank — External Debt Stock", nameAr: "البنك الدولي — رصيد الدين الخارجي", url: "https://api.worldbank.org/v2/country/EGY/indicator/DT.DOD.DECT.CD", type: "international_org" },
+    { nameEn: "World Bank — Debt Service Payments", nameAr: "البنك الدولي — مدفوعات خدمة الدين", url: "https://api.worldbank.org/v2/country/EGY/indicator/DT.TDS.DECT.CD", type: "international_org" },
+  ],
+  budget: [
+    { nameEn: "Ministry of Finance — Open Data", nameAr: "وزارة المالية — البيانات المفتوحة", url: "https://www.mof.gov.eg/en/open-data", type: "official_government" },
+  ],
+  government: [
+    { nameEn: "Ahram Online — Cabinet Composition", nameAr: "الأهرام — تشكيل مجلس الوزراء", url: "https://english.ahram.org.eg/News/562168.aspx", type: "media" },
+    { nameEn: "Ahram Online — Governors List", nameAr: "الأهرام — قائمة المحافظين", url: "https://english.ahram.org.eg/News/526575.aspx", type: "media" },
+  ],
+  parliament: [
+    { nameEn: "Wikipedia — 2025 Egyptian Parliamentary Election", nameAr: "ويكيبيديا — انتخابات البرلمان المصري ٢٠٢٥", url: "https://en.wikipedia.org/wiki/2025_Egyptian_parliamentary_election", type: "media" },
+  ],
+  economy: [
+    { nameEn: "World Bank — Economic Indicators", nameAr: "البنك الدولي — المؤشرات الاقتصادية", url: "https://api.worldbank.org/v2/country/EGY/indicator", type: "international_org" },
+    { nameEn: "IMF — DataMapper API", nameAr: "صندوق النقد الدولي — واجهة بيانات DataMapper", url: "https://www.imf.org/external/datamapper/api/v1", type: "international_org" },
+    { nameEn: "ExchangeRate API — USD/EGP", nameAr: "واجهة أسعار الصرف — دولار/جنيه", url: "https://open.er-api.com/v6/latest/USD", type: "other" },
+    { nameEn: "Central Bank of Egypt — T-Bill Rates", nameAr: "البنك المركزي المصري — أسعار أذون الخزانة", url: "https://www.cbe.org.eg/en/economic-research/statistics/egp-t-bills-secondary-market", type: "official_government" },
+    { nameEn: "Banque Misr — Certificate of Deposit Rates", nameAr: "بنك مصر — أسعار شهادات الإيداع", url: "https://www.banquemisr.com/en/SMEs/Retail-Banking/Accounts-And-Deposits/Certificates", type: "other" },
+    { nameEn: "CountryEconomy — EGX 30 Stock Index", nameAr: "CountryEconomy — مؤشر البورصة المصرية EGX 30", url: "https://countryeconomy.com/stock-exchange/egypt", type: "other" },
+    { nameEn: "Egyptian Exchange (EGX)", nameAr: "البورصة المصرية (EGX)", url: "https://www.egx.com.eg", type: "other" },
+  ],
+  governorate_stats: [
+    { nameEn: "Wikipedia — Governorates of Egypt", nameAr: "ويكيبيديا — محافظات مصر", url: "https://en.wikipedia.org/wiki/Governorates_of_Egypt", type: "media" },
+    { nameEn: "Wikipedia — Governorate HDI Rankings", nameAr: "ويكيبيديا — ترتيب المحافظات حسب التنمية البشرية", url: "https://en.wikipedia.org/wiki/List_of_governorates_of_Egypt_by_Human_Development_Index", type: "media" },
+  ],
+  constitution: [
+    { nameEn: "FAO — Egypt Constitution 2019 (PDF)", nameAr: "منظمة الأغذية والزراعة — دستور مصر ٢٠١٩", url: "https://faolex.fao.org/docs/pdf/egy127542e.pdf", type: "international_org" },
+    { nameEn: "Constitute Project — Egypt 2019", nameAr: "مشروع Constitute — دستور مصر ٢٠١٩", url: "https://www.constituteproject.org/constitution/Egypt_2019", type: "academic" },
+  ],
+};
+
 // ─── DEBT REFRESH ─────────────────────────────────────────────────────────────
 
 async function refreshDebtData(
@@ -1865,36 +1911,19 @@ async function refreshCategory(
 
     const { recordsUpdated, sourceUrl } = result;
 
-    // Update the central source registry so pages always read live references.
-    const sourceRegistryMap: Record<RefreshCategory, { nameEn: string; nameAr: string; type: "official_government" | "international_org" | "academic" | "media" | "other" }> = {
-      government: { nameEn: "Wikipedia — Madbouly Cabinet", nameAr: "ويكيبيديا — حكومة مدبولي", type: "media" },
-      parliament: { nameEn: "Wikipedia — 2025 Egyptian Parliamentary Election", nameAr: "ويكيبيديا — انتخابات البرلمان المصري 2025", type: "media" },
-      budget: { nameEn: "Ministry of Finance", nameAr: "وزارة المالية", type: "official_government" },
-      debt: { nameEn: "World Bank — Egypt External Debt", nameAr: "البنك الدولي — الدين الخارجي لمصر", type: "international_org" },
-      economy: { nameEn: "World Bank — Egypt Economic Indicators", nameAr: "البنك الدولي — المؤشرات الاقتصادية لمصر", type: "international_org" },
-      governorate_stats: { nameEn: "Wikipedia — Governorates of Egypt", nameAr: "ويكيبيديا — محافظات مصر", type: "other" as const },
-    };
-    const categorySourceUrlMap: Record<RefreshCategory, string> = {
-      government: "https://en.wikipedia.org/wiki/Madbouly_Cabinet",
-      parliament: "https://en.wikipedia.org/wiki/2025_Egyptian_parliamentary_election",
-      budget: "https://www.mof.gov.eg",
-      debt: "https://data.worldbank.org",
-      economy: "https://data.worldbank.org",
-      governorate_stats: "https://en.wikipedia.org/wiki/Governorates_of_Egypt",
-    };
-    const registryMeta = sourceRegistryMap[category];
-    const registryUrl = sourceUrl ?? categorySourceUrlMap[category];
-    if (registryUrl) {
+    // Update the central source registry — register ALL URLs used by this category
+    // so the /transparency page always reflects the full list of live references.
+    for (const src of CATEGORY_SOURCES[category] ?? []) {
       try {
         await ctx.runMutation(internal.sources.upsertSourceInternal, {
-          nameEn: registryMeta.nameEn,
-          nameAr: registryMeta.nameAr,
-          url: registryUrl,
+          nameEn: src.nameEn,
+          nameAr: src.nameAr,
+          url: src.url,
           category,
-          type: registryMeta.type,
+          type: src.type,
         });
       } catch (srcErr) {
-        console.warn(`[dataAgent] Failed to update source registry for ${category}: ${srcErr}`);
+        console.warn(`[dataAgent] Failed to update source registry for ${category} (${src.url}): ${srcErr}`);
       }
     }
 
@@ -2107,6 +2136,20 @@ export const orchestrateRefresh = internalAction({
         internal.agents.constitutionAgent.refreshConstitution,
         {}
       );
+      // Register constitution sources
+      for (const src of CATEGORY_SOURCES.constitution ?? []) {
+        try {
+          await ctx.runMutation(internal.sources.upsertSourceInternal, {
+            nameEn: src.nameEn,
+            nameAr: src.nameAr,
+            url: src.url,
+            category: "constitution",
+            type: src.type,
+          });
+        } catch (srcErr) {
+          console.warn(`[dataAgent] Failed to update source registry for constitution (${src.url}): ${srcErr}`);
+        }
+      }
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
         runId,
         step: "constitution",
