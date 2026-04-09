@@ -52,7 +52,12 @@
     "zod": "^3.23.0"
   },
   "lint-staged": {
-    "*.{ts,tsx}": "eslint --no-warn-ignored --max-warnings 0"
+    "*.{ts,tsx}": [
+      "eslint --no-warn-ignored --max-warnings 0"
+    ],
+    "package.json": [
+      "bash -c 'npx tsc --noEmit'"
+    ]
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
