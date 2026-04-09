@@ -370,6 +370,7 @@ interface CapitalMatcherTabProps {
   fromEGP: (egp: number) => number;
   symbol: string;
   stats: Stats | undefined;
+  inferredContext?: string | null;
 }
 
 function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: CapitalMatcherTabProps) {
@@ -774,7 +775,7 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
 
       {/* Key metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {Number.isFinite(opp.costEgp) && opp.costEgp > 0 && (
+        {opp.costEgp != null && opp.costEgp > 0 && (
           <Card className="border-amber-500/20 bg-amber-500/5">
             <CardContent className="p-3">
               <p className="text-[0.6rem] text-muted-foreground uppercase tracking-wide mb-1">
@@ -786,7 +787,7 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
             </CardContent>
           </Card>
         )}
-        {Number.isFinite(opp.unitAreaSqm ?? opp.landAreaSqm) && (
+        {(opp.unitAreaSqm ?? opp.landAreaSqm) != null && (opp.unitAreaSqm ?? opp.landAreaSqm)! > 0 && (
           <Card className="border-border/50 bg-card/50">
             <CardContent className="p-3">
               <p className="text-[0.6rem] text-muted-foreground uppercase tracking-wide mb-1">
