@@ -7,7 +7,7 @@
 
 **Egypt's government, made visible.**
 
-Mizan is a civic transparency platform that makes Egyptian government data accessible, searchable, and understandable. Budget allocations, national debt, parliament members, government structure, and constitutional articles -- all in one place, backed by official sources.
+Mizan is a civic transparency platform that makes Egyptian government data accessible, searchable, and understandable. Budget allocations, national debt, parliament members, government structure, and constitutional articles - all in one place, backed by official sources.
 
 ميزان هو منصة شفافية مدنية تجعل بيانات الحكومة المصرية متاحة وقابلة للبحث والفهم. مخصصات الموازنة، الدين العام، أعضاء البرلمان، هيكل الحكومة، ومواد الدستور -- كل ذلك في مكان واحد، مدعوم بمصادر رسمية.
 
