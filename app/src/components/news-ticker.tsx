@@ -1,12 +1,16 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useQuery, useMutation } from "convex/react";
-import { api } from "../../convex/_generated/api";
+import { useState, useEffect, useRef } from "react";
 import { useLanguage } from "@/components/providers";
 import { Newspaper, ExternalLink } from "lucide-react";
 
-const STALE_MS = 15 * 60 * 1000; // 15 minutes
+interface Headline {
+  title: string;
+  url: string;
+  sourceDomain: string;
+  language: string;
+  publishedAt: number;
+}
 
 function relativeTime(epochMs: number, isAr: boolean): string {
   const diff = Date.now() - epochMs;
@@ -22,42 +26,29 @@ function relativeTime(epochMs: number, isAr: boolean): string {
 export function NewsTicker() {
   const { lang } = useLanguage();
   const isAr = lang === "ar";
-  // Prefer headlines matching the current language, but show all if not enough
-  const preferred = useQuery(api.news.getLatest, {
-    limit: 20,
-    language: isAr ? "Arabic" : "English",
-  });
-  const fallback = useQuery(api.news.getLatest, { limit: 20 });
-  const data = (preferred?.headlines?.length ?? 0) >= 3 ? preferred : fallback;
-  const writeHeadlines = useMutation(api.news.writeHeadlines);
-  const hasTriggeredRef = useRef(false);
+  const [headlines, setHeadlines] = useState<Headline[]>([]);
+  const [loading, setLoading] = useState(true);
+  const fetchedRef = useRef(false);
 
-  // If cache is stale, fetch from /api/news (Next.js proxy → GDELT) and write to Convex
   useEffect(() => {
-    if (!data || hasTriggeredRef.current) return;
-    if (data.lastFetchedAt === 0 || Date.now() - data.lastFetchedAt > STALE_MS) {
-      hasTriggeredRef.current = true;
-      fetch("/api/news")
-        .then((res) => res.json())
-        .then((json: { articles?: Array<{ title: string; url: string; sourceDomain: string; language: string; publishedAt: number; imageUrl?: string }> }) => {
-          if (json.articles?.length) {
-            writeHeadlines({ items: json.articles }).catch(() => {});
-          }
-        })
-        .catch(() => {});
-    }
-  }, [data, writeHeadlines]);
-
-  const headlines = data?.headlines ?? [];
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+    fetch("/api/news")
+      .then((res) => res.json())
+      .then((data: { articles?: Headline[] }) => {
+        setHeadlines(data.articles ?? []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
 
   return (
     <div className="relative group/ticker h-full">
-      {/* Hover glow — matches DailyPoll pattern */}
       <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 via-primary/5 to-primary/20 rounded-2xl blur-sm opacity-0 group-hover/ticker:opacity-100 transition-opacity duration-500" />
 
       <div className="relative border border-border/60 rounded-2xl bg-card/80 backdrop-blur-sm overflow-hidden h-full flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-primary/10 via-transparent to-primary/5 border-b border-border/40">
+        <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-primary/10 via-transparent to-primary/5 border-b border-border/40 shrink-0">
           <div className="flex items-center gap-2">
             <div className="relative">
               <Newspaper size={14} className="text-primary" />
@@ -75,77 +66,43 @@ export function NewsTicker() {
         </div>
 
         {/* Ticker body */}
-        {data === undefined ? (
+        {loading ? (
           <TickerSkeleton />
         ) : headlines.length === 0 ? (
-          <div className="flex items-center justify-center flex-1 min-h-[200px] text-xs text-muted-foreground/40">
-            {isAr ? "جارٍ تحميل الأخبار..." : "Loading news..."}
+          <div className="flex items-center justify-center flex-1 text-xs text-muted-foreground/40">
+            {isAr ? "لا توجد أخبار حالياً" : "No news available"}
           </div>
         ) : (
-          <TickerScroll headlines={headlines} isAr={isAr} />
+          <div className="ticker-wrap relative flex-1 overflow-hidden">
+            <div className="absolute top-0 left-0 right-0 h-6 z-10 pointer-events-none bg-gradient-to-b from-card/90 to-transparent" />
+            <div
+              className="ticker-track flex flex-col"
+              style={{
+                animation: `ticker-scroll ${Math.max(20, headlines.length * 3)}s linear infinite`,
+                willChange: "transform",
+              }}
+            >
+              {headlines.map((h, i) => (
+                <HeadlineCard key={i} headline={h} isAr={isAr} />
+              ))}
+              {headlines.map((h, i) => (
+                <HeadlineCard key={`dup-${i}`} headline={h} isAr={isAr} />
+              ))}
+            </div>
+            <div className="absolute bottom-0 left-0 right-0 h-6 z-10 pointer-events-none bg-gradient-to-t from-card/90 to-transparent" />
+          </div>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-1.5 border-t border-border/30 bg-muted/5">
+        <div className="flex items-center justify-between px-4 py-1.5 border-t border-border/30 bg-muted/5 shrink-0">
           <span className="text-[0.5rem] text-muted-foreground/30 font-mono uppercase tracking-wider">
-            via GDELT
+            RSS
           </span>
-          {data?.lastFetchedAt ? (
-            <span className="text-[0.5rem] text-muted-foreground/30 font-mono">
-              {relativeTime(data.lastFetchedAt, isAr)}
-            </span>
-          ) : null}
         </div>
       </div>
     </div>
   );
 }
-
-/* ─── Scrolling ticker track ─── */
-
-interface Headline {
-  _id: string;
-  title: string;
-  url: string;
-  sourceDomain: string;
-  language: string;
-  publishedAt: number;
-}
-
-function TickerScroll({ headlines, isAr }: { headlines: Headline[]; isAr: boolean }) {
-  // Duration scales with headline count — ~3s per headline
-  const duration = Math.max(20, headlines.length * 3);
-
-  return (
-    <div className="ticker-wrap relative flex-1 min-h-[200px] overflow-hidden">
-      {/* Top gradient fade */}
-      <div className="absolute top-0 left-0 right-0 h-8 z-10 pointer-events-none bg-gradient-to-b from-card/95 to-transparent" />
-
-      {/* Scrolling track — duplicated for seamless loop */}
-      <div
-        className="ticker-track flex flex-col"
-        style={{
-          animation: `ticker-scroll ${duration}s linear infinite`,
-          willChange: "transform",
-        }}
-      >
-        {/* First pass */}
-        {headlines.map((h) => (
-          <HeadlineCard key={h._id} headline={h} isAr={isAr} />
-        ))}
-        {/* Duplicate for seamless loop */}
-        {headlines.map((h) => (
-          <HeadlineCard key={`dup-${h._id}`} headline={h} isAr={isAr} />
-        ))}
-      </div>
-
-      {/* Bottom gradient fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-8 z-10 pointer-events-none bg-gradient-to-t from-card/95 to-transparent" />
-    </div>
-  );
-}
-
-/* ─── Individual headline card ─── */
 
 function HeadlineCard({ headline, isAr }: { headline: Headline; isAr: boolean }) {
   return (
@@ -175,12 +132,10 @@ function HeadlineCard({ headline, isAr }: { headline: Headline; isAr: boolean })
   );
 }
 
-/* ─── Loading skeleton ─── */
-
 function TickerSkeleton() {
   return (
-    <div className="h-[300px] px-4 py-3 space-y-3">
-      {Array.from({ length: 6 }).map((_, i) => (
+    <div className="flex-1 px-4 py-3 space-y-3">
+      {Array.from({ length: 5 }).map((_, i) => (
         <div key={i} className="space-y-1.5 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
           <div className="flex items-center gap-2">
             <div className="h-2.5 w-16 bg-muted/30 rounded" />

@@ -1,74 +1,108 @@
 import { NextResponse } from "next/server";
 
-const GDELT_BASE = "https://api.gdeltproject.org/api/v2/doc/doc";
+// Egyptian news RSS feeds — accessible from any server, no API key needed
+const RSS_FEEDS = [
+  { url: "https://www.dailynewsegypt.com/feed/", language: "English", domain: "dailynewsegypt.com" },
+  { url: "https://www.al-monitor.com/rss", language: "English", domain: "al-monitor.com" },
+];
 
-interface GdeltArticle {
-  url?: string;
-  title?: string;
-  seendate?: string;
-  socialimage?: string;
-  domain?: string;
-  language?: string;
+interface ParsedArticle {
+  title: string;
+  url: string;
+  sourceDomain: string;
+  language: string;
+  publishedAt: number;
 }
 
-/** Parse GDELT seendate "20260409T043000Z" → epoch ms */
-function parseGdeltDate(seendate?: string): number {
-  if (!seendate) return Date.now();
-  const s = seendate;
-  if (s.length >= 15) {
-    const iso = `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}T${s.slice(9, 11)}:${s.slice(11, 13)}:${s.slice(13, 15)}Z`;
-    const ts = new Date(iso).getTime();
-    if (!isNaN(ts)) return ts;
+async function parseRssFeed(
+  feedUrl: string,
+  language: string,
+  domain: string,
+): Promise<ParsedArticle[]> {
+  try {
+    const res = await fetch(feedUrl, {
+      signal: AbortSignal.timeout(10000),
+      headers: { "User-Agent": "Mizan/1.0 (https://mizanmasr.com)" },
+    });
+    if (!res.ok) return [];
+
+    const xml = await res.text();
+    const articles: ParsedArticle[] = [];
+
+    // Simple XML parsing without external dependencies
+    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    let match;
+    while ((match = itemRegex.exec(xml)) !== null && articles.length < 15) {
+      const itemXml = match[1];
+      const title = extractTag(itemXml, "title");
+      const link = extractTag(itemXml, "link");
+      const pubDate = extractTag(itemXml, "pubDate");
+
+      if (title && link) {
+        // Filter for Egypt-related content from al-monitor (it covers whole MENA)
+        if (domain === "al-monitor.com" && !isEgyptRelated(title)) continue;
+
+        articles.push({
+          title: decodeEntities(title),
+          url: link,
+          sourceDomain: domain,
+          language,
+          publishedAt: pubDate ? new Date(pubDate).getTime() : Date.now(),
+        });
+      }
+    }
+
+    return articles;
+  } catch {
+    return [];
   }
-  return Date.now();
 }
 
-async function fetchGdelt(query: string) {
-  const params = new URLSearchParams({
-    query,
-    mode: "ArtList",
-    maxrecords: "20",
-    timespan: "72h",
-    format: "json",
-    sort: "DateDesc",
-  });
+function extractTag(xml: string, tag: string): string | null {
+  // Handle CDATA: <title><![CDATA[...]]></title>
+  const cdataRegex = new RegExp(`<${tag}[^>]*>\\s*<!\\[CDATA\\[([\\s\\S]*?)\\]\\]>\\s*</${tag}>`);
+  const cdataMatch = xml.match(cdataRegex);
+  if (cdataMatch) return cdataMatch[1].trim();
 
-  const res = await fetch(`${GDELT_BASE}?${params}`, {
-    signal: AbortSignal.timeout(10000),
-    headers: { "User-Agent": "Mizan/1.0 (https://mizanmasr.com)" },
-  });
+  // Handle plain text: <title>...</title>
+  const plainRegex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`);
+  const plainMatch = xml.match(plainRegex);
+  if (plainMatch) return plainMatch[1].trim();
 
-  if (!res.ok) return [];
+  return null;
+}
 
-  const data = (await res.json()) as { articles?: GdeltArticle[] };
-  if (!data.articles) return [];
+function decodeEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+    .replace(/&#8217;/g, "\u2019")
+    .replace(/&#8216;/g, "\u2018")
+    .replace(/&#8220;/g, "\u201C")
+    .replace(/&#8221;/g, "\u201D");
+}
 
-  return data.articles
-    .filter((a): a is GdeltArticle & { url: string; title: string; domain: string } =>
-      Boolean(a.url && a.title && a.domain)
-    )
-    .map((a) => ({
-      title: a.title,
-      url: a.url,
-      sourceDomain: a.domain,
-      language: a.language ?? "Unknown",
-      publishedAt: parseGdeltDate(a.seendate),
-      imageUrl: a.socialimage || undefined,
-    }));
+function isEgyptRelated(title: string): boolean {
+  const keywords = /egypt|cairo|suez|sinai|nile|sisi|madbouly|egp|egyptian/i;
+  return keywords.test(title);
 }
 
 export async function GET() {
   try {
-    const [enResult, arResult] = await Promise.allSettled([
-      fetchGdelt("sourcecountry:EG sourcelang:eng"),
-      fetchGdelt("sourcecountry:EG sourcelang:ara"),
-    ]);
+    const results = await Promise.allSettled(
+      RSS_FEEDS.map((feed) => parseRssFeed(feed.url, feed.language, feed.domain))
+    );
 
-    const en = enResult.status === "fulfilled" ? enResult.value : [];
-    const ar = arResult.status === "fulfilled" ? arResult.value : [];
+    const articles = results
+      .filter((r): r is PromiseFulfilledResult<ParsedArticle[]> => r.status === "fulfilled")
+      .flatMap((r) => r.value)
+      .sort((a, b) => b.publishedAt - a.publishedAt);
 
     return NextResponse.json(
-      { articles: [...en, ...ar] },
+      { articles },
       {
         headers: {
           "Cache-Control": "public, s-maxage=900, stale-while-revalidate=1800",

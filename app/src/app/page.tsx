@@ -183,9 +183,9 @@ export default function HomePage() {
          ════════════════════════════════════════════════════ */}
       <section className="relative overflow-hidden">
         <div className="container-page relative" style={{ zIndex: 1 }}>
-          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr_320px] gap-6 lg:items-stretch pt-4 md:pt-8 pb-12 md:pb-16" style={{ direction: "ltr" }}>
-            {/* News — visual left on desktop, stretches to match poll height */}
-            <div className="order-2 lg:order-1 w-full max-w-sm mx-auto lg:mx-0">
+          <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr_320px] gap-6 items-start pt-4 md:pt-8 pb-12 md:pb-16" style={{ direction: "ltr" }}>
+            {/* News — hidden on mobile, fixed height */}
+            <div className="hidden lg:block lg:order-1 w-full h-[480px]">
               <NewsTicker />
             </div>
 
@@ -216,8 +216,8 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Poll — visual right on desktop */}
-            <div className="order-3 lg:sticky lg:top-24 w-full max-w-sm mx-auto lg:mx-0">
+            {/* Poll — right on desktop, below hero on mobile */}
+            <div className="order-3 w-full max-w-sm mx-auto lg:mx-0">
               <DailyPoll />
             </div>
           </div>
