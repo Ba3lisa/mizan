@@ -113,6 +113,12 @@ export const checkEmptyTables = internalQuery({
     const govStats = await ctx.db.query("governorateStats").take(1);
 
     const industry = await ctx.db.query("investmentOpportunities").take(1);
+    // Also consider industry "empty" if all records lack cost data (forces cost estimation)
+    let industryNeedsCosts = false;
+    if (industry.length > 0) {
+      const allOpps = await ctx.db.query("investmentOpportunities").collect();
+      industryNeedsCosts = allOpps.every((o) => o.costEgp === undefined);
+    }
 
     return {
       government: govOfficials.length === 0,
@@ -121,7 +127,7 @@ export const checkEmptyTables = internalQuery({
       parliament: members.length === 0,
       economy: econ.length === 0,
       governorate_stats: govStats.length === 0,
-      industry: industry.length === 0,
+      industry: industry.length === 0 || industryNeedsCosts,
     };
   },
 });

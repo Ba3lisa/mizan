@@ -254,6 +254,57 @@ export async function evaluateDataChange(
   return parseCouncilVote(response);
 }
 
+// ─── WEB RESEARCH + STRUCTURED OUTPUT (two-step) ────────────────────────────
+
+/**
+ * Two-step call: first uses server tools (web_search/web_fetch) to gather data,
+ * then uses structured output (tool_use) to parse the results into a typed schema.
+ * This avoids JSON parsing failures from free-form Claude responses.
+ */
+export async function callClaudeWebResearchStructured<T>(
+  researchPrompt: string,
+  serverTools: ServerToolDef[],
+  schema: ToolSchema,
+  parsePrompt?: string,
+  systemPrompt?: string,
+): Promise<{ result: T | null; usage: LLMCallResult["usage"]; rawResearch: string | null }> {
+  // Step 1: Web research with server tools
+  const researchResult = await callClaudeWithServerTools(
+    researchPrompt,
+    serverTools,
+    systemPrompt,
+  );
+
+  if (!researchResult.text) {
+    return { result: null, usage: researchResult.usage, rawResearch: null };
+  }
+
+  // Step 2: Structured parsing of the research results
+  const structuredResult = await callClaudeStructuredWithUsage<T>(
+    parsePrompt
+      ? `${parsePrompt}\n\n## RAW RESEARCH DATA:\n${researchResult.text}`
+      : `Parse the following research data into the required structured format.\n\n## RAW RESEARCH DATA:\n${researchResult.text}`,
+    schema,
+    "Extract structured data from the research results. Be precise and thorough.",
+  );
+
+  // Combine usage from both calls
+  const combinedUsage: LLMCallResult["usage"] = (researchResult.usage && structuredResult.usage)
+    ? {
+        inputTokens: researchResult.usage.inputTokens + structuredResult.usage.inputTokens,
+        outputTokens: researchResult.usage.outputTokens + structuredResult.usage.outputTokens,
+        model: researchResult.usage.model,
+        durationMs: researchResult.usage.durationMs + structuredResult.usage.durationMs,
+      }
+    : researchResult.usage ?? structuredResult.usage;
+
+  return {
+    result: structuredResult.result,
+    usage: combinedUsage,
+    rawResearch: researchResult.text,
+  };
+}
+
 // ─── PROVIDER INTERFACE ─────────────────────────────────────────────────────
 
 export const anthropicProvider: LLMProvider = {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 // usePersistedState removed — causes hydration mismatches with SSR
 import { useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
@@ -33,6 +33,7 @@ import {
   Layers,
   Globe,
   Users,
+  Lightbulb,
 } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -371,10 +372,11 @@ interface CapitalMatcherTabProps {
   symbol: string;
   stats: Stats | undefined;
   inferredContext?: string | null;
+  capital: number;
+  setCapital: (v: number) => void;
 }
 
-function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: CapitalMatcherTabProps) {
-  const [capital, setCapital] = useState(1_000_000);
+function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferredContext, capital, setCapital }: CapitalMatcherTabProps) {
   const [sector, setSector] = useState("");
   const [governorate, setGovernorate] = useState("");
 
@@ -391,6 +393,18 @@ function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: Capi
 
   return (
     <div className="space-y-5">
+      {/* Cross-tool inference banner */}
+      {inferredContext && (
+        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-amber-500/5 border border-amber-500/10 rounded-lg px-3 py-2">
+          <Lightbulb size={12} className="text-amber-500 shrink-0" />
+          <span>
+            {isAr ? "بناءً على استخدامك للأدوات الأخرى:" : "Based on your other tools:"}
+            {" "}
+            <span className="text-foreground font-medium">{inferredContext}</span>
+          </span>
+        </div>
+      )}
+
       {/* Capital input */}
       <Card className="border-amber-500/20 bg-amber-500/5">
         <CardContent className="p-4 space-y-3">
@@ -967,8 +981,60 @@ export default function MashroaakPage() {
   const [activeTab, setActiveTab] = useState("matcher");
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [previousTab, setPreviousTab] = useState("matcher");
+  const [inferredContext, setInferredContext] = useState<string | null>(null);
 
   const stats = useQuery(api.industry.getStats, {});
+
+  // Cross-tool inference: read localStorage from other Mizan tools
+  const [capital, setCapital] = useState(1_000_000);
+  useEffect(() => {
+    const CAPITAL_TIERS = [100_000, 250_000, 500_000, 1_000_000, 2_500_000, 5_000_000, 10_000_000, 25_000_000, 50_000_000, 100_000_000];
+    const context: string[] = [];
+    let suggestedCapital: number | null = null;
+
+    try {
+      const capitalIdxStr = localStorage.getItem("invest-capitalIdx");
+      if (capitalIdxStr) {
+        const idx = parseInt(capitalIdxStr);
+        if (idx >= 0 && idx < CAPITAL_TIERS.length) {
+          suggestedCapital = CAPITAL_TIERS[idx];
+          context.push(isAr
+            ? `محاكي الاستثمار: ${fmtEgp(suggestedCapital, { compact: true })} EGP`
+            : `Investment sim: EGP ${fmtEgp(suggestedCapital, { compact: true })}`);
+        }
+      }
+
+      const presetStr = localStorage.getItem("invest-activePreset");
+      if (presetStr && presetStr !== "balanced") {
+        const labels: Record<string, { en: string; ar: string }> = {
+          conservative: { en: "Conservative profile", ar: "مستثمر متحفظ" },
+          aggressive: { en: "Aggressive profile", ar: "مستثمر جريء" },
+          gold_heavy: { en: "Gold-focused", ar: "يركز على الذهب" },
+          real_estate: { en: "Real estate focused", ar: "يركز على العقارات" },
+          egyptian_stocks: { en: "Egyptian stocks", ar: "أسهم مصرية" },
+        };
+        const l = labels[presetStr];
+        if (l) context.push(isAr ? l.ar : l.en);
+      }
+
+      const homePriceStr = localStorage.getItem("bvr-homePrice");
+      if (homePriceStr) {
+        const homePrice = parseFloat(homePriceStr);
+        if (homePrice > 0) {
+          const estimated = Math.round(homePrice * 0.4);
+          if (!suggestedCapital || estimated > suggestedCapital) suggestedCapital = estimated;
+          context.push(isAr
+            ? `ميزانية عقارية: ${fmtEgp(homePrice, { compact: true })} EGP`
+            : `Real estate budget: EGP ${fmtEgp(homePrice, { compact: true })}`);
+        }
+      }
+    } catch {
+      // localStorage not available (SSR)
+    }
+
+    if (suggestedCapital) setCapital(suggestedCapital);
+    if (context.length > 0) setInferredContext(context.join(" · "));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Unique sectors/governorates from stats
   const statsData = stats as Stats | undefined;
@@ -1064,6 +1130,9 @@ export default function MashroaakPage() {
             fromEGP={fromEGP}
             symbol={symbol}
             stats={statsData}
+            inferredContext={inferredContext}
+            capital={capital}
+            setCapital={setCapital}
           />
         </TabsContent>
 
