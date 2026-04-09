@@ -9,15 +9,35 @@ import { WebMcpRegistration } from "@/components/web-mcp";
 export const metadata: Metadata = {
   metadataBase: new URL("https://mizanmasr.com"),
   title: {
-    default: "ميزان — Egypt, visualized.",
+    default: "ميزان — Egypt's government, made visible.",
     template: "%s | ميزان",
   },
   description:
-    "منصة شفافية مدنية تتيح الوصول إلى بيانات الحكومة المصرية — الوزارات، البرلمان، الدستور، الميزانية، والديون. Civic transparency platform for Egyptian government data.",
+    "ميزان — منصة شفافية مدنية تتيح الوصول إلى بيانات الحكومة المصرية: الوزارات، البرلمان، الدستور، الميزانية، الديون، والاقتصاد. Mizan — Egypt's government, made visible. Live data on Egypt's cabinet, parliament, economy, budget, debt, and constitution.",
   keywords: [
-    "مصر", "حكومة", "شفافية", "برلمان", "ميزانية", "دستور", "ديون", "انتخابات",
-    "Egypt", "government", "transparency", "parliament", "budget", "constitution", "debt", "elections",
-    "Egyptian government data", "open data Egypt", "ميزان",
+    "mizan egypt",
+    "egypt government data",
+    "egypt open data",
+    "egypt transparency",
+    "egyptian government",
+    "egypt cabinet",
+    "egypt parliament",
+    "egypt budget",
+    "egypt debt",
+    "egypt constitution",
+    "egypt economy",
+    "egypt gdp",
+    "egypt inflation",
+    "ميزان",
+    "مصر",
+    "حكومة مصر",
+    "شفافية مصر",
+    "بيانات مصر",
+    "الحكومة المصرية",
+    "البرلمان المصري",
+    "الدستور المصري",
+    "ميزانية مصر",
+    "ديون مصر",
   ],
   icons: {
     icon: "/icon.svg",
@@ -30,8 +50,9 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "ميزان — Egypt, visualized.",
-    description: "Egypt, visualized.",
+    title: "ميزان — Egypt's government, made visible.",
+    description:
+      "Live data on Egypt's cabinet, parliament, economy, budget, debt, and constitution. Egypt's government, made visible.",
     url: "https://mizanmasr.com",
     siteName: "Mizan - ميزان",
     locale: "ar_EG",
@@ -40,8 +61,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "ميزان — Egypt, visualized.",
-    description: "Civic transparency platform for Egyptian government data.",
+    title: "ميزان — Egypt's government, made visible.",
+    description:
+      "Live data on Egypt's cabinet, parliament, economy, budget, debt, and constitution.",
   },
   robots: {
     index: true,
@@ -61,12 +83,21 @@ const jsonLd = {
   "@graph": [
     {
       "@type": "WebSite",
+      "@id": "https://mizanmasr.com/#website",
       name: "Mizan",
       alternateName: "ميزان",
       url: "https://mizanmasr.com",
       inLanguage: ["ar", "en"],
       description: "Civic transparency platform for Egyptian government data.",
       publisher: { "@id": "https://mizanmasr.com/#org" },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: "https://mizanmasr.com/constitution?q={search_term_string}",
+        },
+        "query-input": "required name=search_term_string",
+      },
     },
     {
       "@type": "Organization",
@@ -74,6 +105,7 @@ const jsonLd = {
       name: "Mizan",
       alternateName: "ميزان",
       url: "https://mizanmasr.com",
+      description: "Egypt's government, made visible. منصة شفافية مدنية.",
       sameAs: ["https://github.com/Ba3lisa/mizan"],
     },
   ],

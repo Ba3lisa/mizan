@@ -93,6 +93,16 @@ Managed by Father of Projects (FoP). Stack: nextjs-convex.
 - Run `npx convex dev --once` to verify Convex functions compile after changes
 - Never hardcode data that should come from Convex — this includes chart segments, stat counts, and UI labels derived from data
 
+### SEO — Critical for Every Page
+- SEO is a first-class concern — every new page/tool MUST include proper metadata
+- Use Next.js `generateMetadata` with bilingual title, description, and OpenGraph tags
+- Add structured data (JSON-LD) where applicable (Article, FAQPage, BreadcrumbList, etc.)
+- Ensure semantic HTML: proper heading hierarchy (h1 → h2 → h3), landmark regions, alt text
+- Use `convex/seo.ts` schema generators for consistent structured data across pages
+- Every page should have a unique, descriptive `<title>` and `<meta description>`
+- Internal linking between related pages improves discoverability
+- The `/llms.txt` and `/llms-full.txt` endpoints serve as LLM-optimized sitemaps — keep them updated when adding pages
+
 ### Everything Is Code
 - No manual workarounds
 - All config in version control

@@ -12,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/tools/tax-calculator", priority: 0.7, changeFrequency: "monthly" as const },
     { path: "/tools/buy-vs-rent", priority: 0.7, changeFrequency: "monthly" as const },
     { path: "/tools/invest", priority: 0.7, changeFrequency: "monthly" as const },
+    { path: "/tools/mashroaak", priority: 0.7, changeFrequency: "weekly" as const },
     { path: "/debt", priority: 0.9, changeFrequency: "weekly" as const },
     { path: "/economy", priority: 0.8, changeFrequency: "weekly" as const },
     { path: "/elections", priority: 0.8, changeFrequency: "monthly" as const },
