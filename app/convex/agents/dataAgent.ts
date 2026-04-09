@@ -64,7 +64,7 @@ async function callClaude(
 
 type RefreshCategory = "government" | "parliament" | "budget" | "debt" | "economy" | "governorate_stats";
 
-const STALE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 hours (matches cron interval)
+const STALE_THRESHOLD_MS = 12 * 60 * 60 * 1000; // 12 hours (matches cron interval)
 
 // ─── SOURCE REGISTRY ─────────────────────────────────────────────────────────
 // Every URL the pipeline fetches, grouped by category.
@@ -2149,7 +2149,7 @@ async function refreshCategory(
 
 /**
  * Exposed internal action so the backfill can be triggered manually via CLI
- * without waiting for the 6-hour staleness window to expire.
+ * without waiting for the 12-hour staleness window to expire.
  * Safe to run multiple times — each indicator block is idempotent (checks count first).
  */
 export const runBackfillInvestmentHistory = internalAction({
@@ -2167,7 +2167,7 @@ export const runBackfillInvestmentHistory = internalAction({
  * Main AI orchestrator. Checks which data categories are stale (>24 h since
  * last successful refresh) and refreshes them using public APIs and Claude.
  *
- * Called by the cron job every 6 hours and can also be triggered manually.
+ * Called by the cron job every 12 hours and can also be triggered manually.
  */
 export const orchestrateRefresh = internalAction({
   args: {},

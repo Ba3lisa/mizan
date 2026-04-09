@@ -61,7 +61,7 @@ Convex has no native `COUNT(*)`. The codebase uses `.collect()` on entire tables
 
 ### Assumptions
 - 100 daily visitors, avg 2 pages each
-- Pipeline runs 4×/day (every 6h), each run writes ~50 change log entries
+- Pipeline runs 2×/day (every 12h), each run writes ~50 change log entries
 - 10% of visitors view transparency page, 20% view constitution
 
 ### Per-Visit Database I/O
@@ -147,18 +147,55 @@ Convex has no native `COUNT(*)`. The codebase uses `.collect()` on entire tables
 
 ---
 
-## Pro Plan Consideration
+## SEO Entity Pages — Cost Impact
 
-If optimizations bring usage to ~10 GB/month, the free plan works fine (1 GB free + $0.22/GB = ~$2/month overage).
+### New dynamic pages (Phase 1 SEO)
+~1,200 entity pages: 30 officials + 247 constitution articles + 27 governorates + 896 MPs
 
-If traffic grows beyond 500 daily visitors, Pro plan ($25/month) provides 50 GB Database I/O and would be cost-effective.
+**How caching works:**
+- Pages use ISR with `revalidate = 43200` (12 hours)
+- First visit: 1 Convex query → HTML cached by Next.js
+- Subsequent visits: served from cache → zero Convex cost
+- After 12 hours: next visit re-fetches → re-caches
+
+**Cost estimate per entity page query:**
+- Official lookup: ~2 KB (1 record by slug)
+- Article lookup: ~3 KB (1 record by number)
+- Governorate lookup: ~1 KB (1 record by slug)
+
+**Monthly estimate (100 daily visitors, 5% visit entity pages):**
+- 5 entity page visits/day × 3 KB avg × 30 days = ~450 KB/month
+- With ISR cache: even less since most visits hit cache
+- **Impact: negligible — <1 MB/month additional**
+
+**Worst case (Google bot crawls all 1,200 pages in one day):**
+- 1,200 × 3 KB = 3.6 MB — still negligible
+
+### Current actual costs (April 2026)
+- **API tokens used**: 16,161 (6 calls) — $0.04 total
+- **Infrastructure**: Convex $10/mo + DigitalOcean $12/mo = $22/mo
+- **Total monthly burn**: ~$22.04/mo
+
+---
+
+## Current Plan: Starter ($10/mo, capped at $20)
+
+At current usage levels, the Starter plan is more than sufficient:
+- Database I/O: well under 1 GB/month
+- Function calls: ~50K/month (limit: 1M)
+- The $10 spend includes development overhead
+
+**Pro plan ($25/mo)** only needed if:
+- Traffic exceeds 500 daily visitors AND
+- Pipeline runs cause subscription re-triggers exceeding 50 GB I/O
 
 ---
 
 ## Monitoring
 
 Track these metrics monthly:
-- **Database I/O** — Convex dashboard → Usage tab
-- **Top queries by bandwidth** — `npx convex dashboard` → Functions tab
-- **Subscription count** — Monitor active WebSocket connections
-- Run `npx convex insights` for detailed function-level metrics
+- **Convex Dashboard** → Usage tab (https://dashboard.convex.dev)
+- **API costs** → `npx convex run usage:getCurrentMonthCost` (real-time from our tracking)
+- **Usage by purpose** → `npx convex run usage:getUsageByPurpose '{"days": 30}'`
+- **Runway** → `npx convex run usage:getRunwaySummary`
+- Run `npx convex insights` (requires user auth, not deploy key)

@@ -111,6 +111,18 @@ def create(
     if not Confirm.ask(f"Create release [bold cyan]{version}[/bold cyan] and deploy to prod?"):
         raise typer.Exit(0)
 
+    # Bump package.json version
+    import json
+    pkg_path = APP_DIR / "package.json"
+    pkg = json.loads(pkg_path.read_text())
+    pkg["version"] = f"{major}.{minor}.{patch}"
+    pkg_path.write_text(json.dumps(pkg, indent=2, ensure_ascii=False) + "\n")
+
+    # Commit version bump
+    _run(["git", "add", str(pkg_path)])
+    _run(["git", "commit", "-m", f"chore: bump version to {version}"])
+    _run(["git", "push", "origin", "main"])
+
     # Create the release via gh CLI
     result = subprocess.run(
         [

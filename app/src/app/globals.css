@@ -239,6 +239,15 @@ html[dir="ltr"] { font-family: var(--font-body); line-height: 1.65; }
   background: #2EC4B6; animation: pulse-glow 2s ease-in-out infinite;
 }
 
+/* ── News ticker ── */
+@keyframes ticker-scroll {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+.ticker-wrap:hover .ticker-track {
+  animation-play-state: paused;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

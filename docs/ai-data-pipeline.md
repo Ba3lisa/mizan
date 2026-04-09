@@ -2,7 +2,7 @@
 
 ## Overview
 
-Mizan uses an AI-powered data agent built on Convex to keep all government data fresh, validated, and properly sourced. The agent runs every 6 hours via a Convex cron job and orchestrates data collection across all categories.
+Mizan uses an AI-powered data agent built on Convex to keep all government data fresh, validated, and properly sourced. The agent runs every 12 hours via a Convex cron job and orchestrates data collection across all categories.
 
 ## Architecture
 
@@ -10,7 +10,7 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 ┌─────────────────────────────────────────────────────┐
 │                    Convex Cron Jobs                   │
 │                                                       │
-│  Every 6 hours:                                       │
+│  Every 12 hours:                                       │
 │    crons.ts → internal.agents.dataAgent.orchestrateRefresh │
 │  Daily:                                               │
 │    crons.ts → log compaction (delete logs >30 days)   │
@@ -159,14 +159,14 @@ To avoid unnecessary AI API calls, the pipeline uses content hashing on fetched 
 4. If the hash matches the previous successful refresh, Claude parsing is skipped entirely
 5. This means unchanged pages cost zero AI tokens -- only the HTTP fetch is performed
 
-This is particularly valuable for the budget page, which may only change once per fiscal year but is checked every 6 hours.
+This is particularly valuable for the budget page, which may only change once per fiscal year but is checked every 12 hours.
 
 ## Setup
 
 1. Set `ANTHROPIC_API_KEY` in Convex dashboard (Settings -> Environment Variables)
 2. The model used is `claude-haiku-4-5-20251001` (Claude Haiku 4.5) for all data extraction tasks
 3. Without the key, World Bank API data still refreshes (no auth needed), but Claude-powered parsing is skipped
-4. Cron job runs automatically every 6 hours
+4. Cron job runs automatically every 12 hours
 5. Manual trigger: `npx convex run agents/dataAgent:orchestrateRefresh`
 
 ## Graceful Degradation
@@ -182,7 +182,7 @@ A GitHub Actions workflow (`health-check.yml`) runs every 12 hours and checks th
 
 ## Log Compaction
 
-A daily cron job deletes `dataRefreshLog` entries older than 30 days to prevent unbounded table growth. This runs independently of the 6-hour refresh cycle.
+A daily cron job deletes `dataRefreshLog` entries older than 30 days to prevent unbounded table growth. This runs independently of the 12-hour refresh cycle.
 
 ## Sanad Reference Confidence System
 

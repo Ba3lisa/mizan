@@ -4,6 +4,9 @@ import Link from "next/link";
 import { Scale, ExternalLink, Github } from "lucide-react";
 import { useLanguage } from "@/components/providers";
 import { NAV_GROUPS } from "@/lib/navigation";
+import pkg from "../../package.json";
+
+const APP_VERSION = pkg.version;
 
 const srcs = [
   { name: "parliament.gov.eg", url: "https://www.parliament.gov.eg" },
@@ -75,7 +78,7 @@ export function Footer() {
             rel="noopener noreferrer"
             className="text-[0.625rem] text-muted-foreground/60 no-underline hover:text-primary font-mono transition-colors"
           >
-            {process.env.NEXT_PUBLIC_APP_VERSION || "v1.0.2"}
+            v{APP_VERSION}
           </a>
           <p className="text-xs text-muted-foreground font-mono">© {new Date().getFullYear()}</p>
         </div>

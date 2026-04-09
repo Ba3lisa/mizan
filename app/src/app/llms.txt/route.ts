@@ -16,13 +16,13 @@ export async function GET() {
 
 > A civic transparency platform providing cited, verified data on Egyptian government structure,
 > parliament, constitution, budget, debt, elections, and economy.
-> All data is AI-collected every 6 hours from official sources and fully auditable.
+> All data is AI-collected every 12 hours from official sources and fully auditable.
 
 ## About
 
 Mizan is an open-source transparency platform at https://mizanmasr.com.
 Every number is backed by a cited official source. Data is collected, verified,
-and refreshed every 6 hours by AI agents. The full audit trail is publicly visible.
+and refreshed every 12 hours by AI agents. The full audit trail is publicly visible.
 
 - **Language**: Fully bilingual — Arabic (RTL) and English
 - **Currency**: All financial data supports EGP/USD toggle
@@ -113,7 +113,7 @@ Every data point has a Sanad (سند) level indicating source reliability:
 ## API & Machine Access
 
 - \`/llms.txt\` — This file: site overview for AI navigation
-- \`/llms-full.txt\` — Complete data export (refreshed every 6 hours)
+- \`/llms-full.txt\` — Complete data export (refreshed every 12 hours)
 - WebMCP support — Chrome AI agents can auto-discover Mizan tools via navigator.modelContext
 `;
 

@@ -187,13 +187,13 @@ const SCALING_TIERS = [
     color: "#C9A84C",
     featuresEn: [
       "Single LLM (Claude Haiku) for data extraction",
-      "6-hour automated refresh cycle",
+      "12-hour automated refresh cycle",
       "Basic HTML scraping (no JS-rendered sites)",
       "~120 AI calls/month, minimal token budget",
     ],
     featuresAr: [
       "نموذج واحد (Claude Haiku) لاستخراج البيانات",
-      "تحديث تلقائي كل 6 ساعات",
+      "تحديث تلقائي كل 12 ساعة",
       "استخراج HTML أساسي (بدون مواقع JS)",
       "~120 استدعاء AI شهرياً، ميزانية محدودة",
     ],

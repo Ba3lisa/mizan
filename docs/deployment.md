@@ -40,7 +40,7 @@
 2. Set environment variables in Convex dashboard:
    - `ANTHROPIC_API_KEY` = (your key) -- used with model `claude-haiku-4-5-20251001` (Claude Haiku 4.5) for all data extraction and LLM Council tasks
    - `GITHUB_TOKEN` = GitHub personal access token with `issues:write` permission on `Ba3lisa/mizan` (required for the GitHub Issues AI agent to read and comment on community data corrections)
-3. The 6-hour cron job will start automatically
+3. The 12-hour cron job will start automatically
 4. Seed production data: `npx convex run --prod seedData:seed`
 
 ### External Dependencies (convex.json)

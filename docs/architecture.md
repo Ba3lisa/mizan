@@ -50,7 +50,7 @@ Mizan is structured in three layers: a Visual Layer that users interact with, a 
 |                      AGENTIC LAYER                            |
 |                    Convex Agents                              |
 |                                                               |
-|  Orchestrator: dataAgent.ts (cron every 6h)                   |
+|  Orchestrator: dataAgent.ts (cron every 12h)                   |
 |  LLM Council: multi-model voting on data changes              |
 |  GitHub Agent: issue ingestion, spam filtering                |
 |  Validators: deterministic checks (sums, counts, ranges)      |
@@ -136,7 +136,7 @@ The Agentic Layer is responsible for keeping data fresh and processing community
 
 ### Orchestrator (dataAgent.ts)
 
-A Convex cron job fires every 6 hours and triggers the orchestrator. The orchestrator runs the following steps in sequence:
+A Convex cron job fires every 12 hours and triggers the orchestrator. The orchestrator runs the following steps in sequence:
 1. **ensureAllReferenceData** -- checks all 18 tables, loads from backup if empty (zero cost if populated)
 2. **Debt refresh** -- fetches from World Bank API, converts USD to billions, upserts all available years
 3. **Budget refresh** -- fetches MOF page, uses content hashing to skip when unchanged, Claude extracts fiscal year totals
@@ -171,7 +171,7 @@ Located in `convex/agents/validators.ts`. These are pure functions with no LLM i
 External Sources (gov APIs, websites)
     |
     v
-Orchestrator (every 6h cron)
+Orchestrator (every 12h cron)
     |
     v
 Category-specific fetcher (HTTP request)

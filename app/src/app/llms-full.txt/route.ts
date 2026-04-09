@@ -41,7 +41,7 @@ export async function GET() {
     let md = `# Mizan Data Export — ${now}
 
 > Complete structured data from Mizan (mizanmasr.com), Egypt's civic transparency platform.
-> This file is auto-generated every 6 hours from verified official sources.
+> This file is auto-generated every 12 hours from verified official sources.
 > All data is cited — see source URLs for each data point.
 
 `;

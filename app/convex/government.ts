@@ -67,7 +67,7 @@ export const getHomeStats = query({
 
 
     return {
-      parliamentarians: { value: parliamentarians, source: "parliament.gov.eg", sourceUrl: "https://www.parliament.gov.eg", sanadLevel: 1 },
+      parliamentarians: { value: parliamentarians, house: houseMembers.length, senate: senateMembers.length, source: "parliament.gov.eg", sourceUrl: "https://www.parliament.gov.eg", sanadLevel: 1 },
       governorates: { value: governorates.length, source: "capmas.gov.eg", sourceUrl: "https://www.capmas.gov.eg", sanadLevel: 1 },
       constitutionArticles: { value: articles.length, source: "presidency.eg", sourceUrl: "https://www.presidency.eg", sanadLevel: 1 },
       ministries: { value: ministries.length, source: "cabinet.gov.eg", sourceUrl: "https://www.cabinet.gov.eg", sanadLevel: 1 },
@@ -103,6 +103,66 @@ export const getHomeStats = query({
   },
 });
 
+
+/** Governorate data for the EgyptMap component — population + coordinates. */
+export const getGovernorateMapData = query({
+  args: {
+    indicator: v.optional(v.string()),
+    year: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const indicator = args.indicator ?? "population";
+    const governorates = await ctx.db.query("governorates").collect();
+
+    // Get stats for the requested indicator
+    const stats = await ctx.db
+      .query("governorateStats")
+      .withIndex("by_indicator_and_year", (q) => {
+        const base = q.eq("indicator", indicator);
+        return args.year ? base.eq("year", args.year) : base;
+      })
+      .collect();
+
+    // Group stats by governorateId, keep latest year if no year specified
+    const statsByGov = new Map<string, { value: number; year: string; unit: string }>();
+    for (const s of stats) {
+      const key = s.governorateId;
+      const existing = statsByGov.get(key);
+      if (!existing || s.year > existing.year) {
+        statsByGov.set(key, { value: s.value, year: s.year, unit: s.unit });
+      }
+    }
+
+    // Get available years for the indicator
+    const years = [...new Set(stats.map((s) => s.year))].sort();
+
+    // Get available indicators
+    const allIndicatorStats = await ctx.db.query("governorateStats").take(500);
+    const indicators = [...new Set(allIndicatorStats.map((s) => s.indicator))].sort();
+
+    return {
+      governorates: governorates.map((g) => {
+        const stat = statsByGov.get(g._id);
+        return {
+          id: g._id,
+          nameEn: g.nameEn,
+          nameAr: g.nameAr,
+          capitalEn: g.capitalEn,
+          capitalAr: g.capitalAr,
+          population: g.population,
+          area: g.area,
+          geoJsonId: g.geoJsonId,
+          value: stat?.value ?? null,
+          year: stat?.year ?? null,
+          unit: stat?.unit ?? null,
+        };
+      }),
+      years,
+      indicators,
+      currentIndicator: indicator,
+    };
+  },
+});
 
 export const listMinistriesSorted = query({
   args: {},

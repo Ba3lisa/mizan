@@ -704,7 +704,7 @@ function CategoryDetailsCard({
                         <RefreshCw size={9} />
                         {isAr
                           ? "يتجدد تلقائياً كل ٦ ساعات"
-                          : "Auto-refreshes every 6 hours"}
+                          : "Auto-refreshes every 12 hours"}
                       </div>
                     </div>
                   )}
@@ -1027,7 +1027,7 @@ export default function TransparencyPage() {
           <p className="text-sm text-muted-foreground max-w-xl">
             {isAr
               ? "عرض موحد لصحة البيانات، المصادر، وسجل التحديثات الآلية. يعمل وكيل الذكاء الاصطناعي كل ٦ ساعات للتحقق من المصادر الرسمية وتحديث السجلات."
-              : "A unified view of data health, tracked sources, and the automated refresh audit trail. The AI agent runs every 6 hours to validate official sources and update records."}
+              : "A unified view of data health, tracked sources, and the automated refresh audit trail. The AI agent runs every 12 hours to validate official sources and update records."}
           </p>
         </div>
 

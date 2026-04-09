@@ -342,7 +342,7 @@ export default defineSchema({
     .index("by_category", ["category"])
     .index("by_url", ["url"]),
 
-  // ECONOMIC INDICATORS (fetched from World Bank and CBE every 6 hours)
+  // ECONOMIC INDICATORS (fetched from World Bank and CBE every 12 hours)
   economicIndicators: defineTable({
     indicator: v.string(),
     year: v.optional(v.string()),
@@ -766,4 +766,17 @@ export default defineSchema({
   })
     .index("by_runId", ["runId"])
     .index("by_runId_and_step", ["runId", "step"]),
+
+  // NEWS HEADLINES (GDELT cache)
+  newsHeadlines: defineTable({
+    title: v.string(),
+    url: v.string(),
+    sourceDomain: v.string(),
+    language: v.string(),
+    publishedAt: v.number(),
+    imageUrl: v.optional(v.string()),
+    fetchedAt: v.number(),
+  })
+    .index("by_publishedAt", ["publishedAt"])
+    .index("by_url", ["url"]),
 });

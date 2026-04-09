@@ -63,7 +63,7 @@ export default function MethodologyPage() {
           <p className="text-sm text-muted-foreground mb-6 max-w-xl">
             {isAr
               ? "نظام آلي يعمل كل ٦ ساعات لجمع البيانات والتحقق منها من المصادر الرسمية."
-              : "An automated system running every 6 hours to collect and verify data from official sources."}
+              : "An automated system running every 12 hours to collect and verify data from official sources."}
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">

@@ -10,14 +10,73 @@ import type { Id } from "../../convex/_generated/dataModel";
 
 // ─── VISITOR ID (anonymous, localStorage-based) ──────────────────────────────
 
+/**
+ * Generate a stable browser fingerprint that survives localStorage clears
+ * and incognito mode. Based on hardware/browser properties that don't change.
+ * Not perfect (same device + same browser = same hash) but blocks casual abuse.
+ */
 function getVisitorHash(): string {
   if (typeof window === "undefined") return "";
-  let hash = localStorage.getItem("mizan-visitor-hash");
-  if (!hash) {
-    hash = crypto.randomUUID();
-    localStorage.setItem("mizan-visitor-hash", hash);
+
+  // Try cached fingerprint first (faster)
+  const cached = localStorage.getItem("mizan-visitor-hash");
+  if (cached && cached.length > 20) return cached;
+
+  // Generate stable fingerprint from browser properties
+  const components = [
+    navigator.language,
+    navigator.languages?.join(","),
+    screen.width + "x" + screen.height,
+    screen.colorDepth,
+    new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency,
+    navigator.maxTouchPoints,
+    navigator.platform,
+    // Canvas fingerprint (renders text and hashes the pixel data)
+    (() => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = 200;
+        canvas.height = 50;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return "no-canvas";
+        ctx.textBaseline = "top";
+        ctx.font = "14px Arial";
+        ctx.fillStyle = "#f60";
+        ctx.fillRect(0, 0, 200, 50);
+        ctx.fillStyle = "#069";
+        ctx.fillText("mizanmasr.com", 2, 2);
+        return canvas.toDataURL().slice(-50);
+      } catch {
+        return "canvas-err";
+      }
+    })(),
+    // WebGL renderer
+    (() => {
+      try {
+        const canvas = document.createElement("canvas");
+        const gl = canvas.getContext("webgl");
+        if (!gl) return "no-webgl";
+        const ext = gl.getExtension("WEBGL_debug_renderer_info");
+        return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "webgl-ok";
+      } catch {
+        return "webgl-err";
+      }
+    })(),
+  ].join("|");
+
+  // Hash the components into a stable string
+  let hash = 0;
+  for (let i = 0; i < components.length; i++) {
+    const char = components.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
   }
-  return hash;
+  const fingerprint = "fp_" + Math.abs(hash).toString(36) + "_" + components.length.toString(36);
+
+  // Cache it (speeds up subsequent visits, but fingerprint regenerates if cleared)
+  try { localStorage.setItem("mizan-visitor-hash", fingerprint); } catch { /* ignore */ }
+  return fingerprint;
 }
 
 // ─── COUNTDOWN HOOK ──────────────────────────────────────────────────────────
@@ -63,7 +122,7 @@ const optionColors = [
 
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
-export function DailyPoll() {
+export function DailyPoll({ compact: _compact = false }: { compact?: boolean } = {}) {
   const { lang } = useLanguage();
   const isAr = lang === "ar";
 

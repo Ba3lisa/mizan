@@ -3795,7 +3795,7 @@ export const seed = internalMutation({
       contentAr:
         "تم فحص موقع وزارة المالية. لا توجد بيانات جديدة. إجماليات الموازنة مؤكدة: مجموع بنود الإيرادات يساوي 1,474 مليار جنيه، والمصروفات 2,565 مليار جنيه، والعجز 1,091 مليار جنيه.",
       contentEn:
-        "## Methodology\n\nChecked mof.gov.eg for updated budget statements.\n\n### Findings\n- No new fiscal year data published since last check\n- Budget totals validated: revenue items sum to 1,474B EGP\n- Expenditure items sum to 2,565B EGP\n- Deficit calculation correct: 1,091B EGP\n\n### Recommendation\nData is current. Next check scheduled in 6 hours.",
+        "## Methodology\n\nChecked mof.gov.eg for updated budget statements.\n\n### Findings\n- No new fiscal year data published since last check\n- Budget totals validated: revenue items sum to 1,474B EGP\n- Expenditure items sum to 2,565B EGP\n- Deficit calculation correct: 1,091B EGP\n\n### Recommendation\nData is current. Next check scheduled in 12 hours.",
       sourcesChecked: [
         {
           nameEn: "Ministry of Finance",

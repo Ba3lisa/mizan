@@ -44,7 +44,7 @@ export function WebMcpRegistration() {
     nav.modelContext.registerTool({
       name: "get_egypt_government_data",
       description:
-        "Get complete structured data about the Egyptian government: cabinet ministers, parliament members, budget figures, national debt, economic indicators, election results, and constitution. Data is verified from official sources every 6 hours.",
+        "Get complete structured data about the Egyptian government: cabinet ministers, parliament members, budget figures, national debt, economic indicators, election results, and constitution. Data is verified from official sources every 12 hours.",
       inputSchema: {
         type: "object",
         properties: {

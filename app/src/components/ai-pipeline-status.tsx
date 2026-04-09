@@ -137,7 +137,7 @@ function statusLabel(status: StepStatus, isAr: boolean): string {
 // ─── Countdown Hook ───────────────────────────────────────────────────────────
 
 function useCountdown(lastCompletedAt: number | null, steps: PipelineStep[]): { msUntilNext: number; isRunning: boolean } {
-  const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+  const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
 
   const [now, setNow] = useState(() => Date.now());
 
@@ -152,7 +152,7 @@ function useCountdown(lastCompletedAt: number | null, steps: PipelineStep[]): { 
     return { msUntilNext: 0, isRunning };
   }
 
-  const nextRun = lastCompletedAt + SIX_HOURS_MS;
+  const nextRun = lastCompletedAt + TWELVE_HOURS_MS;
   const msUntilNext = Math.max(0, nextRun - now);
   return { msUntilNext, isRunning };
 }

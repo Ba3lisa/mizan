@@ -44,7 +44,7 @@ A second approver will be added as the contributor base grows.
 
 ## How Data Gets Refreshed
 
-A Convex cron job runs every 6 hours, triggering the data agent orchestrator at `convex/agents/dataAgent.ts`. The orchestrator:
+A Convex cron job runs every 12 hours, triggering the data agent orchestrator at `convex/agents/dataAgent.ts`. The orchestrator:
 
 1. Checks staleness of each data category (debt, budget, government, parliament, constitution, elections)
 2. For each stale category (older than 24 hours), dispatches a category-specific refresh

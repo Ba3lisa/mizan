@@ -2,6 +2,18 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  transpilePackages: [
+    "deck.gl",
+    "@deck.gl/core",
+    "@deck.gl/layers",
+    "@deck.gl/react",
+    "@luma.gl/core",
+    "@luma.gl/engine",
+    "@luma.gl/webgl",
+    "@luma.gl/shadertools",
+    "@luma.gl/constants",
+    "@luma.gl/gltf",
+  ],
   images: {
     remotePatterns: [],
   },

@@ -16,7 +16,7 @@ The foundation: a fully functional transparency platform covering all major bran
 - **Government Structure** -- Cabinet ministers, ministries, and all 27 governorates with governor profiles
 - **Constitution Search** -- Full text of all 247 articles of the 2014 Constitution (as amended), with instant full-text search
 - **Elections History** -- Presidential and parliamentary election results with interactive governorate map
-- **AI Data Agent** -- Automated data refresh cycle every 6 hours, pulling from World Bank API, Ministry of Finance, Cabinet portal, and other official sources
+- **AI Data Agent** -- Automated data refresh cycle every 12 hours, pulling from World Bank API, Ministry of Finance, Cabinet portal, and other official sources
 - **Transparency Page** -- Full audit trail of every data refresh the agent has performed, including successes, failures, and data change counts
 - **Bilingual Arabic/English Interface** -- Complete right-to-left Arabic support alongside English, switchable from any page
 - **Your Tax Share** -- Personal tax calculator at /budget/your-share showing where your taxes go, powered by live budget data from Convex and official tax brackets (7 brackets, Law 7/2024)
