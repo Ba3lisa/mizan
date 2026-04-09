@@ -77,9 +77,21 @@ Managed by Father of Projects (FoP). Stack: nextjs-convex.
 - Always ask before merging
 
 ### Approvals — ALWAYS pause for human on:
-- Production deployments
+- Production deployments and releases (NEVER run `./dev release` without explicit approval)
 - Schema migrations
 - Any destructive operations
+- Environment-switching commands — always confirm dev vs prod before running mutations, API calls, or CLI commands targeting a specific environment
+
+### UI & Frontend Changes
+- For visual/UI changes, show a minimal diff first and get approval before making sweeping changes
+- Never redesign large sections without confirmation — iterate incrementally
+- When a UI approach fails twice, stop and ask the user for direction instead of trying more variations
+- Clear `.next` cache (`rm -rf .next`) after major file changes to prevent stale chunk errors
+
+### Data & Backend Integrity
+- When modifying Convex schemas or queries, double-check field names match between schema definitions, query returns, and UI components before committing
+- Run `npx convex dev --once` to verify Convex functions compile after changes
+- Never hardcode data that should come from Convex — this includes chart segments, stat counts, and UI labels derived from data
 
 ### Everything Is Code
 - No manual workarounds
