@@ -244,9 +244,17 @@ html[dir="ltr"] { font-family: var(--font-body); line-height: 1.65; }
   0% { transform: translateY(0); }
   100% { transform: translateY(-50%); }
 }
-.ticker-wrap:hover .ticker-track {
+.ticker-wrap:hover .ticker-track,
+.ticker-wrap:active .ticker-track {
   animation-play-state: paused;
 }
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--primary-rgb, 128 128 128) / 0.2) transparent;
+}
+.scrollbar-thin::-webkit-scrollbar { width: 4px; }
+.scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+.scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(var(--primary-rgb, 128 128 128) / 0.2); border-radius: 2px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

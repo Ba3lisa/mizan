@@ -2,14 +2,18 @@ import { NextResponse } from "next/server";
 
 // Egyptian news RSS feeds — accessible from any server, no API key needed
 // egyptOnly: false means we filter for Egypt-related headlines
+// useSourceTag: Google News has <source> tag with actual outlet name
 const RSS_FEEDS = [
+  // Google News — aggregates from many sources, pre-filtered by "Egypt" query
+  { url: "https://news.google.com/rss/search?q=Egypt&hl=en-US&gl=US&ceid=US:en", language: "English", domain: "google-news", egyptOnly: true, useSourceTag: true },
+  { url: "https://news.google.com/rss/search?q=مصر&hl=ar&gl=EG&ceid=EG:ar", language: "Arabic", domain: "google-news", egyptOnly: true, useSourceTag: true },
   // Egyptian outlets (all content is Egypt-related)
-  { url: "https://www.dailynewsegypt.com/feed/", language: "English", domain: "dailynewsegypt.com", egyptOnly: true },
-  { url: "https://egyptindependent.com/feed/", language: "English", domain: "egyptindependent.com", egyptOnly: true },
+  { url: "https://www.dailynewsegypt.com/feed/", language: "English", domain: "dailynewsegypt.com", egyptOnly: true, useSourceTag: false },
+  { url: "https://egyptindependent.com/feed/", language: "English", domain: "egyptindependent.com", egyptOnly: true, useSourceTag: false },
   // Regional / international (filter for Egypt mentions)
-  { url: "https://www.al-monitor.com/rss", language: "English", domain: "al-monitor.com", egyptOnly: false },
-  { url: "https://feeds.bbci.co.uk/news/world/middle_east/rss.xml", language: "English", domain: "bbc.co.uk", egyptOnly: false },
-  { url: "https://rss.nytimes.com/services/xml/rss/nyt/MiddleEast.xml", language: "English", domain: "nytimes.com", egyptOnly: false },
+  { url: "https://www.al-monitor.com/rss", language: "English", domain: "al-monitor.com", egyptOnly: false, useSourceTag: false },
+  { url: "https://feeds.bbci.co.uk/news/world/middle_east/rss.xml", language: "English", domain: "bbc.co.uk", egyptOnly: false, useSourceTag: false },
+  { url: "https://rss.nytimes.com/services/xml/rss/nyt/MiddleEast.xml", language: "English", domain: "nytimes.com", egyptOnly: false, useSourceTag: false },
 ];
 
 interface ParsedArticle {
@@ -25,6 +29,7 @@ async function parseRssFeed(
   language: string,
   domain: string,
   egyptOnly: boolean,
+  useSourceTag: boolean,
 ): Promise<ParsedArticle[]> {
   try {
     const res = await fetch(feedUrl, {
@@ -49,10 +54,17 @@ async function parseRssFeed(
         // Filter for Egypt-related content from non-Egyptian outlets
         if (!egyptOnly && !isEgyptRelated(title)) continue;
 
+        // Google News: use <source> tag for actual outlet name
+        let sourceName = domain;
+        if (useSourceTag) {
+          const sourceTag = extractTag(itemXml, "source");
+          if (sourceTag) sourceName = sourceTag;
+        }
+
         articles.push({
           title: decodeEntities(title),
           url: link,
-          sourceDomain: domain,
+          sourceDomain: sourceName,
           language,
           publishedAt: pubDate ? new Date(pubDate).getTime() : Date.now(),
         });
@@ -100,7 +112,7 @@ function isEgyptRelated(title: string): boolean {
 export async function GET() {
   try {
     const results = await Promise.allSettled(
-      RSS_FEEDS.map((feed) => parseRssFeed(feed.url, feed.language, feed.domain, feed.egyptOnly))
+      RSS_FEEDS.map((feed) => parseRssFeed(feed.url, feed.language, feed.domain, feed.egyptOnly, feed.useSourceTag))
     );
 
     const articles = results

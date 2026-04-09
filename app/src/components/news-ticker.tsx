@@ -12,15 +12,15 @@ interface Headline {
   publishedAt: number;
 }
 
-function relativeTime(epochMs: number, isAr: boolean): string {
+function relativeTime(epochMs: number): string {
   const diff = Date.now() - epochMs;
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return isAr ? "الآن" : "now";
-  if (mins < 60) return isAr ? `${mins} د` : `${mins}m`;
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return isAr ? `${hrs} س` : `${hrs}h`;
+  if (hrs < 24) return `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  return isAr ? `${days} ي` : `${days}d`;
+  return `${days}d ago`;
 }
 
 export function NewsTicker() {
@@ -78,15 +78,15 @@ export function NewsTicker() {
             <div
               className="ticker-track flex flex-col"
               style={{
-                animation: `ticker-scroll ${Math.max(20, headlines.length * 3)}s linear infinite`,
+                animation: `ticker-scroll ${Math.max(25, headlines.length * 3)}s linear infinite`,
                 willChange: "transform",
               }}
             >
               {headlines.map((h, i) => (
-                <HeadlineCard key={i} headline={h} isAr={isAr} />
+                <HeadlineCard key={i} headline={h} />
               ))}
               {headlines.map((h, i) => (
-                <HeadlineCard key={`dup-${i}`} headline={h} isAr={isAr} />
+                <HeadlineCard key={`dup-${i}`} headline={h} />
               ))}
             </div>
             <div className="absolute bottom-0 left-0 right-0 h-6 z-10 pointer-events-none bg-gradient-to-t from-card/90 to-transparent" />
@@ -96,7 +96,7 @@ export function NewsTicker() {
         {/* Footer */}
         <div className="flex items-center justify-between px-4 py-1.5 border-t border-border/30 bg-muted/5 shrink-0">
           <span className="text-[0.5rem] text-muted-foreground/30 font-mono uppercase tracking-wider">
-            RSS
+            RSS + AI
           </span>
         </div>
       </div>
@@ -104,7 +104,7 @@ export function NewsTicker() {
   );
 }
 
-function HeadlineCard({ headline, isAr }: { headline: Headline; isAr: boolean }) {
+function HeadlineCard({ headline }: { headline: Headline }) {
   return (
     <a
       href={headline.url}
@@ -118,7 +118,7 @@ function HeadlineCard({ headline, isAr }: { headline: Headline; isAr: boolean })
         </span>
         <span className="text-[0.5rem] text-muted-foreground/25">·</span>
         <span className="text-[0.5rem] text-muted-foreground/35 font-mono shrink-0">
-          {relativeTime(headline.publishedAt, isAr)}
+          {relativeTime(headline.publishedAt)}
         </span>
         <ExternalLink
           size={8}

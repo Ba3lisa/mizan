@@ -2383,6 +2383,95 @@ export const orchestrateRefresh = internalAction({
       });
     }
 
+    // ── Step: news ────────────────────────────────────────────────────────────
+    await ctx.runMutation(internal.pipelineProgress.updateStep, {
+      runId,
+      step: "news",
+      status: "running",
+      message: "Refreshing Egyptian news headlines...",
+      messageAr: "جارٍ تحديث الأخبار المصرية...",
+    });
+    try {
+      // Use Claude web_search to find current Egyptian news beyond RSS feeds
+      const newsResult = await callClaudeWithServerTools(
+        `Search for the latest important Egyptian news from the past 24 hours. Include economic, political, and social news.
+
+Return ONLY a JSON array (no markdown, no explanation):
+[
+  {"title": "headline text", "url": "source url", "source": "outlet name"},
+  ...
+]
+
+Include 10-15 headlines. Prefer authoritative sources (Reuters, Bloomberg, Ahram, BBC, Al Jazeera).`,
+        [
+          {
+            type: "web_search_20250305",
+            name: "web_search",
+            max_uses: 3,
+          },
+        ],
+        "Return ONLY a JSON array of news headlines. No prose.",
+      );
+
+      let headlinesInserted = 0;
+      if (newsResult.text) {
+        try {
+          let jsonStr = newsResult.text;
+          const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+          if (fence) jsonStr = fence[1];
+          // Extract array from possible prose
+          const arrMatch = jsonStr.match(/\[[\s\S]*\]/);
+          if (arrMatch) jsonStr = arrMatch[0];
+
+          const headlines = JSON.parse(jsonStr.trim()) as Array<{ title: string; url: string; source: string }>;
+          if (Array.isArray(headlines) && headlines.length > 0) {
+            const items = headlines
+              .filter((h) => h.title && h.url)
+              .map((h) => ({
+                title: h.title,
+                url: h.url,
+                sourceDomain: h.source ?? "unknown",
+                language: "English",
+                publishedAt: Date.now(),
+              }));
+            headlinesInserted = await ctx.runMutation(internal.news.upsertHeadlines, { items }) as number;
+          }
+        } catch (parseErr) {
+          console.warn(`[dataAgent/news] Failed to parse news headlines: ${parseErr}`);
+        }
+      }
+
+      // Log usage
+      if (newsResult.usage) {
+        const { inputTokens, outputTokens, model, durationMs } = newsResult.usage;
+        const costUsd = inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN;
+        try {
+          await ctx.runMutation(internal.usage.logApiUsage, {
+            provider: "anthropic", model, purpose: "data_pipeline_news",
+            inputTokens, outputTokens, totalTokens: inputTokens + outputTokens,
+            costUsd, durationMs, success: true, timestamp: Date.now(),
+          });
+        } catch { /* non-critical */ }
+      }
+
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "news",
+        status: "success",
+        message: `${headlinesInserted} new headlines added.`,
+        messageAr: `تمت إضافة ${headlinesInserted} عنوان جديد.`,
+        recordsUpdated: headlinesInserted,
+      });
+    } catch (err) {
+      console.warn(`[dataAgent/news] News step failed: ${err instanceof Error ? err.message : String(err)}`);
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId,
+        step: "news",
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     // ── Step: llm_export ──────────────────────────────────────────────────────
     await ctx.runMutation(internal.pipelineProgress.updateStep, {
       runId,
