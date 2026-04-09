@@ -54,6 +54,7 @@ def create(
         help="Version bump type: major, minor, or patch",
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would happen without creating the release"),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
 ) -> None:
     """Create a new GitHub release that triggers a prod deploy."""
 
@@ -108,7 +109,7 @@ def create(
         console.print("[yellow]Dry run — no release created.[/yellow]")
         raise typer.Exit(0)
 
-    if not Confirm.ask(f"Create release [bold cyan]{version}[/bold cyan] and deploy to prod?"):
+    if not yes and not Confirm.ask(f"Create release [bold cyan]{version}[/bold cyan] and deploy to prod?"):
         raise typer.Exit(0)
 
     # Bump package.json version
