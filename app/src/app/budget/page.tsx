@@ -459,13 +459,21 @@ function YearComparisonChart() {
 
   // Use Convex fiscal years for year comparison -- no hardcoded data
   const convexFYs = useQuery(api.budget.listFiscalYears);
-  const chartData = convexFYs
-    ? convexFYs.map((fy) => ({
-        year: fy.year.replace("/", "-").slice(0, 4),
-        revenue: fy.totalRevenue ?? 0,
-        spending: fy.totalExpenditure ?? 0,
-      }))
-    : [];
+  const chartData = (() => {
+    if (!convexFYs) return [];
+    // Deduplicate by start year (e.g. "2024-2025" and "2024/2025" both → "2024")
+    // Prefer the entry with higher totals (more complete data)
+    const byYear = new Map<string, { year: string; revenue: number; spending: number }>();
+    for (const fy of convexFYs) {
+      const key = fy.year.replace("/", "-").slice(0, 4);
+      const entry = { year: key, revenue: fy.totalRevenue ?? 0, spending: fy.totalExpenditure ?? 0 };
+      const prev = byYear.get(key);
+      if (!prev || entry.revenue + entry.spending > prev.revenue + prev.spending) {
+        byYear.set(key, entry);
+      }
+    }
+    return Array.from(byYear.values());
+  })();
 
   const svgW = 600;
   const svgH = 260;
@@ -794,16 +802,27 @@ export default function BudgetPage() {
   const populationTimeline = useQuery(api.economy.getIndicatorTimeline, { indicator: "population" });
   const _isLoading = convexFiscalYears === undefined;
 
-  // Sort newest first for dropdown
-  const sortedFYs = convexFiscalYears
-    ? [...convexFiscalYears].sort((a, b) => b.year.localeCompare(a.year))
-    : [];
+  // Sort newest first for dropdown, deduplicate by normalized year (e.g. "2024-2025" vs "2024/2025")
+  // Prefer the record with higher totals (more budget items linked)
+  const sortedFYs = (() => {
+    if (!convexFiscalYears) return [];
+    const byNormalized = new Map<string, (typeof convexFiscalYears)[number]>();
+    for (const fy of convexFiscalYears) {
+      const key = fy.year.replace("/", "-");
+      const prev = byNormalized.get(key);
+      if (!prev || (fy.totalRevenue ?? 0) + (fy.totalExpenditure ?? 0) > (prev.totalRevenue ?? 0) + (prev.totalExpenditure ?? 0)) {
+        byNormalized.set(key, fy);
+      }
+    }
+    return Array.from(byNormalized.values()).sort((a, b) => b.year.localeCompare(a.year));
+  })();
 
   // Default to latest fiscal year
   const effectiveYear = selectedYearStr || sortedFYs[0]?.year || "";
 
-  // Find the selected fiscal year from Convex
-  const selectedFY = sortedFYs.find((fy) => fy.year === effectiveYear);
+  // Find the selected fiscal year from Convex (try exact match, then normalized)
+  const selectedFY = sortedFYs.find((fy) => fy.year === effectiveYear)
+    ?? sortedFYs.find((fy) => fy.year.replace("/", "-") === effectiveYear.replace("/", "-"));
 
   const yearOptions = sortedFYs.map((fy) => fy.year);
 

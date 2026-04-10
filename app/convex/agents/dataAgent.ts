@@ -2808,6 +2808,12 @@ export const orchestrateRefresh = internalAction({
     }
     console.log("[dataAgent] orchestrateRefresh started.");
 
+    // Deduplicate fiscal years before any refresh (e.g. "2024/2025" vs "2024-2025")
+    const dedupResult = await ctx.runMutation(internal.dataRefresh.deduplicateFiscalYears, {});
+    if (dedupResult.deleted > 0) {
+      console.log(`[dataAgent] Deduplicated ${dedupResult.deleted} fiscal year(s).`);
+    }
+
     const runId = Date.now().toString();
 
     // Initialize pipeline progress tracking — clears old entries and creates
