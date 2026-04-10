@@ -42,6 +42,7 @@ import type * as funding from "../funding.js";
 import type * as githubIssueQueries from "../githubIssueQueries.js";
 import type * as government from "../government.js";
 import type * as governmentCleanup from "../governmentCleanup.js";
+import type * as guide from "../guide.js";
 import type * as imfData from "../imfData.js";
 import type * as industry from "../industry.js";
 import type * as lib_tokenCost from "../lib/tokenCost.js";
@@ -110,6 +111,7 @@ declare const fullApi: ApiFromModules<{
   githubIssueQueries: typeof githubIssueQueries;
   government: typeof government;
   governmentCleanup: typeof governmentCleanup;
+  guide: typeof guide;
   imfData: typeof imfData;
   industry: typeof industry;
   "lib/tokenCost": typeof lib_tokenCost;

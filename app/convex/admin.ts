@@ -76,7 +76,7 @@ export const upsertGovernorate = mutation({
     population: v.optional(v.number()),
     area: v.optional(v.number()),
     isCity: v.boolean(),
-    geoJsonId: v.string(),
+    geoJsonId: v.optional(v.string()),
     regionAr: v.optional(v.string()),
     regionEn: v.optional(v.string()),
   },
