@@ -1,5 +1,6 @@
 import {
   query,
+  mutation,
   internalQuery,
   internalMutation,
   internalAction,
@@ -273,18 +274,29 @@ export const upsertFiscalYear = internalMutation({
     sanadLevel: v.number(),
   },
   handler: async (ctx, args) => {
-    const existing = await ctx.db
+    // Normalize year format: "2024/2025" → "2024-2025" to prevent duplicates
+    const normalizedYear = args.year.replace("/", "-");
+
+    // Try both the normalized form and the original to find existing records
+    let existing = await ctx.db
       .query("fiscalYears")
-      .withIndex("by_year", (q) => q.eq("year", args.year))
+      .withIndex("by_year", (q) => q.eq("year", normalizedYear))
       .unique();
 
+    if (!existing && normalizedYear !== args.year) {
+      existing = await ctx.db
+        .query("fiscalYears")
+        .withIndex("by_year", (q) => q.eq("year", args.year))
+        .unique();
+    }
+
     if (!existing) {
-      // Derive conventional start/end dates from fiscal year string "YYYY/YYYY"
-      const parts = args.year.split("/");
-      const startYear = parts[0] ?? args.year;
-      const endYear = parts[1] ?? args.year;
+      // Derive conventional start/end dates from fiscal year string "YYYY-YYYY"
+      const parts = normalizedYear.split("-");
+      const startYear = parts[0] ?? normalizedYear;
+      const endYear = parts[1] ?? normalizedYear;
       await ctx.db.insert("fiscalYears", {
-        year: args.year,
+        year: normalizedYear,
         startDate: `${startYear}-07-01`,
         endDate: `${endYear}-06-30`,
         totalRevenue: args.totalRevenue,
@@ -1270,5 +1282,99 @@ export const upsertInvestmentProjectDetail = internalMutation({
       return 1;
     }
     return 0;
+  },
+});
+
+/**
+ * Deduplicate fiscal years that differ only by separator ("/" vs "-").
+ * Keeps the record with more budget items linked; deletes the orphan.
+ * Called automatically at the start of each pipeline run.
+ */
+export const deduplicateFiscalYears = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const all = await ctx.db.query("fiscalYears").collect();
+
+    // Group by normalized key
+    const byNormalized = new Map<string, typeof all>();
+    for (const fy of all) {
+      const key = fy.year.replace("/", "-");
+      const group = byNormalized.get(key) ?? [];
+      group.push(fy);
+      byNormalized.set(key, group);
+    }
+
+    let deleted = 0;
+    for (const [, group] of byNormalized) {
+      if (group.length <= 1) continue;
+
+      // Count budget items per record to find the one with actual data
+      const scored = await Promise.all(
+        group.map(async (fy) => {
+          const items = await ctx.db
+            .query("budgetItems")
+            .withIndex("by_fiscalYearId_and_category", (q) =>
+              q.eq("fiscalYearId", fy._id)
+            )
+            .collect();
+          return { fy, itemCount: items.length, total: (fy.totalRevenue ?? 0) + (fy.totalExpenditure ?? 0) };
+        })
+      );
+
+      // Keep the record with most items (then highest totals as tiebreaker)
+      scored.sort((a, b) => b.itemCount - a.itemCount || b.total - a.total);
+      const keep = scored[0];
+
+      // Normalize the kept record's year format to use "-"
+      const normalizedYear = keep.fy.year.replace("/", "-");
+      if (keep.fy.year !== normalizedYear) {
+        await ctx.db.patch(keep.fy._id, { year: normalizedYear });
+      }
+
+      // Delete duplicates and reassign any orphaned budget items
+      for (let i = 1; i < scored.length; i++) {
+        const dup = scored[i];
+        // Move any budget items from the duplicate to the keeper
+        const orphanItems = await ctx.db
+          .query("budgetItems")
+          .withIndex("by_fiscalYearId_and_category", (q) =>
+            q.eq("fiscalYearId", dup.fy._id)
+          )
+          .collect();
+        for (const item of orphanItems) {
+          await ctx.db.patch(item._id, { fiscalYearId: keep.fy._id });
+        }
+        await ctx.db.delete(dup.fy._id);
+        deleted++;
+      }
+    }
+
+    return { deleted };
+  },
+});
+
+/**
+ * Admin: delete a specific fiscal year by ID.
+ * Usage: npx convex run dataRefresh:adminDeleteFiscalYear '{"fiscalYearId":"<id>"}'
+ */
+export const adminDeleteFiscalYear = mutation({
+  args: { fiscalYearId: v.id("fiscalYears") },
+  handler: async (ctx, args) => {
+    const fy = await ctx.db.get(args.fiscalYearId);
+    if (!fy) return { deleted: false, reason: "not found" };
+
+    // Also delete any budget items linked to this fiscal year
+    const items = await ctx.db
+      .query("budgetItems")
+      .withIndex("by_fiscalYearId_and_category", (q) =>
+        q.eq("fiscalYearId", args.fiscalYearId)
+      )
+      .collect();
+    for (const item of items) {
+      await ctx.db.delete(item._id);
+    }
+
+    await ctx.db.delete(args.fiscalYearId);
+    return { deleted: true, year: fy.year, itemsDeleted: items.length };
   },
 });

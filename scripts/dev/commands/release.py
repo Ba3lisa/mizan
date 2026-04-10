@@ -55,6 +55,7 @@ def create(
     ),
     dry_run: bool = typer.Option(False, "--dry-run", help="Show what would happen without creating the release"),
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation prompt"),
+    skip_dirty: bool = typer.Option(False, "--skip-dirty", help="Skip the uncommitted-changes check (e.g. when releasing from a worktree merge)"),
 ) -> None:
     """Create a new GitHub release that triggers a prod deploy."""
 
@@ -65,8 +66,9 @@ def create(
         raise typer.Exit(1)
 
     status = _run(["git", "status", "--porcelain"]).stdout.strip()
-    if status:
+    if status and not skip_dirty:
         console.print("[red]Working directory not clean. Commit or stash changes first.[/red]")
+        console.print("[dim]Use --skip-dirty to release anyway.[/dim]")
         console.print(status)
         raise typer.Exit(1)
 

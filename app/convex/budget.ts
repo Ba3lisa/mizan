@@ -10,11 +10,23 @@ const categoryValidator = v.union(
 export const listFiscalYears = query({
   args: {},
   handler: async (ctx) => {
-    return await ctx.db
+    const all = await ctx.db
       .query("fiscalYears")
       .withIndex("by_year")
       .order("asc")
       .collect();
+
+    // Deduplicate by normalized year ("2024/2025" and "2024-2025" are the same).
+    // Keep the record with more budget data (higher revenue + expenditure totals).
+    const byNormalized = new Map<string, (typeof all)[number]>();
+    for (const fy of all) {
+      const key = fy.year.replace("/", "-");
+      const prev = byNormalized.get(key);
+      if (!prev || (fy.totalRevenue ?? 0) + (fy.totalExpenditure ?? 0) > (prev.totalRevenue ?? 0) + (prev.totalExpenditure ?? 0)) {
+        byNormalized.set(key, fy);
+      }
+    }
+    return Array.from(byNormalized.values());
   },
 });
 
