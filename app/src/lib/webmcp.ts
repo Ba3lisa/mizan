@@ -37,7 +37,7 @@ export interface UseWebMCPToolOptions {
 export function useWebMCPTool(options: UseWebMCPToolOptions): void {
   const registeredRef = useRef(false);
   const executeRef = useRef(options.execute);
-  executeRef.current = options.execute;
+  useEffect(() => { executeRef.current = options.execute; });
 
   const { name, description, title, inputSchema, readOnly } = options;
 
