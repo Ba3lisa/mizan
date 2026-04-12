@@ -257,6 +257,7 @@ export default function TaxCalculatorPage() {
   const healthAmount = (taxPaid * 4.7) / 100;
 
   // ─── WebMCP: expose tax calculator to AI agents ────────────────────────────
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const inputSchema = useMemo(() => ({
     type: "object" as const,
     properties: {
@@ -275,6 +276,7 @@ export default function TaxCalculatorPage() {
     description: "Calculate Egyptian income tax for a given annual salary. Returns tax amount, effective rate, and a breakdown showing how the tax is distributed across government budget sectors (debt service, education, health, etc.).",
     title: "Egypt Tax Calculator",
     inputSchema,
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     execute: useCallback((input: Record<string, unknown>) => {
       const sal = Number(input.annualSalary);
       if (!sal || sal < MIN_SALARY || sal > MAX_SALARY) {
@@ -305,6 +307,7 @@ export default function TaxCalculatorPage() {
           amountEgp: Math.round((tax * cat.pct) / 100),
         })),
       });
+    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     }, [TAX_BRACKETS, SPENDING, personalExemption, setSalary, setInputVal]),
   });
 

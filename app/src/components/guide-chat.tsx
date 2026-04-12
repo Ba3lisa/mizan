@@ -86,7 +86,7 @@ function useIsMobile() {
 
 // ─── Action Cards ───────────────────────────────────────────────────────────
 
-function NavigateCard({ href, reason, isAr, onGo }: {
+function NavigateCard({ href, reason, isAr: _isAr, onGo }: {
   href: string; reason: string; isAr: boolean; onGo: () => void;
 }) {
   const { t } = useLanguage();
@@ -418,7 +418,7 @@ export function GuideChat() {
     isAr, pathname, threadId, messages, isWaiting, isCreating, isOverBudget,
     localTourSteps, localTourIndex, isMobile,
     onSend: handleSend, onReset: handleReset, onLocalTour: handleLocalTour, onLocalNext: handleLocalNext,
-    onMinimize: () => setIsMinimized(true),
+    onMinimize: () => {},
   };
 
   const PANEL_WIDTH = 360;

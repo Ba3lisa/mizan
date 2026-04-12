@@ -429,7 +429,7 @@ function Section({
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function BuyVsRentPage() {
-  const { t, lang, dir } = useLanguage();
+  const { t, lang: _lang, dir } = useLanguage();
   // Translation helper for keys not yet in translations.ts — will be added in a follow-up
   
   const mortgageData = useQuery(api.tools.getMortgageRate);

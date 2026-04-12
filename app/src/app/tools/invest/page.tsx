@@ -358,7 +358,7 @@ interface CustomTooltipProps {
   isAr: boolean;
 }
 
-function DarkTooltip({ active, payload, label, isAr, yearLabel, totalLabel }: CustomTooltipProps & { yearLabel: string; totalLabel: string }) {
+function DarkTooltip({ active, payload, label, isAr: _isAr, yearLabel, totalLabel }: CustomTooltipProps & { yearLabel: string; totalLabel: string }) {
   if (!active || !payload || payload.length === 0) return null;
   const total = payload.reduce((s, p) => s + (p.value ?? 0), 0);
   return (
@@ -391,7 +391,7 @@ interface RaceTipProps {
   isAr: boolean;
 }
 
-function RaceTooltip({ active, payload, label, isAr, yearLabel }: RaceTipProps & { yearLabel: string }) {
+function RaceTooltip({ active, payload, label, isAr: _isAr, yearLabel }: RaceTipProps & { yearLabel: string }) {
   if (!active || !payload || payload.length === 0) return null;
   const sorted = [...payload].sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
   return (

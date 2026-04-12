@@ -549,7 +549,7 @@ interface ConvexElection {
 
 export default function ElectionsPage() {
   const { t, lang, dir } = useLanguage();
-  const isAr = lang === "ar";
+  const _isAr = lang === "ar";
 
   // ─── Wire to Convex ───────────────────────────────────────────────────────
   const convexPresidential = useQuery(api.elections.listPresidentialElections);

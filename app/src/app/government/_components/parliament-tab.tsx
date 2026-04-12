@@ -550,7 +550,7 @@ function CommitteesTab() {
 
 export function ParliamentTab() {
   const { t, lang } = useLanguage();
-  const isAr = lang === "ar";
+  const _isAr = lang === "ar";
   const [chamber, setChamber] = useState<"house" | "senate">("house");
   const [directoryPartyFilter, setDirectoryPartyFilter] = useState("all");
   const [subTab, setSubTab] = useState("hemicycle");

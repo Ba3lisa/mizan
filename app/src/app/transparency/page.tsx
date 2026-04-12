@@ -246,7 +246,7 @@ function StatusIcon({ status }: { status: string }) {
 
 function StatusBadge({
   status,
-  isAr,
+  isAr: _isAr,
 }: {
   status: "success" | "failed" | "flagged";
   isAr: boolean;

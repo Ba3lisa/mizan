@@ -735,7 +735,7 @@ const usageApi = (api as unknown as Record<string, Record<string, unknown>>)["us
 // This inner component is only mounted when usageApi is defined.
 function ApiUsageDashboardInner() {
   const { t, lang } = useLanguage();
-  const isAr = lang === "ar";
+  const _isAr = lang === "ar";
   // Hooks are always called here since this component is only mounted when
   // usageApi is defined — safe per Rules of Hooks.
   const dailyUsage = useQuery(
@@ -1350,7 +1350,7 @@ function CostTransparencyTableInner() {
 
 export default function FundingPage() {
   const { t, lang, dir } = useLanguage();
-  const isAr = lang === "ar";
+  const _isAr = lang === "ar";
 
   const summaries = useQuery(api.funding.getFundingSummary) as FundingSummaryRow[] | undefined;
   const donations = useQuery(api.funding.getRecentDonations, { limit: 20 }) as DonationRow[] | undefined;

@@ -13,7 +13,7 @@ import {
 import { DailyPoll } from "@/components/daily-poll";
 import { NewsTicker } from "@/components/news-ticker";
 import { useLanguage } from "@/components/providers";
-import { fmt, fmtEGP, fmtUSD } from "@/lib/format";
+import { fmtEGP, fmtUSD } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { AiPipelineStatus } from "@/components/ai-pipeline-status";
 import { SanadBadge } from "@/components/sanad-badge";

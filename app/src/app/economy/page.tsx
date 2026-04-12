@@ -976,7 +976,7 @@ function MoneyFlowsChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }
 
 // ─── Empty Chart Placeholder ──────────────────────────────────────────────────
 
-function EmptyChart({ isAr }: { isAr: boolean }) {
+function EmptyChart({ isAr: _isAr }: { isAr: boolean }) {
   const { t } = useLanguage();
   return (
     <div className="h-[280px] flex flex-col items-center justify-center gap-2 border border-dashed border-border/40 rounded-xl">
