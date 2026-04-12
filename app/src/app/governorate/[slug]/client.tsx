@@ -14,21 +14,19 @@ function slugToName(slug: string): string {
   return slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatPopulation(n: number, isAr: boolean): string {
+function formatPopulation(n: number, millionLabel: string): string {
   if (n >= 1_000_000) {
-    return isAr
-      ? `${(n / 1_000_000).toFixed(1)} مليون`
-      : `${(n / 1_000_000).toFixed(1)}M`;
+    return millionLabel.replace("{n}", (n / 1_000_000).toFixed(1));
   }
   return n.toLocaleString();
 }
 
-function formatArea(n: number, isAr: boolean): string {
-  return isAr ? `${n.toLocaleString()} كم²` : `${n.toLocaleString()} km²`;
+function formatArea(n: number, areaLabel: string): string {
+  return areaLabel.replace("{n}", n.toLocaleString());
 }
 
 export default function GovernoratePageClient({ slug }: { slug: string }) {
-  const { lang, dir } = useLanguage();
+  const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
   const governorate = useQuery(api.seo.getGovernorateBySlug, { slug });
@@ -52,13 +50,13 @@ export default function GovernoratePageClient({ slug }: { slug: string }) {
       <div className="page-content" dir={dir}>
         <div className="container-page text-center py-20">
           <p className="text-muted-foreground text-sm">
-            {isAr ? "المحافظة غير موجودة" : "Governorate not found"}
+            {t.governorateDetail_notFound}
           </p>
           <Link
             href="/governorate"
             className="text-primary hover:underline text-sm mt-4 inline-block"
           >
-            {isAr ? "← العودة للمحافظات" : "← Back to Governorates"}
+            {t.governorateDetail_backToGovernorates}
           </Link>
         </div>
       </div>
@@ -71,11 +69,11 @@ export default function GovernoratePageClient({ slug }: { slug: string }) {
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground mb-8">
           <Link href="/" className="hover:text-foreground">
-            {isAr ? "الرئيسية" : "Home"}
+            {t.common_home}
           </Link>
           <ChevronRight size={10} />
           <Link href="/governorate" className="hover:text-foreground">
-            {isAr ? "المحافظات" : "Governorates"}
+            {t.governorates}
           </Link>
           <ChevronRight size={10} />
           <span className="text-foreground">{displayName}</span>
@@ -84,15 +82,16 @@ export default function GovernoratePageClient({ slug }: { slug: string }) {
         <Skeleton name="governorate-profile" loading={isLoading}>
           {/* Direct-answer paragraph for GEO */}
           <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-            {isAr
-              ? `${displayName} هي محافظة مصرية${capitalName ? `، عاصمتها ${capitalName}` : ""}${governorate?.population ? `، يبلغ تعدادها السكاني ${formatPopulation(governorate.population, true)}` : ""}.`
-              : `${displayName} is an Egyptian governorate${capitalName ? `, with its capital at ${capitalName}` : ""}${governorate?.population ? `, with a population of ${formatPopulation(governorate.population, false)}` : ""}.`}
+            {t.governorateDetail_geoSummary
+              .replace("{name}", displayName)
+              .replace("{capital}", capitalName ? t.governorateDetail_geoCapital.replace("{capital}", capitalName) : "")
+              .replace("{population}", governorate?.population ? t.governorateDetail_geoPopulation.replace("{pop}", formatPopulation(governorate.population, t.governorateDetail_million)) : "")}
           </p>
 
           {/* Header */}
           <div className="mb-6">
             <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-1">
-              {isAr ? "محافظة مصرية" : "Egyptian Governorate"}
+              {t.governorateDetail_egyptianGovernorate}
             </p>
             <h1 className="text-3xl font-black">{displayName}</h1>
             {isAr && governorate?.nameEn && (
@@ -111,7 +110,7 @@ export default function GovernoratePageClient({ slug }: { slug: string }) {
                   <MapPin size={16} className="text-primary mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">
-                      {isAr ? "العاصمة" : "Capital"}
+                      {t.governorateDetail_capital}
                     </p>
                     <p className="font-semibold text-sm">{capitalName}</p>
                   </div>
@@ -125,10 +124,10 @@ export default function GovernoratePageClient({ slug }: { slug: string }) {
                   <Users size={16} className="text-primary mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">
-                      {isAr ? "السكان" : "Population"}
+                      {t.population}
                     </p>
                     <p className="font-semibold text-sm font-mono tabular-nums">
-                      {formatPopulation(governorate.population, isAr)}
+                      {formatPopulation(governorate.population, t.governorateDetail_million)}
                     </p>
                   </div>
                 </CardContent>
@@ -141,10 +140,10 @@ export default function GovernoratePageClient({ slug }: { slug: string }) {
                   <Ruler size={16} className="text-primary mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">
-                      {isAr ? "المساحة" : "Area"}
+                      {t.governorateDetail_area}
                     </p>
                     <p className="font-semibold text-sm font-mono tabular-nums">
-                      {formatArea(governorate.area, isAr)}
+                      {formatArea(governorate.area, t.governorateDetail_areaUnit)}
                     </p>
                   </div>
                 </CardContent>
@@ -167,7 +166,7 @@ export default function GovernoratePageClient({ slug }: { slug: string }) {
             className="text-sm text-primary hover:underline inline-flex items-center gap-1"
           >
             <ArrowLeft size={14} />
-            {isAr ? "عرض كل المحافظات" : "View all governorates"}
+            {t.governorateDetail_viewAll}
           </Link>
         </Skeleton>
 

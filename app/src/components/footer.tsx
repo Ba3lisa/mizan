@@ -26,7 +26,7 @@ const NavColumn = ({ title, items, isAr }: { title: string; items: Array<{ href:
 );
 
 export function Footer() {
-  const { lang, dir } = useLanguage();
+  const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
 
@@ -37,10 +37,10 @@ export function Footer() {
         <div className="col-span-2 md:col-span-3 lg:col-span-1">
           <div className="flex items-center gap-2 mb-2">
             <div className="w-5 h-5 rounded bg-primary text-primary-foreground flex items-center justify-center"><Scale size={10} strokeWidth={2} /></div>
-            <span className="font-bold text-sm">{isAr ? "ميزان" : "Mizan"}</span>
+            <span className="font-bold text-sm">{t.siteName}</span>
           </div>
           <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mb-3">
-            {isAr ? "بيانات مفتوحة عن الحكومة المصرية. يُدار بالكامل بواسطة الذكاء الاصطناعي." : "Open data about the Egyptian government. Fully AI-managed."}
+            {t.footer_description}
           </p>
           <a href="https://github.com/Ba3lisa/mizan" target="_blank" rel="noopener noreferrer"
             className="text-xs text-muted-foreground no-underline hover:text-primary transition-colors inline-flex items-center gap-1.5">
@@ -55,7 +55,7 @@ export function Footer() {
 
         {/* Sources */}
         <div>
-          <h4 className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{isAr ? "المصادر" : "Sources"}</h4>
+          <h4 className="text-[0.6875rem] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{t.footer_sources}</h4>
           <nav className="flex flex-col gap-1.5">
             {srcs.map((s) => <a key={s.name} href={s.url} target="_blank" rel="noopener noreferrer" className="text-sm text-muted-foreground no-underline hover:text-primary transition-colors inline-flex items-center gap-1">{s.name} <ExternalLink size={10} /></a>)}
           </nav>
@@ -63,8 +63,8 @@ export function Footer() {
       </div>
       <div className="py-4 border-t border-border flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          {isAr ? "ميزان — منصة شفافية مدنية." : "Mizan — civic transparency."}{" "}
-          {isAr ? "بناء" : "Built by"}{" "}
+          {t.footer_tagline}{" "}
+          {t.footer_builtBy}{" "}
           <a href="https://egouda.xyz/" target="_blank" rel="noopener noreferrer" className="text-primary no-underline hover:underline">Essam Gouda</a>
           {" & "}
           <a href="https://www.linkedin.com/in/youssof-elessawy/" target="_blank" rel="noopener noreferrer" className="text-primary no-underline hover:underline">Youssof Elessawy</a>

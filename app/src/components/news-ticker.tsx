@@ -26,8 +26,7 @@ function relativeTime(epochMs: number): string {
 const SCROLL_SPEED = 0.5; // pixels per frame
 
 export function NewsTicker() {
-  const { lang } = useLanguage();
-  const isAr = lang === "ar";
+  const { t } = useLanguage();
   const [headlines, setHeadlines] = useState<Headline[]>([]);
   const [loading, setLoading] = useState(true);
   const [hovered, setHovered] = useState(false);
@@ -80,12 +79,12 @@ export function NewsTicker() {
               <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
             </div>
             <span className="text-xs font-bold text-primary tracking-wide uppercase">
-              {isAr ? "أخبار مصر" : "Egyptian News"}
+              {t.newsTicker_title}
             </span>
           </div>
           {headlines.length > 0 && (
             <span className="text-[0.6rem] text-muted-foreground/50 font-mono">
-              {headlines.length} {isAr ? "خبر" : "stories"}
+              {headlines.length} {t.newsTicker_stories}
             </span>
           )}
         </div>
@@ -95,7 +94,7 @@ export function NewsTicker() {
           <TickerSkeleton />
         ) : headlines.length === 0 ? (
           <div className="flex items-center justify-center flex-1 text-xs text-muted-foreground/40">
-            {isAr ? "لا توجد أخبار حالياً" : "No news available"}
+            {t.newsTicker_noNews}
           </div>
         ) : (
           <div className="relative flex-1 overflow-hidden">

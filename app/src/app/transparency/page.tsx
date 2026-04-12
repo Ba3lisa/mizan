@@ -190,14 +190,21 @@ const SOURCE_TYPE_CONFIG: Record<
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatRelativeTime(timestamp: number | null, isAr: boolean): string {
-  if (!timestamp) return isAr ? "لم يتم" : "Never";
+interface RelativeTimeLabels {
+  never: string;
+  lessThanHour: string;
+  hoursAgo: string;
+  daysAgo: string;
+}
+
+function formatRelativeTime(timestamp: number | null, labels: RelativeTimeLabels): string {
+  if (!timestamp) return labels.never;
   const diff = Date.now() - timestamp;
   const hours = Math.floor(diff / (1000 * 60 * 60));
-  if (hours < 1) return isAr ? "أقل من ساعة" : "< 1h ago";
-  if (hours < 24) return isAr ? `منذ ${hours}س` : `${hours}h ago`;
+  if (hours < 1) return labels.lessThanHour;
+  if (hours < 24) return labels.hoursAgo.replace("{n}", String(hours));
   const days = Math.floor(hours / 24);
-  return isAr ? `منذ ${days}ي` : `${days}d ago`;
+  return labels.daysAgo.replace("{n}", String(days));
 }
 
 function mapStatus(
@@ -244,27 +251,20 @@ function StatusBadge({
   status: "success" | "failed" | "flagged";
   isAr: boolean;
 }) {
-  const config = {
-    success: {
-      label: "Healthy",
-      labelAr: "سليم",
-      className: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0",
-    },
-    failed: {
-      label: "Failed",
-      labelAr: "فشل",
-      className: "bg-red-500/15 text-red-600 dark:text-red-400 border-0",
-    },
-    flagged: {
-      label: "Stale",
-      labelAr: "قديم",
-      className: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0",
-    },
+  const { t } = useLanguage();
+  const labels: Record<string, string> = {
+    success: t.transparency_statusHealthy,
+    failed: t.transparency_statusFailed,
+    flagged: t.transparency_statusStale,
   };
-  const c = config[status];
+  const classNames: Record<string, string> = {
+    success: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-0",
+    failed: "bg-red-500/15 text-red-600 dark:text-red-400 border-0",
+    flagged: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-0",
+  };
   return (
-    <Badge className={cn("text-[0.6rem] px-1.5 py-0", c.className)}>
-      {isAr ? c.labelAr : c.label}
+    <Badge className={cn("text-[0.6rem] px-1.5 py-0", classNames[status])}>
+      {labels[status]}
     </Badge>
   );
 }
@@ -278,6 +278,7 @@ interface HealthCardProps {
 }
 
 function OverallHealthCard({ isAr, categoryHealth, isLoading }: HealthCardProps) {
+  const { t } = useLanguage();
   const totalRecords = categoryHealth
     ? categoryHealth.reduce((sum, ch) => sum + ch.recordCount, 0)
     : 0;
@@ -309,7 +310,7 @@ function OverallHealthCard({ isAr, categoryHealth, isLoading }: HealthCardProps)
         <div className="flex items-center gap-2 mb-4">
           <Shield size={16} className="text-primary" />
           <h2 className="text-sm font-bold">
-            {isAr ? "الصحة الإجمالية" : "Overall Health"}
+            {t.transparency_overallHealth}
           </h2>
         </div>
 
@@ -319,7 +320,7 @@ function OverallHealthCard({ isAr, categoryHealth, isLoading }: HealthCardProps)
               {totalRecords.toLocaleString()}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isAr ? "إجمالي السجلات" : "total records tracked"}
+              {t.transparency_totalRecords}
             </p>
           </div>
 
@@ -341,15 +342,15 @@ function OverallHealthCard({ isAr, categoryHealth, isLoading }: HealthCardProps)
           <div className="flex items-center gap-3 text-[0.6rem] text-muted-foreground mb-5">
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-              {isAr ? `${successCount} سليم` : `${successCount} healthy`}
+              {t.transparency_healthyCount.replace("{n}", String(successCount))}
             </span>
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
-              {isAr ? `${flaggedCount} قديم` : `${flaggedCount} stale`}
+              {t.transparency_staleCount.replace("{n}", String(flaggedCount))}
             </span>
             <span className="flex items-center gap-1">
               <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
-              {isAr ? `${failedCount} فشل` : `${failedCount} failed`}
+              {t.transparency_failedCount.replace("{n}", String(failedCount))}
             </span>
           </div>
 
@@ -390,6 +391,7 @@ function LatestActivityCard({
   activityLogs,
   isLoading,
 }: ActivityCardProps) {
+  const { t } = useLanguage();
   const recentLogs = activityLogs ? activityLogs.slice(0, 5) : [];
 
   return (
@@ -398,7 +400,7 @@ function LatestActivityCard({
         <div className="flex items-center gap-2 mb-4">
           <Activity size={16} className="text-primary" />
           <h2 className="text-sm font-bold">
-            {isAr ? "آخر تحديثات" : "Latest Activity"}
+            {t.transparency_latestActivity}
           </h2>
         </div>
 
@@ -406,13 +408,18 @@ function LatestActivityCard({
           <div className="space-y-3">
             {recentLogs.length === 0 ? (
               <p className="text-xs text-muted-foreground">
-                {isAr ? "لا يوجد نشاط حتى الآن" : "No activity yet"}
+                {t.transparency_noActivity}
               </p>
             ) : (
               recentLogs.map((log) => {
                 const status = mapStatus(log.status);
                 const label = CATEGORY_LABELS[log.category];
-                const relTime = formatRelativeTime(log.startedAt, isAr);
+                const relTime = formatRelativeTime(log.startedAt, {
+                  never: t.transparency_timeNever,
+                  lessThanHour: t.transparency_timeLessThanHour,
+                  hoursAgo: t.transparency_timeHoursAgo,
+                  daysAgo: t.transparency_timeDaysAgo,
+                });
                 // Pick first change that has a value transition
                 const highlight = log.changes.find(
                   (c) => c.previousValue && c.newValue
@@ -437,9 +444,7 @@ function LatestActivityCard({
                       </div>
                       {log.recordsUpdated !== undefined && (
                         <p className="text-[0.6rem] text-muted-foreground">
-                          {isAr
-                            ? `${log.recordsUpdated} سجل محدث`
-                            : `${log.recordsUpdated} records updated`}
+                          {t.transparency_recordsUpdated.replace("{n}", String(log.recordsUpdated))}
                         </p>
                       )}
                       {highlight && (
@@ -474,6 +479,7 @@ interface SourcesCardProps {
 }
 
 function DataSourcesCard({ isAr, sources, isLoading }: SourcesCardProps) {
+  const { t } = useLanguage();
   return (
     <Card className="border-border/60 col-span-2 lg:col-span-1">
       <CardContent className="p-5">
@@ -481,7 +487,7 @@ function DataSourcesCard({ isAr, sources, isLoading }: SourcesCardProps) {
           <div className="flex items-center gap-2">
             <Database size={16} className="text-primary" />
             <h2 className="text-sm font-bold">
-              {isAr ? "المصادر المتتبعة" : "Tracked Sources"}
+              {t.transparency_trackedSources}
             </h2>
           </div>
           {sources && (
@@ -491,9 +497,7 @@ function DataSourcesCard({ isAr, sources, isLoading }: SourcesCardProps) {
           )}
         </div>
         <p className="text-[0.6rem] text-muted-foreground mb-4">
-          {isAr
-            ? "جميع المصادر التي يراقبها وكيل البيانات"
-            : "All sources monitored by the data agent"}
+          {t.transparency_sourcesDesc}
         </p>
 
         <Skeleton name="sources-list" loading={isLoading}>
@@ -526,7 +530,7 @@ function DataSourcesCard({ isAr, sources, isLoading }: SourcesCardProps) {
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-primary transition-colors mt-0.5 shrink-0"
-                    aria-label={isAr ? "فتح المصدر" : "Open source"}
+                    aria-label={t.transparency_openSource}
                   >
                     <ExternalLink size={11} />
                   </a>
@@ -557,6 +561,7 @@ function CategoryDetailsCard({
   sources,
   isLoading,
 }: CategoryDetailsCardProps) {
+  const { t } = useLanguage();
   const [openCategory, setOpenCategory] = useState<string | null>(null);
 
   const toggle = (cat: string) =>
@@ -579,7 +584,7 @@ function CategoryDetailsCard({
         <div className="flex items-center gap-2 mb-4">
           <RefreshCw size={16} className="text-primary" />
           <h2 className="text-sm font-bold">
-            {isAr ? "تفاصيل الفئات" : "Category Details"}
+            {t.transparency_categoryDetails}
           </h2>
         </div>
 
@@ -622,10 +627,15 @@ function CategoryDetailsCard({
                         ? ch.recordCount.toLocaleString()
                         : "—"}
                       {" "}
-                      {isAr ? "سجل" : "rec."}
+                      {t.transparency_rec}
                     </span>
                     <span className="text-[0.6rem] text-muted-foreground hidden sm:block">
-                      {formatRelativeTime(ch?.lastRefreshTime ?? null, isAr)}
+                      {formatRelativeTime(ch?.lastRefreshTime ?? null, {
+                        never: t.transparency_timeNever,
+                        lessThanHour: t.transparency_timeLessThanHour,
+                        hoursAgo: t.transparency_timeHoursAgo,
+                        daysAgo: t.transparency_timeDaysAgo,
+                      })}
                     </span>
                     {isOpen ? (
                       <ChevronDown size={14} className="text-muted-foreground shrink-0" />
@@ -640,7 +650,7 @@ function CategoryDetailsCard({
                       {tableCounts && relatedTables.length > 0 && (
                         <div>
                           <p className="text-[0.625rem] uppercase font-semibold text-muted-foreground tracking-wider mb-2">
-                            {isAr ? "إحصائيات الجداول" : "Table Stats"}
+                            {t.transparency_tableStats}
                           </p>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                             {relatedTables.map((tbl) => {
@@ -669,7 +679,7 @@ function CategoryDetailsCard({
                       {catSources.length > 0 && (
                         <div>
                           <p className="text-[0.625rem] uppercase font-semibold text-muted-foreground tracking-wider mb-2">
-                            {isAr ? "المصادر المسجلة" : "Registered Sources"}
+                            {t.transparency_registeredSources}
                           </p>
                           <div className="space-y-1">
                             {catSources.map((src) => (
@@ -702,9 +712,7 @@ function CategoryDetailsCard({
                       {/* Auto-refresh indicator */}
                       <div className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
                         <RefreshCw size={9} />
-                        {isAr
-                          ? "يتجدد تلقائياً كل ٦ ساعات"
-                          : "Auto-refreshes every 12 hours"}
+                        {t.transparency_autoRefresh}
                       </div>
                     </div>
                   )}
@@ -721,6 +729,7 @@ function CategoryDetailsCard({
 // ─── Row 3: Sanad Levels ──────────────────────────────────────────────────────
 
 function ConfidenceLevels({ isAr }: { isAr: boolean }) {
+  const { t } = useLanguage();
   const levels = [
     { key: "consensus", level: "✓", labelAr: "إجماع", labelEn: "Consensus", descAr: "مصادر متعددة تتفق — أعلى مستوى ثقة", descEn: "Multiple sources agree — highest confidence", dot: "bg-teal-500", textColor: "text-teal-600 dark:text-teal-400" },
     { key: "official_government", level: "1", labelAr: "حكومي رسمي", labelEn: "Official Government", descAr: "مباشر من مصادر حكومية رسمية (.gov.eg)", descEn: "Direct from gov.eg sources (CAPMAS, ministries)", dot: "bg-emerald-500", textColor: "text-emerald-600 dark:text-emerald-400" },
@@ -733,9 +742,7 @@ function ConfidenceLevels({ isAr }: { isAr: boolean }) {
   return (
     <div className="space-y-1.5">
       <p className="text-[0.65rem] text-muted-foreground/70 mb-3 max-w-2xl">
-        {isAr
-          ? "النقاط الملونة بجانب الأرقام في الموقع تشير إلى مستوى السند — مدى ثقتنا في المصدر. تصنيف المستويات هو الجزء الوحيد في ميزان الذي يتضمن رأياً بشرياً. نخطط لجعل هذا التصنيف يعتمد على الذكاء الاصطناعي مستقبلاً."
-          : "The colored dots next to numbers throughout the app indicate the Sanad level — how much we trust the source. This ranking is the only opinionated part of Mizan. We plan to make this LLM-guided in the future."}
+        {t.transparency_sanadExplanation}
       </p>
       {levels.map((lvl) => (
         <div
@@ -831,6 +838,7 @@ const RESEARCH_REPORTS: ResearchReport[] = [
 ];
 
 function ResearchReportsSection({ isAr }: { isAr: boolean }) {
+  const { t } = useLanguage();
   const [openReport, setOpenReport] = useState<number | null>(null);
 
   return (
@@ -861,16 +869,14 @@ function ResearchReportsSection({ isAr }: { isAr: boolean }) {
                       )}
                     >
                       {report.discrepancyCount === 0
-                        ? (isAr ? "لا تباين" : "No discrepancies")
-                        : (isAr
-                            ? `${report.discrepancyCount} تباين`
-                            : `${report.discrepancyCount} discrepancy`)}
+                        ? t.transparency_noDiscrepancies
+                        : t.transparency_discrepancyCount.replace("{n}", String(report.discrepancyCount))}
                     </Badge>
                   </div>
                   <p className="text-[0.65rem] text-muted-foreground mt-0.5">
-                    {isAr
-                      ? `${report.findingsCount} نتيجة · ${report.sourcesChecked.length} مصادر`
-                      : `${report.findingsCount} findings · ${report.sourcesChecked.length} sources`}
+                    {t.transparency_findingsSummary
+                      .replace("{findings}", String(report.findingsCount))
+                      .replace("{sources}", String(report.sourcesChecked.length))}
                   </p>
                 </div>
                 {isOpen ? (
@@ -891,7 +897,7 @@ function ResearchReportsSection({ isAr }: { isAr: boolean }) {
                     {/* Sources checked */}
                     <div>
                       <p className="text-[0.625rem] uppercase font-semibold text-muted-foreground tracking-wider mb-2">
-                        {isAr ? "المصادر المفحوصة" : "Sources Checked"}
+                        {t.transparency_sourcesChecked}
                       </p>
                       <div className="space-y-1">
                         {report.sourcesChecked.map((src, si) => (
@@ -921,8 +927,8 @@ function ResearchReportsSection({ isAr }: { isAr: boolean }) {
                             </span>
                             <span className="text-[0.6rem] text-muted-foreground">
                               {src.accessible
-                                ? (isAr ? "متاح" : "accessible")
-                                : (isAr ? "غير متاح" : "NOT accessible")}
+                                ? t.transparency_accessible
+                                : t.transparency_notAccessible}
                             </span>
                           </div>
                         ))}
@@ -932,7 +938,7 @@ function ResearchReportsSection({ isAr }: { isAr: boolean }) {
                     {/* Validation results */}
                     <div>
                       <p className="text-[0.625rem] uppercase font-semibold text-muted-foreground tracking-wider mb-2">
-                        {isAr ? "نتائج التحقق" : "Validation Results"}
+                        {t.transparency_validationResults}
                       </p>
                       <div className="space-y-1">
                         {report.validationResults.map((result, ri) => (
@@ -969,7 +975,7 @@ function ResearchReportsSection({ isAr }: { isAr: boolean }) {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TransparencyPage() {
-  const { lang, dir } = useLanguage();
+  const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
   // Convex queries — getDataOverview removed (was reading 12 full tables on
@@ -1015,19 +1021,15 @@ export default function TransparencyPage() {
             </div>
             <div>
               <p className="text-xs font-semibold text-primary uppercase tracking-widest">
-                {isAr ? "الشفافية" : "Transparency"}
+                {t.navTransparency}
               </p>
               <h1 className="text-2xl md:text-3xl font-black">
-                {isAr
-                  ? "لوحة شفافية البيانات"
-                  : "Data Transparency Dashboard"}
+                {t.transparency_dashboardTitle}
               </h1>
             </div>
           </div>
           <p className="text-sm text-muted-foreground max-w-xl">
-            {isAr
-              ? "عرض موحد لصحة البيانات، المصادر، وسجل التحديثات الآلية. يعمل وكيل الذكاء الاصطناعي كل ٦ ساعات للتحقق من المصادر الرسمية وتحديث السجلات."
-              : "A unified view of data health, tracked sources, and the automated refresh audit trail. The AI agent runs every 12 hours to validate official sources and update records."}
+            {t.transparency_dashboardDesc}
           </p>
         </div>
 
@@ -1066,7 +1068,7 @@ export default function TransparencyPage() {
         {/* ─── Row 3: Sanad Levels ─── */}
         <div className="mb-6">
           <h2 className="text-sm font-bold mb-3">
-            {isAr ? "مستويات السند" : "Sanad Levels"}
+            {t.transparency_sanadLevels}
           </h2>
           <ConfidenceLevels isAr={isAr} />
         </div>
@@ -1074,7 +1076,7 @@ export default function TransparencyPage() {
         {/* ─── Row 3: Research Reports ─── */}
         <div className="mb-8">
           <h2 className="text-sm font-bold mb-3">
-            {isAr ? "تقارير التحقق" : "Research Reports"}
+            {t.transparency_researchReports}
           </h2>
           <ResearchReportsSection isAr={isAr} />
         </div>
@@ -1082,9 +1084,7 @@ export default function TransparencyPage() {
         {/* ─── Footer Note ─── */}
         <p className="text-xs text-muted-foreground flex items-center gap-1.5 pb-4">
           <Activity size={11} className="shrink-0" />
-          {isAr
-            ? "هذه الصفحة تعرض سجلاً شفافاً لجميع عمليات التحديث الآلية. لا يتم تعديل أي بيانات بدون تسجيل."
-            : "This page shows a transparent log of all automated updates. No data is modified without logging."}
+          {t.transparency_footerNote}
         </p>
       </div>
     </div>

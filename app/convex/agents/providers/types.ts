@@ -18,6 +18,16 @@ export interface ToolSchema {
   input_schema: Record<string, unknown>;
 }
 
+/** Server-side tool definition (web_search, web_fetch, etc.) */
+export interface ServerToolDef {
+  type: string;
+  name: string;
+  max_uses?: number;
+  allowed_domains?: string[];
+  blocked_domains?: string[];
+  max_content_tokens?: number;
+}
+
 export interface CouncilEvaluationContext {
   category: string;
   tableName: string;
@@ -36,13 +46,35 @@ export interface CouncilVoteResult {
   sourceVerified: boolean;
 }
 
-/** Every LLM provider exports these three functions. */
+/** Every LLM provider implements this interface for pipeline compatibility. */
 export interface LLMProvider {
   name: string;
-  /** Send a prompt and get a text response. */
+
+  // ── Basic (required by all providers) ──────────────────────────────────────
   callLLM(prompt: string, systemPrompt?: string): Promise<string | null>;
-  /** Send a prompt with a JSON schema and get a structured response. */
   callLLMStructured<T>(prompt: string, schema: ToolSchema, systemPrompt?: string): Promise<T | null>;
-  /** Evaluate a data change for the LLM council. */
   evaluateDataChange(context: CouncilEvaluationContext): Promise<CouncilVoteResult | null>;
+
+  // ── With-usage variants (required — all providers can track tokens) ────────
+  callLLMWithUsage(prompt: string, systemPrompt?: string): Promise<LLMCallResult>;
+  callLLMStructuredWithUsage<T>(
+    prompt: string,
+    schema: ToolSchema,
+    systemPrompt?: string,
+  ): Promise<{ result: T | null; usage: LLMCallResult["usage"] }>;
+
+  // ── Server tools (optional — only providers with web search implement) ─────
+  supportsServerTools: boolean;
+  callLLMWithServerTools(
+    prompt: string,
+    serverTools: ServerToolDef[],
+    systemPrompt?: string,
+  ): Promise<LLMCallResult & { searchRequests?: number }>;
+  callLLMWebResearchStructured<T>(
+    researchPrompt: string,
+    serverTools: ServerToolDef[],
+    schema: ToolSchema,
+    parsePrompt?: string,
+    systemPrompt?: string,
+  ): Promise<{ result: T | null; usage: LLMCallResult["usage"]; rawResearch: string | null }>;
 }

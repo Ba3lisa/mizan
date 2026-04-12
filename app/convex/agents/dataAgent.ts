@@ -1,47 +1,48 @@
 "use node";
 // AI-powered data orchestrator for Mizan.
-// Uses the Claude API (via raw fetch — no SDK dependency) to parse and validate
+// Uses LLM APIs (via raw fetch — no SDK dependency) to parse and validate
 // government transparency data fetched from public sources.
 //
-// SETUP: Set the ANTHROPIC_API_KEY environment variable in your Convex dashboard
+// SETUP: Set at least one LLM API key (XAI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.) in your Convex dashboard
 // (Settings → Environment Variables) before deploying this action.
 
 import { internalAction, ActionCtx } from "../_generated/server";
 import { internal, api } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
+import { v } from "convex/values";
 
 import {
   parseWorldBankResponse,
   validateDebtRecord,
 } from "./validators";
-import { callLLMStructured as callClaudeStructured } from "./providers/registry";
-import { callClaudeWithUsage, callClaudeWithServerTools, callClaudeStructuredWithUsage } from "./providers/anthropic";
+import { callLLMStructured, callLLMWithUsage, callLLMStructuredWithUsage, callLLMWebResearchStructured, getPrimaryProvider } from "./providers/registry";
+import { estimateCost } from "../lib/tokenCost";
+import { BudgetDataSchema, BudgetWikipediaSchema, CabinetDataSchema, GovernorsDataSchema, IMFIndicatorsExtractionSchema, InterestRateSchema, BankRatesSchema, StockIndexSchema, RawNewsListSchema, IDAOpportunitiesSchema, GAFIOpportunitiesSchema, IndustrialBenchmarksSchema, CostEstimatesSchema, IDAComplexesSchema, GAFIZonesSchema, InvestmentIncentivesSchema, zodToToolSchema } from "./schemas";
+import { parseAndVerify } from "./verify";
+import { z } from "zod";
 
 // ─── COST TRACKING ───────────────────────────────────────────────────────────
 
-// Haiku pricing: $0.80/MTok input, $4/MTok output
-const COST_PER_INPUT_TOKEN = 0.80 / 1_000_000;
-const COST_PER_OUTPUT_TOKEN = 4.0 / 1_000_000;
-
 /**
- * Call Claude and log usage to apiUsageLog for the funding page.
- * Drop-in replacement for callClaude that adds cost tracking.
+ * Call the primary LLM provider and log usage to apiUsageLog for the funding page.
+ * Provider-agnostic — routes through the registry to whichever provider is active.
  */
-async function callClaude(
+async function callPrimaryLLM(
   ctx: ActionCtx,
   prompt: string,
   systemPrompt?: string,
   purpose = "data_pipeline"
 ): Promise<string | null> {
-  const result = await callClaudeWithUsage(prompt, systemPrompt);
+  const provider = getPrimaryProvider();
+  const providerName = provider?.name ?? "unknown";
+  const result = await callLLMWithUsage(prompt, systemPrompt);
 
-  // Log usage if we got a response
   if (result.usage) {
     const { inputTokens, outputTokens, model, durationMs } = result.usage;
-    const costUsd = inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN;
+    const costUsd = estimateCost(model, inputTokens, outputTokens);
     try {
       await ctx.runMutation(internal.usage.logApiUsage, {
-        provider: "anthropic",
+        provider: providerName,
         model,
         purpose,
         inputTokens,
@@ -58,6 +59,11 @@ async function callClaude(
   }
 
   return result.text;
+}
+
+/** Get the active provider name for usage logging. */
+function activeProviderName(): string {
+  return getPrimaryProvider()?.name ?? "unknown";
 }
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -209,56 +215,48 @@ async function refreshDebtData(
 async function refreshBudgetData(
   ctx: ActionCtx
 ): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.warn("[dataAgent] Skipping budget refresh — ANTHROPIC_API_KEY not set.");
+  const hasLLM = !!getPrimaryProvider();
+  if (!hasLLM) {
+    console.warn("[dataAgent] Skipping budget refresh — no LLM provider configured.");
     return { recordsUpdated: 0 };
   }
 
-  // ── Level 1: MOF Financial Monthly PDF via Claude web_search + web_fetch ──
-  // Claude searches for the latest PDF on assets.mof.gov.eg, fetches it, and
-  // extracts fiscal data from Section 4 (Fiscal Sector). Anthropic executes
+  // ── Level 1: MOF Financial Monthly PDF via LLM web_search ──
+  // The LLM searches for the latest PDF on assets.mof.gov.eg, fetches it, and
+  // extracts fiscal data from Section 4 (Fiscal Sector). The provider executes
   // the search/fetch server-side — no headless browser needed.
   try {
-    console.log("[dataAgent/budget] Attempting MOF PDF via Claude web_search + web_fetch...");
+    console.log("[dataAgent/budget] Attempting MOF via web_search → structured output...");
 
-    const result = await callClaudeWithServerTools(
-      `Search for the latest Egypt government budget data. Try these searches:
-1. "Egypt Ministry of Finance Financial Monthly 2025 revenue expenditure deficit EGP billions"
-2. "Egypt budget fiscal year 2024/2025 total revenue total expenditure"
-
-From the search results, extract the most recent Egyptian national budget figures.
-
-RESPOND WITH ONLY THIS JSON — no explanation, no preamble:
-{
-  "fiscalYear": "2024/2025",
-  "totalRevenue": <cumulative revenue in EGP billions — e.g. 1442 not 1.442>,
-  "totalExpenditure": <cumulative expenditure in EGP billions — e.g. 2308 not 2.308>,
-  "deficit": <overall deficit in EGP billions, negative means deficit — e.g. -879 not -0.879>,
-  "gdp": <GDP in EGP billions — e.g. 17000 not 17>,
-  "sourceUrl": "<URL of the source with the data>",
-  "period": "<e.g. July-October 2025>"
-}
-
-CRITICAL: All monetary values MUST be in EGP BILLIONS (not trillions). If a source says "EGP 1.442 trillion", convert to 1442 billion. If it says "EGP 879.3 billion", use 879.3.
-totalRevenue and totalExpenditure are REQUIRED. Use the most recent figures available.`,
-      [
-        {
-          type: "web_search_20250305",
-          name: "web_search",
-          max_uses: 3,
-        },
-      ],
-      "You are a data extraction assistant. Return ONLY valid JSON. No prose, no explanations, no markdown fences.",
+    // Two-step: web research → structured parse with Zod-verified schema
+    const budgetToolSchema = zodToToolSchema(
+      "extract_budget",
+      "Extract Egyptian national budget data from web research",
+      BudgetDataSchema,
     );
 
-    // Log usage (tokens + search costs)
+    const result = await callLLMWebResearchStructured<z.infer<typeof BudgetDataSchema>>(
+      `Search for the latest Egypt government budget data. Try these searches:
+1. "Egypt Ministry of Finance Financial Monthly 2025 revenue expenditure deficit EGP billions"
+2. "Egypt budget fiscal year 2024-2025 total revenue total expenditure"
+
+From the search results, find the most recent Egyptian national budget figures.
+All monetary values MUST be in EGP BILLIONS (not trillions). If a source says "EGP 1.442 trillion", convert to 1442 billion.
+fiscalYear MUST use dash separator "YYYY-YYYY" (e.g. "2024-2025"), NEVER slash.`,
+      [{ type: "web_search_20250305", name: "web_search", max_uses: 3 }],
+      budgetToolSchema,
+      `Extract the Egyptian national budget data into structured format.
+CRITICAL: fiscalYear must be "YYYY-YYYY" with dash (e.g. "2024-2025"). All amounts in EGP billions.`,
+      "You are a data extraction assistant for Egyptian government fiscal data.",
+    );
+
+    // Log usage
     if (result.usage) {
       const { inputTokens, outputTokens, model, durationMs } = result.usage;
-      const costUsd = inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN;
+      const costUsd = estimateCost(model, inputTokens, outputTokens);
       try {
         await ctx.runMutation(internal.usage.logApiUsage, {
-          provider: "anthropic",
+          provider: activeProviderName(),
           model,
           purpose: "data_pipeline_budget",
           inputTokens,
@@ -266,7 +264,7 @@ totalRevenue and totalExpenditure are REQUIRED. Use the most recent figures avai
           totalTokens: inputTokens + outputTokens,
           costUsd,
           durationMs,
-          success: result.text !== null,
+          success: result.result !== null,
           timestamp: Date.now(),
         });
       } catch (err) {
@@ -274,11 +272,14 @@ totalRevenue and totalExpenditure are REQUIRED. Use the most recent figures avai
       }
     }
 
-    if (result.text) {
-      const mofResult = parseBudgetJson(result.text);
-      if (mofResult?.fiscalYear) {
-        const srcUrl = mofResult.sourceUrl ?? "https://www.mof.gov.eg";
-        // Determine sanadLevel from source domain
+    if (result.result) {
+      // Verify with Zod before upserting
+      const verified = BudgetDataSchema.safeParse(result.result);
+      if (!verified.success) {
+        console.error("[dataAgent/budget] REJECTED by verifier:", verified.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
+      } else {
+        const data = verified.data;
+        const srcUrl = data.sourceUrl;
         const isMof = srcUrl.includes("mof.gov.eg");
         const isIntlOrg = srcUrl.includes("worldbank.org") || srcUrl.includes("imf.org");
         const sanadLevel = isMof ? 1 : isIntlOrg ? 2 : 3;
@@ -286,11 +287,11 @@ totalRevenue and totalExpenditure are REQUIRED. Use the most recent figures avai
         const recordsUpdated: number = await ctx.runMutation(
           internal.dataRefresh.upsertFiscalYear,
           {
-            year: mofResult.fiscalYear,
-            totalRevenue: mofResult.totalRevenue,
-            totalExpenditure: mofResult.totalExpenditure,
-            deficit: mofResult.deficit,
-            gdp: mofResult.gdp,
+            year: data.fiscalYear,
+            totalRevenue: data.totalRevenue,
+            totalExpenditure: data.totalExpenditure,
+            deficit: data.deficit,
+            gdp: data.gdp,
             sourceUrl: srcUrl,
             sanadLevel,
           }
@@ -299,7 +300,7 @@ totalRevenue and totalExpenditure are REQUIRED. Use the most recent figures avai
         return { recordsUpdated, sourceUrl: srcUrl };
       }
     }
-    console.warn("[dataAgent/budget] MOF PDF extraction returned no usable data — falling back to Wikipedia.");
+    console.warn("[dataAgent/budget] MOF extraction returned no usable data — falling back to Wikipedia.");
   } catch (err) {
     console.warn(`[dataAgent/budget] MOF PDF approach failed: ${err instanceof Error ? err.message : String(err)} — falling back to Wikipedia.`);
   }
@@ -324,36 +325,52 @@ totalRevenue and totalExpenditure are REQUIRED. Use the most recent figures avai
       return { recordsUpdated: 0 };
     }
 
-    // Extract with Claude — wikitext is structured template data, very reliable
-    const wikiResponse = await callClaude(ctx,
+    // Extract with Claude structured output — wikitext is structured template data
+    const wikiToolSchema = zodToToolSchema(
+      "extract_wiki_budget",
+      "Extract Egyptian budget data from Wikipedia infobox",
+      BudgetWikipediaSchema,
+    );
+
+    const { result: wikiResult, usage: wikiUsage } = await callLLMStructuredWithUsage<z.infer<typeof BudgetWikipediaSchema>>(
       `Extract Egyptian government budget data from this Wikipedia infobox wikitext.
 The infobox contains fields like: | revenue = $XX billion (YYYY) | expenses = $XX billion (YYYY)
-
-Return JSON (no markdown fences):
-{
-  "fiscalYear": "2024/2025",
-  "revenueUsd": <number in USD billions>,
-  "expenditureUsd": <number in USD billions>,
-  "deficitUsd": <number in USD billions, negative = deficit>,
-  "gdpNominalUsd": <number in USD billions>,
-  "year": "2025"
-}
+fiscalYear MUST use dash separator "YYYY-YYYY" (e.g. "2024-2025"), NEVER slash.
 
 Wikitext (first 6000 chars):
 ${wikitext.slice(0, 6000)}`,
-      "Extract fiscal data from Wikipedia infobox. JSON only, no markdown."
+      wikiToolSchema,
+      "Extract fiscal data from Wikipedia infobox. Be precise with numbers.",
     );
 
-    if (!wikiResponse) {
-      console.warn("[dataAgent/budget] Claude returned no data from Wikipedia.");
+    // Log usage
+    if (wikiUsage) {
+      const costUsd = estimateCost(wikiUsage.model, wikiUsage.inputTokens, wikiUsage.outputTokens);
+      try {
+        await ctx.runMutation(internal.usage.logApiUsage, {
+          provider: activeProviderName(), model: wikiUsage.model, purpose: "data_pipeline_budget_wiki",
+          inputTokens: wikiUsage.inputTokens, outputTokens: wikiUsage.outputTokens,
+          totalTokens: wikiUsage.inputTokens + wikiUsage.outputTokens,
+          costUsd, durationMs: wikiUsage.durationMs, success: wikiResult !== null, timestamp: Date.now(),
+        });
+      } catch (err) {
+        console.warn("[dataAgent/budget] Failed to log wiki usage:", err);
+      }
+    }
+
+    if (!wikiResult) {
+      console.warn("[dataAgent/budget] Claude returned no structured data from Wikipedia.");
       return { recordsUpdated: 0 };
     }
 
-    const wikiBudget = parseBudgetJson(wikiResponse);
-    if (!wikiBudget?.fiscalYear && !wikiBudget?.revenueUsd) {
-      console.warn("[dataAgent/budget] Could not parse Wikipedia budget data.");
+    // Verify with Zod
+    const verified = BudgetWikipediaSchema.safeParse(wikiResult);
+    if (!verified.success) {
+      console.error("[dataAgent/budget] Wikipedia data REJECTED by verifier:", verified.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
       return { recordsUpdated: 0 };
     }
+
+    const wikiBudget = verified.data;
 
     // Convert USD → EGP using latest exchange rate from economicIndicators
     let usdToEgp = 50; // Conservative fallback
@@ -366,16 +383,15 @@ ${wikitext.slice(0, 6000)}`,
       console.warn("[dataAgent/budget] Could not fetch exchange rate, using fallback.");
     }
 
-    const fiscalYear = wikiBudget.fiscalYear ?? `${wikiBudget.year ?? "2025"}`;
-    const totalRevenue = wikiBudget.revenueUsd ? wikiBudget.revenueUsd * usdToEgp : wikiBudget.totalRevenue;
-    const totalExpenditure = wikiBudget.expenditureUsd ? wikiBudget.expenditureUsd * usdToEgp : wikiBudget.totalExpenditure;
-    const deficit = wikiBudget.deficitUsd ? wikiBudget.deficitUsd * usdToEgp : wikiBudget.deficit;
-    const gdp = wikiBudget.gdpNominalUsd ? wikiBudget.gdpNominalUsd * usdToEgp : wikiBudget.gdp;
+    const totalRevenue = wikiBudget.revenueUsd * usdToEgp;
+    const totalExpenditure = wikiBudget.expenditureUsd * usdToEgp;
+    const deficit = wikiBudget.deficitUsd * usdToEgp;
+    const gdp = wikiBudget.gdpNominalUsd * usdToEgp;
 
     const recordsUpdated: number = await ctx.runMutation(
       internal.dataRefresh.upsertFiscalYear,
       {
-        year: fiscalYear,
+        year: wikiBudget.fiscalYear,
         totalRevenue,
         totalExpenditure,
         deficit,
@@ -393,61 +409,18 @@ ${wikitext.slice(0, 6000)}`,
   }
 }
 
-interface BudgetParseResult {
-  fiscalYear?: string;
-  totalRevenue?: number;
-  totalExpenditure?: number;
-  deficit?: number;
-  gdp?: number;
-  sourceUrl?: string;
-  revenueUsd?: number;
-  expenditureUsd?: number;
-  deficitUsd?: number;
-  gdpNominalUsd?: number;
-  year?: string;
-}
-
-/** Parse budget JSON from Claude response, handling markdown fences and prose. */
-function parseBudgetJson(text: string): BudgetParseResult | null {
-  try {
-    let jsonStr = text;
-    // Strip markdown fences
-    const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fence) jsonStr = fence[1];
-    // If still not valid JSON, try extracting a JSON object from prose
-    if (!jsonStr.trim().startsWith("{")) {
-      const objMatch = jsonStr.match(/\{[\s\S]*"fiscalYear"[\s\S]*\}/);
-      if (objMatch) jsonStr = objMatch[0];
-    }
-    const raw = JSON.parse(jsonStr.trim()) as Record<string, unknown>;
-    return {
-      fiscalYear: typeof raw.fiscalYear === "string" ? raw.fiscalYear : undefined,
-      totalRevenue: typeof raw.totalRevenue === "number" ? raw.totalRevenue : undefined,
-      totalExpenditure: typeof raw.totalExpenditure === "number" ? raw.totalExpenditure : undefined,
-      deficit: typeof raw.deficit === "number" ? raw.deficit : undefined,
-      gdp: typeof raw.gdp === "number" ? raw.gdp : undefined,
-      sourceUrl: typeof raw.sourceUrl === "string" ? raw.sourceUrl : undefined,
-      revenueUsd: typeof raw.revenueUsd === "number" ? raw.revenueUsd : undefined,
-      expenditureUsd: typeof raw.expenditureUsd === "number" ? raw.expenditureUsd : undefined,
-      deficitUsd: typeof raw.deficitUsd === "number" ? raw.deficitUsd : undefined,
-      gdpNominalUsd: typeof raw.gdpNominalUsd === "number" ? raw.gdpNominalUsd : undefined,
-      year: typeof raw.year === "string" ? raw.year : undefined,
-    };
-  } catch {
-    console.warn("[dataAgent/budget] JSON parse failed:", text.slice(0, 200));
-    return null;
-  }
-}
+// parseBudgetJson removed — budget calls now use structured output with Zod verification
+// via BudgetDataSchema and BudgetWikipediaSchema from schemas.ts
 
 // ─── GOVERNMENT REFRESH ───────────────────────────────────────────────────────
 
 async function refreshGovernmentData(
   ctx: ActionCtx
 ): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const hasLLM = !!getPrimaryProvider();
+  if (!hasLLM) {
     console.warn(
-      "[dataAgent] Skipping government AI refresh — ANTHROPIC_API_KEY not set."
+      "[dataAgent] Skipping government AI refresh — no LLM provider configured."
     );
     return { recordsUpdated: 0 };
   }
@@ -513,44 +486,26 @@ ${pageText || "(page content unavailable)"}`;
   }
 
   console.log(`[dataAgent] Government: sending ${pageText.length} chars to Claude for ministers...`);
-  const claudeResponse = await callClaude(ctx, prompt, systemPrompt);
+  const cabinetToolSchema = zodToToolSchema("extract_cabinet", "Extract Egyptian cabinet officials", CabinetDataSchema);
+  const { result: cabinetResult } = await callLLMStructuredWithUsage<z.infer<typeof CabinetDataSchema>>(
+    prompt,
+    cabinetToolSchema,
+    systemPrompt,
+  );
 
-  if (!claudeResponse) {
+  if (!cabinetResult) {
     console.warn("[dataAgent] Claude returned no government data (null response).");
     return { recordsUpdated: 0 };
   }
 
-  console.log(`[dataAgent] Government: Claude returned ${claudeResponse.length} chars`);
-
-  let officials: Array<{
-    nameEn: string;
-    titleEn: string;
-    nameAr: string;
-    titleAr: string;
-    role: string;
-  }>;
-  try {
-    let jsonStr = claudeResponse;
-    const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fence) jsonStr = fence[1];
-    const parsed: unknown = JSON.parse(jsonStr.trim());
-    if (!Array.isArray(parsed)) {
-      console.warn("[dataAgent] Claude government response is not an array.");
-      return { recordsUpdated: 0 };
-    }
-    officials = parsed as typeof officials;
-  } catch {
-    console.warn(
-      `[dataAgent] Could not parse Claude government response`
-    );
+  const cabinetVerified = CabinetDataSchema.safeParse(cabinetResult);
+  if (!cabinetVerified.success) {
+    console.error("[dataAgent/government] REJECTED by verifier:", cabinetVerified.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
     return { recordsUpdated: 0 };
   }
 
-  console.log(`[dataAgent] Government: parsed ${officials.length} officials from Claude response`);
-  if (officials.length === 0) {
-    console.warn("[dataAgent] Claude found no officials. First 300 chars of response: " + claudeResponse.slice(0, 300));
-    return { recordsUpdated: 0 };
-  }
+  const officials = cabinetVerified.data.officials;
+  console.log(`[dataAgent] Government: verified ${officials.length} officials`);
 
   // Auto-write officials to DB (upsert by name, never delete existing)
   let recordsUpdated: number = await ctx.runMutation(
@@ -573,44 +528,38 @@ ${pageText || "(page content unavailable)"}`;
   // Step 2: Extract governors separately (different source)
   if (governorText.length > 200) {
     console.log(`[dataAgent] Government: extracting governors from ${governorText.length} chars...`);
-    const govResponse = await callClaude(ctx,
+    const govToolSchema = zodToToolSchema("extract_governors", "Extract Egyptian governors", GovernorsDataSchema);
+    const { result: govResult } = await callLLMStructuredWithUsage<z.infer<typeof GovernorsDataSchema>>(
       `Extract ALL 27 Egyptian governors from this text.
-Return a JSON array: [{"nameEn": "...", "titleEn": "Governor of [Governorate]", "nameAr": "", "titleAr": "", "role": "governor"}]
 Egypt has 27 governorates. Extract every governor mentioned.
 
 Text:
 ${governorText.slice(0, 8000)}`,
-      systemPrompt
+      govToolSchema,
+      systemPrompt,
     );
 
-    if (govResponse) {
-      try {
-        let jsonStr = govResponse;
-        const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (fence) jsonStr = fence[1];
-        const govParsed = JSON.parse(jsonStr.trim()) as Array<{
-          nameEn: string; titleEn: string; nameAr: string; titleAr: string; role: string;
-        }>;
-        if (Array.isArray(govParsed) && govParsed.length > 0) {
-          const govUpdated: number = await ctx.runMutation(
-            internal.dataRefresh.upsertGovernmentOfficials,
-            {
-              officials: govParsed.map((o) => ({
-                nameEn: o.nameEn,
-                nameAr: o.nameAr || "",
-                titleEn: o.titleEn,
-                titleAr: o.titleAr || "",
-                role: "governor" as const,
-              })),
-              sourceUrl: "https://english.ahram.org.eg/News/526575.aspx",
-              sanadLevel: 3,
-            }
-          );
-          recordsUpdated += govUpdated;
-          console.log(`[dataAgent] Government: ${govParsed.length} governors extracted`);
-        }
-      } catch {
-        console.warn("[dataAgent] Failed to parse governor response");
+    if (govResult) {
+      const govVerified = GovernorsDataSchema.safeParse(govResult);
+      if (!govVerified.success) {
+        console.warn("[dataAgent] Governors REJECTED by verifier:", govVerified.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
+      } else {
+        const govUpdated: number = await ctx.runMutation(
+          internal.dataRefresh.upsertGovernmentOfficials,
+          {
+            officials: govVerified.data.governors.map((o) => ({
+              nameEn: o.nameEn,
+              nameAr: o.nameAr || "",
+              titleEn: o.titleEn,
+              titleAr: o.titleAr || "",
+              role: "governor" as const,
+            })),
+            sourceUrl: "https://english.ahram.org.eg/News/526575.aspx",
+            sanadLevel: 3,
+          }
+        );
+        recordsUpdated += govUpdated;
+        console.log(`[dataAgent] Government: ${govVerified.data.governors.length} governors extracted`);
       }
     }
   }
@@ -812,11 +761,11 @@ async function _refreshIMFData(
   }
 
   if (imfText.length > 500) {
-    const imfResponse = await callClaude(ctx,
+    const imfToolSchema = zodToToolSchema("extract_imf", "Extract IMF economic projections for Egypt", IMFIndicatorsExtractionSchema);
+    const { result: imfResult } = await callLLMStructuredWithUsage<z.infer<typeof IMFIndicatorsExtractionSchema>>(
       `Extract IMF economic projections for Egypt from this Wikipedia article.
-Return JSON: {"indicators": [{"indicator": "imf_gdp_growth_forecast", "data": {"2024": 2.4, "2025": 4.3, ...}}, ...]}
 
-Extract these if available:
+Extract these indicators if available:
 - imf_gdp_growth_forecast (Real GDP growth %)
 - imf_inflation_forecast (Inflation %)
 - imf_current_account_forecast (Current account % of GDP)
@@ -825,44 +774,37 @@ Extract these if available:
 Include both historical and forecast years (2020-2030).
 
 Text: ${imfText}`,
-      "Extract IMF economic data from Wikipedia. JSON only."
+      imfToolSchema,
+      "Extract IMF economic data from Wikipedia.",
     );
 
-    if (imfResponse) {
-      try {
-        let jsonStr = imfResponse;
-        const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (fence) jsonStr = fence[1];
-        const parsed = JSON.parse(jsonStr.trim()) as {
-          indicators?: Array<{ indicator: string; data: Record<string, number> }>;
-        };
-
-        if (parsed.indicators) {
-          for (const ind of parsed.indicators) {
-            const meta = IMF_INDICATORS.find((i) => i.indicator === ind.indicator);
-            if (!meta) continue;
-            for (const [yearStr, value] of Object.entries(ind.data)) {
-              if (typeof value !== "number" || isNaN(value)) continue;
-              const updated: number = await ctx.runMutation(
-                internal.dataRefresh.upsertEconomicIndicator,
-                {
-                  indicator: ind.indicator,
-                  date: `${yearStr}-12-31`,
-                  year: yearStr,
-                  value,
-                  unit: meta.unit,
-                  sourceUrl: "https://en.wikipedia.org/wiki/Economy_of_Egypt",
-                  sourceNameEn: meta.sourceNameEn,
-                  sanadLevel: 2,
-                }
-              );
-              totalUpdated += updated;
-            }
+    if (imfResult) {
+      const verified = IMFIndicatorsExtractionSchema.safeParse(imfResult);
+      if (!verified.success) {
+        console.warn("[dataAgent/imf] REJECTED by verifier:", verified.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("; "));
+      } else {
+        for (const ind of verified.data.indicators) {
+          const meta = IMF_INDICATORS.find((i) => i.indicator === ind.indicator);
+          if (!meta) continue;
+          for (const [yearStr, value] of Object.entries(ind.data)) {
+            if (typeof value !== "number" || isNaN(value)) continue;
+            const updated: number = await ctx.runMutation(
+              internal.dataRefresh.upsertEconomicIndicator,
+              {
+                indicator: ind.indicator,
+                date: `${yearStr}-12-31`,
+                year: yearStr,
+                value,
+                unit: meta.unit,
+                sourceUrl: "https://en.wikipedia.org/wiki/Economy_of_Egypt",
+                sourceNameEn: meta.sourceNameEn,
+                sanadLevel: 2,
+              }
+            );
+            totalUpdated += updated;
           }
-          console.log(`[dataAgent/imf] Extracted IMF data from Wikipedia: ${totalUpdated} records`);
         }
-      } catch {
-        console.warn("[dataAgent/imf] Failed to parse IMF data from Wikipedia");
+        console.log(`[dataAgent/imf] Extracted IMF data from Wikipedia: ${totalUpdated} records`);
       }
     }
   }
@@ -1072,7 +1014,7 @@ async function refreshInvestmentRates(ctx: ActionCtx): Promise<number> {
   const today = new Date().toISOString().split("T")[0];
   const year = today.slice(0, 4);
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const hasLLM = !!getPrimaryProvider();
 
   // ── CBE T-bill rates ──────────────────────────────────────────────────────
   try {
@@ -1105,28 +1047,50 @@ async function refreshInvestmentRates(ctx: ActionCtx): Promise<number> {
           .slice(0, 6000);
       }
 
-      if (apiKey && tableText.length > 100) {
-        const claudeResponse = await callClaude(ctx,
+      if (hasLLM && tableText.length > 100) {
+        const tbillToolSchema = zodToToolSchema(
+          "extract_tbill_rate",
+          "Extract the latest CBE T-bill weighted average yield from the page content.",
+          InterestRateSchema,
+        );
+        const { result: tbillResult, usage: tbillUsage } = await callLLMStructuredWithUsage<z.infer<typeof InterestRateSchema>>(
           `From this CBE T-bill secondary market page, extract the LATEST weighted average yield (percentage).
-Return ONLY a JSON object: {"yield": <number>}
-If you cannot find the yield, return {"yield": null}.
+Set the "rate" field to the yield as a number. Set "tenor" to the bill tenor if visible (e.g. "91-day").
+If you cannot find the yield, still call the tool but set rate to 0 and note that in tenor.
 
 Page content:
 ${tableText}`,
-          "You are a financial data extraction assistant. Return only valid JSON."
+          tbillToolSchema,
+          "You are a financial data extraction assistant.",
         );
 
-        if (claudeResponse) {
+        if (tbillUsage) {
+          const costUsd = estimateCost(tbillUsage.model, tbillUsage.inputTokens, tbillUsage.outputTokens);
           try {
-            let jsonStr = claudeResponse.trim();
-            const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-            if (fence) jsonStr = fence[1];
-            const parsed = JSON.parse(jsonStr) as { yield?: number | null };
-            const rate = typeof parsed.yield === "number" && !isNaN(parsed.yield)
-              ? parsed.yield
-              : null;
+            await ctx.runMutation(internal.usage.logApiUsage, {
+              provider: activeProviderName(),
+              model: tbillUsage.model,
+              purpose: "data_pipeline",
+              inputTokens: tbillUsage.inputTokens,
+              outputTokens: tbillUsage.outputTokens,
+              totalTokens: tbillUsage.inputTokens + tbillUsage.outputTokens,
+              costUsd,
+              durationMs: tbillUsage.durationMs,
+              success: tbillResult !== null,
+              timestamp: Date.now(),
+            });
+          } catch (err) {
+            console.warn("[dataAgent/investment] Failed to log T-bill API usage:", err);
+          }
+        }
 
-            if (rate !== null) {
+        if (tbillResult) {
+          const verified = InterestRateSchema.safeParse(tbillResult);
+          if (!verified.success) {
+            console.warn("[dataAgent/investment] REJECTED by verifier (T-bill):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+          } else {
+            const rate = verified.data.rate;
+            if (rate > 0) {
               const count: number = await ctx.runMutation(
                 internal.dataRefresh.upsertEconomicIndicator,
                 {
@@ -1145,12 +1109,10 @@ ${tableText}`,
             } else {
               console.warn("[dataAgent/investment] Claude could not extract CBE T-bill yield.");
             }
-          } catch {
-            console.warn("[dataAgent/investment] Failed to parse CBE T-bill Claude response.");
           }
         }
-      } else if (!apiKey) {
-        console.warn("[dataAgent/investment] Skipping CBE T-bill Claude parse — ANTHROPIC_API_KEY not set.");
+      } else if (!hasLLM) {
+        console.warn("[dataAgent/investment] Skipping CBE T-bill Claude parse — no LLM provider configured.");
       } else {
         console.warn("[dataAgent/investment] CBE T-bill page returned insufficient content.");
       }
@@ -1191,37 +1153,51 @@ ${tableText}`,
           .slice(0, 8000);
       }
 
-      if (apiKey && tableText.length > 100) {
-        const claudeResponse = await callClaude(ctx,
-          `From this Banque Misr certificates of deposit page, extract the annual interest rates for:
-1. 1-year fixed-rate certificate
-2. 3-year fixed-rate certificate
-
-Return ONLY a JSON object: {"cd_1yr": <number or null>, "cd_3yr": <number or null>}
-Use the highest available rate for each tenor if multiple tiers exist.
-If a rate cannot be found, use null.
+      if (hasLLM && tableText.length > 100) {
+        const bankRatesToolSchema = zodToToolSchema(
+          "extract_bank_rates",
+          "Extract Banque Misr certificate of deposit annual interest rates.",
+          BankRatesSchema,
+        );
+        const { result: bankRatesResult, usage: bankRatesUsage } = await callLLMStructuredWithUsage<z.infer<typeof BankRatesSchema>>(
+          `From this Banque Misr certificates of deposit page, extract the annual interest rates.
+Set "oneYear" to the highest 1-year fixed-rate certificate rate (as a number, e.g. 22.5).
+Set "threeYear" to the highest 3-year fixed-rate certificate rate.
+Leave a field unset if the rate cannot be found.
 
 Page content:
 ${tableText}`,
-          "You are a financial data extraction assistant. Return only valid JSON."
+          bankRatesToolSchema,
+          "You are a financial data extraction assistant.",
         );
 
-        if (claudeResponse) {
+        if (bankRatesUsage) {
+          const costUsd = estimateCost(bankRatesUsage.model, bankRatesUsage.inputTokens, bankRatesUsage.outputTokens);
           try {
-            let jsonStr = claudeResponse.trim();
-            const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-            if (fence) jsonStr = fence[1];
-            const parsed = JSON.parse(jsonStr) as {
-              cd_1yr?: number | null;
-              cd_3yr?: number | null;
-            };
+            await ctx.runMutation(internal.usage.logApiUsage, {
+              provider: activeProviderName(),
+              model: bankRatesUsage.model,
+              purpose: "data_pipeline",
+              inputTokens: bankRatesUsage.inputTokens,
+              outputTokens: bankRatesUsage.outputTokens,
+              totalTokens: bankRatesUsage.inputTokens + bankRatesUsage.outputTokens,
+              costUsd,
+              durationMs: bankRatesUsage.durationMs,
+              success: bankRatesResult !== null,
+              timestamp: Date.now(),
+            });
+          } catch (err) {
+            console.warn("[dataAgent/investment] Failed to log bank rates API usage:", err);
+          }
+        }
 
-            const rate1yr = typeof parsed.cd_1yr === "number" && !isNaN(parsed.cd_1yr)
-              ? parsed.cd_1yr
-              : null;
-            const rate3yr = typeof parsed.cd_3yr === "number" && !isNaN(parsed.cd_3yr)
-              ? parsed.cd_3yr
-              : null;
+        if (bankRatesResult) {
+          const verified = BankRatesSchema.safeParse(bankRatesResult);
+          if (!verified.success) {
+            console.warn("[dataAgent/investment] REJECTED by verifier (bank rates):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+          } else {
+            const rate1yr = verified.data.oneYear ?? null;
+            const rate3yr = verified.data.threeYear ?? null;
 
             if (rate1yr !== null) {
               const count: number = await ctx.runMutation(
@@ -1262,12 +1238,10 @@ ${tableText}`,
             if (rate1yr === null && rate3yr === null) {
               console.warn("[dataAgent/investment] Claude could not extract any Banque Misr CD rates.");
             }
-          } catch {
-            console.warn("[dataAgent/investment] Failed to parse Banque Misr Claude response.");
           }
         }
-      } else if (!apiKey) {
-        console.warn("[dataAgent/investment] Skipping Banque Misr Claude parse — ANTHROPIC_API_KEY not set.");
+      } else if (!hasLLM) {
+        console.warn("[dataAgent/investment] Skipping Banque Misr Claude parse — no LLM provider configured.");
       } else {
         console.warn("[dataAgent/investment] Banque Misr page returned insufficient content.");
       }
@@ -1539,30 +1513,34 @@ async function refreshStockMarket(
 
   // Fallback to Claude if regex fails
   if (egx30Value === null) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (apiKey) {
+    const hasLLM = !!getPrimaryProvider();
+    if (hasLLM) {
       const snippet = pageText.slice(0, 10000);
-      const claudeResponse = await callClaude(ctx,
+      const egxToolSchema = zodToToolSchema(
+        "extract_egx30",
+        "Extract the current EGX 30 Egyptian Stock Exchange index value from the page.",
+        StockIndexSchema,
+      );
+      const { result: egxResult } = await callLLMStructuredWithUsage<z.infer<typeof StockIndexSchema>>(
         `Extract the current EGX 30 (Egyptian Stock Exchange index) value from this page.
-Return only the number as plain text, no units, no commas, no prose.
-If you cannot find the value, return null.
+Set "value" to the index number. Set "date" to today's date if visible.
+If you cannot find the value, set value to 0.
 
 Page content:
 ${snippet}`,
-        "You are a data extraction assistant. Return only a number or null."
+        egxToolSchema,
+        "You are a data extraction assistant.",
       );
-      if (claudeResponse) {
-        const trimmed = claudeResponse.trim();
-        if (trimmed !== "null" && trimmed !== "") {
-          const cleaned = trimmed.replace(/,/g, "");
-          const parsed = parseFloat(cleaned);
-          if (!isNaN(parsed) && parsed > 0) {
-            egx30Value = parsed;
-          }
+      if (egxResult) {
+        const verified = StockIndexSchema.safeParse(egxResult);
+        if (!verified.success) {
+          console.warn("[dataAgent/stock] REJECTED by verifier (EGX 30):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+        } else if (verified.data.value > 0) {
+          egx30Value = verified.data.value;
         }
       }
     } else {
-      console.warn("[dataAgent/stock] Regex extraction failed and ANTHROPIC_API_KEY not set — skipping EGX 30.");
+      console.warn("[dataAgent/stock] Regex extraction failed and no LLM provider configured — skipping EGX 30.");
     }
   }
 
@@ -1657,9 +1635,9 @@ ${snippet}`,
 // ─── ECONOMIC NARRATIVE GENERATOR ─────────────────────────────────────────────
 
 async function generateEconomicNarrative(ctx: ActionCtx): Promise<void> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    console.warn("[dataAgent/narrative] Skipping narrative — ANTHROPIC_API_KEY not set.");
+  const hasLLM = !!getPrimaryProvider();
+  if (!hasLLM) {
+    console.warn("[dataAgent/narrative] Skipping narrative — no LLM provider configured.");
     return;
   }
 
@@ -1758,7 +1736,7 @@ ${indicatorSummary}`;
     }>;
   }
 
-  const result = await callClaudeStructured<NarrativeResult>(
+  const result = await callLLMStructured<NarrativeResult>(
     prompt,
     narrativeSchema,
     systemPrompt,
@@ -1796,7 +1774,7 @@ ${indicatorSummary}`;
     sourcesChecked,
     findingsCount: Object.keys(indicatorData).length,
     discrepanciesFound: 0,
-    agentModel: "claude-haiku-4-5-20251001",
+    agentModel: getPrimaryProvider()?.name ?? "unknown",
   });
 
   console.log("[dataAgent/narrative] Economic narrative inserted successfully.");
@@ -1812,10 +1790,10 @@ const GOVERNORATES_HDI_URL = "https://en.wikipedia.org/wiki/List_of_governorates
 async function refreshGovernorateStatsData(
   ctx: ActionCtx
 ): Promise<{ recordsUpdated: number; sourceUrl?: string }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
+  const hasLLM = !!getPrimaryProvider();
+  if (!hasLLM) {
     console.warn(
-      "[dataAgent] Skipping governorate stats AI refresh — ANTHROPIC_API_KEY not set."
+      "[dataAgent] Skipping governorate stats AI refresh — no LLM provider configured."
     );
     return { recordsUpdated: 0 };
   }
@@ -1921,7 +1899,7 @@ For HDI, some frontier governorates are grouped — skip those that don't have i
   };
 
   // Use structured output (tool_use) to guarantee valid JSON
-  const structuredResult = await callClaudeStructuredWithUsage<{
+  const structuredResult = await callLLMStructuredWithUsage<{
     governorates: Array<{
       governorateNameEn: string;
       indicators: Array<{ indicator: string; year: string; value: number; unit: string }>;
@@ -1931,10 +1909,10 @@ For HDI, some frontier governorates are grouped — skip those that don't have i
   // Log usage
   if (structuredResult.usage) {
     const { inputTokens, outputTokens, model, durationMs } = structuredResult.usage;
-    const costUsd = inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN;
+    const costUsd = estimateCost(model, inputTokens, outputTokens);
     try {
       await ctx.runMutation(internal.usage.logApiUsage, {
-        provider: "anthropic",
+        provider: activeProviderName(),
         model,
         purpose: "data_pipeline_governorate_stats",
         inputTokens,
@@ -2059,7 +2037,12 @@ async function refreshIndustryData(
   try {
     console.log("[dataAgent/industry] Fetching IDA investment opportunities...");
 
-    const idaResult = await callClaudeWithServerTools(
+    const idaToolSchema = zodToToolSchema(
+      "extract_ida_opportunities",
+      "Extract IDA investment opportunities, industrial units, and land plots from the research.",
+      IDAOpportunitiesSchema,
+    );
+    const idaResult = await callLLMWebResearchStructured<z.infer<typeof IDAOpportunitiesSchema>>(
       `You are a structured data extraction agent. Your task is to find and extract investment opportunity data from Egypt's Industrial Development Authority (IDA).
 
 STEP 1: Search for IDA investment opportunities, industrial units, and land plots:
@@ -2081,88 +2064,38 @@ STEP 3: Extract as many distinct investment opportunities as you can find. For e
 - unitAreaSqm (area in square meters if available)
 - status (available, under_development, reserved, or unknown)
 - sourceUrl (the page URL where you found this data)
+- externalId using pattern "ida-{type}-{number}" (e.g. "ida-unit-001")
 
-Return ONLY valid JSON (no markdown, no explanation) in this exact format:
-{
-  "opportunities": [
-    {
-      "externalId": "ida-unit-001",
-      "nameAr": "...",
-      "nameEn": "...",
-      "sector": "food_processing",
-      "governorate": "Cairo",
-      "governorateAr": "القاهرة",
-      "type": "industrial_unit",
-      "costEgp": 500000,
-      "unitAreaSqm": 200,
-      "status": "available",
-      "sourceUrl": "https://www.ida.gov.eg/..."
-    }
-  ]
-}
-
-IMPORTANT: Generate unique externalIds using pattern "ida-{type}-{number}" (e.g. "ida-unit-001", "ida-land-015", "ida-opp-003").
-If you cannot access a page, use data from search results. Include ALL opportunities you find.`,
+Include ALL opportunities you find.`,
       [
         { type: "web_search_20250305" as const, name: "web_search", max_uses: 5 },
       ],
-      "Extract IDA investment data. Return ONLY valid JSON, no markdown fences, no prose."
+      idaToolSchema,
+      "Parse the researched IDA data into structured investment opportunities. Use externalId pattern 'ida-{type}-{number}'.",
+      "You are a structured data extraction agent for Egyptian investment data.",
     );
 
-    console.log(`[dataAgent/industry] IDA result text length: ${idaResult.text?.length ?? 0}`);
-    if (idaResult.text) {
-      try {
-        // Strip markdown code fences if present
-        const jsonText = idaResult.text.trim();
-        console.log(`[dataAgent/industry] IDA raw response (first 500 chars): ${jsonText.substring(0, 500)}`);
-        // Extract JSON from anywhere in the response
-        const idaJsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, null];
-        const idaJsonBlock = idaJsonMatch[1]?.trim();
-        // Try: extracted from fences, or find first { to last }, or raw text
-        const idaClean = idaJsonBlock
-          ?? (jsonText.substring(jsonText.indexOf("{"), jsonText.lastIndexOf("}") + 1) || jsonText);
-        const parsed = JSON.parse(idaClean) as {
-          opportunities: Array<{
-            externalId: string;
-            nameAr: string;
-            nameEn: string;
-            sector: string;
-            governorate?: string;
-            governorateAr?: string;
-            type: string;
-            costEgp?: number;
-            unitAreaSqm?: number;
-            status?: string;
-            sourceUrl?: string;
-          }>;
-        };
-
-        for (const opp of parsed.opportunities ?? []) {
+    if (idaResult.result) {
+      const verified = IDAOpportunitiesSchema.safeParse(idaResult.result);
+      if (!verified.success) {
+        console.warn("[dataAgent/industry] REJECTED by verifier (IDA):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+      } else {
+        for (const opp of verified.data.opportunities) {
           try {
-            const validTypes = ["industrial_unit", "land_plot", "major_opportunity"] as const;
-            const oppType = validTypes.includes(opp.type as typeof validTypes[number])
-              ? opp.type as typeof validTypes[number]
-              : "major_opportunity" as const;
-
-            const validStatuses = ["available", "under_development", "reserved", "unknown"] as const;
-            const oppStatus = validStatuses.includes(opp.status as typeof validStatuses[number])
-              ? opp.status as typeof validStatuses[number]
-              : "unknown" as const;
-
             const updated: number = await ctx.runMutation(
               internal.dataRefresh.upsertInvestmentOpportunity,
               {
-                externalId: opp.externalId || `ida-${oppType}-${Date.now()}`,
+                externalId: opp.externalId || `ida-${opp.type}-${Date.now()}`,
                 source: "ida" as const,
                 nameAr: opp.nameAr,
                 nameEn: opp.nameEn,
                 sector: opp.sector || "other",
                 governorate: opp.governorate,
                 governorateAr: opp.governorateAr,
-                type: oppType,
+                type: opp.type,
                 costEgp: opp.costEgp ?? undefined,
                 unitAreaSqm: opp.unitAreaSqm ?? undefined,
-                status: oppStatus,
+                status: opp.status ?? "unknown",
                 sourceUrl: opp.sourceUrl || "https://www.ida.gov.eg",
                 sanadLevel: 1,
               }
@@ -2172,21 +2105,16 @@ If you cannot access a page, use data from search results. Include ALL opportuni
             console.warn(`[dataAgent/industry] Failed to upsert IDA opportunity ${opp.externalId}: ${oppErr}`);
           }
         }
-
-        console.log(`[dataAgent/industry] IDA: processed ${parsed.opportunities?.length ?? 0} opportunities, ${totalUpdated} upserted.`);
-      } catch (parseErr) {
-        console.warn(`[dataAgent/industry] Failed to parse IDA response: ${parseErr}`);
+        console.log(`[dataAgent/industry] IDA: processed ${verified.data.opportunities.length} opportunities, ${totalUpdated} upserted.`);
       }
     }
 
     // Log usage
     if (idaResult.usage) {
-      const costUsd =
-        idaResult.usage.inputTokens * COST_PER_INPUT_TOKEN +
-        idaResult.usage.outputTokens * COST_PER_OUTPUT_TOKEN;
+      const costUsd = estimateCost(idaResult.usage.model, idaResult.usage.inputTokens, idaResult.usage.outputTokens);
       try {
         await ctx.runMutation(internal.usage.logApiUsage, {
-          provider: "anthropic",
+          provider: activeProviderName(),
           model: idaResult.usage.model,
           purpose: "data_pipeline_industry",
           inputTokens: idaResult.usage.inputTokens,
@@ -2194,7 +2122,7 @@ If you cannot access a page, use data from search results. Include ALL opportuni
           totalTokens: idaResult.usage.inputTokens + idaResult.usage.outputTokens,
           costUsd,
           durationMs: idaResult.usage.durationMs,
-          success: idaResult.text !== null,
+          success: idaResult.result !== null,
           timestamp: Date.now(),
         });
       } catch (logErr) {
@@ -2209,7 +2137,12 @@ If you cannot access a page, use data from search results. Include ALL opportuni
   try {
     console.log("[dataAgent/industry] Fetching GAFI investment data...");
 
-    const gafiResult = await callClaudeWithServerTools(
+    const gafiToolSchema = zodToToolSchema(
+      "extract_gafi_opportunities",
+      "Extract GAFI investment zones and free zone data from the research.",
+      GAFIOpportunitiesSchema,
+    );
+    const gafiResult = await callLLMWebResearchStructured<z.infer<typeof GAFIOpportunitiesSchema>>(
       `You are a structured data extraction agent. Your task is to find and extract investment data from Egypt's General Authority for Investment and Free Zones (GAFI).
 
 STEP 1: Search for GAFI investment opportunities and free zones:
@@ -2232,76 +2165,28 @@ STEP 3: Extract data about free zones and investment zones. For each, extract:
 - sourceUrl (page URL)
 - descriptionEn (brief description of what the zone offers)
 - descriptionAr (Arabic description)
+- externalId using pattern "gafi-{type}-{number}"
 
-Return ONLY valid JSON (no markdown):
-{
-  "opportunities": [
-    {
-      "externalId": "gafi-fz-001",
-      "nameAr": "...",
-      "nameEn": "...",
-      "sector": "other",
-      "governorate": "...",
-      "governorateAr": "...",
-      "type": "free_zone",
-      "descriptionEn": "...",
-      "descriptionAr": "...",
-      "sourceUrl": "https://www.gafi.gov.eg/..."
-    }
-  ]
-}
-
-Use pattern "gafi-{type}-{number}" for externalIds. Include ALL zones/programs you find.`,
+Include ALL zones/programs you find.`,
       [
         { type: "web_search_20250305" as const, name: "web_search", max_uses: 5 },
       ],
-      "Extract GAFI investment data. Return ONLY valid JSON, no markdown fences, no prose."
+      gafiToolSchema,
+      "Parse the researched GAFI data into structured investment zones/opportunities. Use externalId pattern 'gafi-{type}-{number}'.",
+      "You are a structured data extraction agent for Egyptian investment data.",
     );
 
-    console.log(`[dataAgent/industry] GAFI result text length: ${gafiResult.text?.length ?? 0}`);
-    if (gafiResult.text) {
-      try {
-        const jsonText = gafiResult.text.trim();
-        console.log(`[dataAgent/industry] GAFI raw response (first 500 chars): ${jsonText.substring(0, 500)}`);
-        // Extract JSON from anywhere in the response
-        const gafiJsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, null];
-        const gafiJsonBlock = gafiJsonMatch[1]?.trim();
-        const gafiClean = gafiJsonBlock
-          ?? (jsonText.substring(jsonText.indexOf("{"), jsonText.lastIndexOf("}") + 1) || jsonText);
-        const parsed = JSON.parse(gafiClean) as {
-          opportunities: Array<{
-            externalId: string;
-            nameAr: string;
-            nameEn: string;
-            sector?: string;
-            governorate?: string;
-            governorateAr?: string;
-            type: string;
-            costEgp?: number;
-            landAreaSqm?: number;
-            status?: string;
-            descriptionEn?: string;
-            descriptionAr?: string;
-            sourceUrl?: string;
-          }>;
-        };
-
-        for (const opp of parsed.opportunities ?? []) {
+    if (gafiResult.result) {
+      const verified = GAFIOpportunitiesSchema.safeParse(gafiResult.result);
+      if (!verified.success) {
+        console.warn("[dataAgent/industry] REJECTED by verifier (GAFI):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+      } else {
+        for (const opp of verified.data.opportunities) {
           try {
-            const validTypes = ["free_zone", "investment_zone", "sme_program"] as const;
-            const oppType = validTypes.includes(opp.type as typeof validTypes[number])
-              ? opp.type as typeof validTypes[number]
-              : "investment_zone" as const;
-
-            const validStatuses = ["available", "under_development", "reserved", "unknown"] as const;
-            const oppStatus = validStatuses.includes(opp.status as typeof validStatuses[number])
-              ? opp.status as typeof validStatuses[number]
-              : "unknown" as const;
-
             const updated: number = await ctx.runMutation(
               internal.dataRefresh.upsertInvestmentOpportunity,
               {
-                externalId: opp.externalId || `gafi-${oppType}-${Date.now()}`,
+                externalId: opp.externalId || `gafi-${opp.type}-${Date.now()}`,
                 source: "gafi" as const,
                 nameAr: opp.nameAr,
                 nameEn: opp.nameEn,
@@ -2310,10 +2195,10 @@ Use pattern "gafi-{type}-{number}" for externalIds. Include ALL zones/programs y
                 sector: opp.sector || "other",
                 governorate: opp.governorate,
                 governorateAr: opp.governorateAr,
-                type: oppType,
+                type: opp.type,
                 costEgp: opp.costEgp ?? undefined,
                 landAreaSqm: opp.landAreaSqm ?? undefined,
-                status: oppStatus,
+                status: opp.status ?? "unknown",
                 sourceUrl: opp.sourceUrl || "https://www.gafi.gov.eg",
                 sanadLevel: 1,
               }
@@ -2323,21 +2208,16 @@ Use pattern "gafi-{type}-{number}" for externalIds. Include ALL zones/programs y
             console.warn(`[dataAgent/industry] Failed to upsert GAFI opportunity ${opp.externalId}: ${oppErr}`);
           }
         }
-
-        console.log(`[dataAgent/industry] GAFI: processed ${parsed.opportunities?.length ?? 0} opportunities.`);
-      } catch (parseErr) {
-        console.warn(`[dataAgent/industry] Failed to parse GAFI response: ${parseErr}`);
+        console.log(`[dataAgent/industry] GAFI: processed ${verified.data.opportunities.length} opportunities.`);
       }
     }
 
     // Log usage
     if (gafiResult.usage) {
-      const costUsd =
-        gafiResult.usage.inputTokens * COST_PER_INPUT_TOKEN +
-        gafiResult.usage.outputTokens * COST_PER_OUTPUT_TOKEN;
+      const costUsd = estimateCost(gafiResult.usage.model, gafiResult.usage.inputTokens, gafiResult.usage.outputTokens);
       try {
         await ctx.runMutation(internal.usage.logApiUsage, {
-          provider: "anthropic",
+          provider: activeProviderName(),
           model: gafiResult.usage.model,
           purpose: "data_pipeline_industry",
           inputTokens: gafiResult.usage.inputTokens,
@@ -2345,7 +2225,7 @@ Use pattern "gafi-{type}-{number}" for externalIds. Include ALL zones/programs y
           totalTokens: gafiResult.usage.inputTokens + gafiResult.usage.outputTokens,
           costUsd,
           durationMs: gafiResult.usage.durationMs,
-          success: gafiResult.text !== null,
+          success: gafiResult.result !== null,
           timestamp: Date.now(),
         });
       } catch (logErr) {
@@ -2357,12 +2237,17 @@ Use pattern "gafi-{type}-{number}" for externalIds. Include ALL zones/programs y
   }
 
   // ── STEP 1: Research Egyptian industrial cost benchmarks ──
-  let benchmarkData = "";
+  let verifiedBenchmarks: z.infer<typeof IndustrialBenchmarksSchema> | null = null;
   try {
     console.log("[dataAgent/industry] Step 1: Researching Egyptian industrial cost benchmarks...");
 
-    const benchmarkResult = await callClaudeWithServerTools(
-      `You are an Egyptian industrial real estate and investment research analyst. I need you to research CURRENT 2025-2026 Egyptian market cost benchmarks for industrial projects.
+    const benchmarkToolSchema = zodToToolSchema(
+      "extract_industrial_benchmarks",
+      "Extract current 2025-2026 Egyptian industrial cost benchmarks from research.",
+      IndustrialBenchmarksSchema,
+    );
+    const benchmarkResult = await callLLMWebResearchStructured<z.infer<typeof IndustrialBenchmarksSchema>>(
+      `You are an Egyptian industrial real estate and investment research analyst. Research CURRENT 2025-2026 Egyptian market cost benchmarks for industrial projects.
 
 Search for ALL of the following data points:
 1. "أسعار الأراضي الصناعية مصر 2025" (industrial land prices Egypt by governorate)
@@ -2372,77 +2257,31 @@ Search for ALL of the following data points:
 5. "IDA Egypt industrial unit prices ready-made units cost per sqm"
 6. "هيئة التنمية الصناعية أسعار الوحدات الصناعية"
 
-For each data point you find, note the SOURCE URL.
-
-Return ONLY valid JSON (no markdown, no prose):
-{
-  "benchmarks": {
-    "landPricePerSqm": {
-      "upperEgypt": { "min": 500, "max": 1500, "source": "url" },
-      "deltaRegion": { "min": 1000, "max": 3000, "source": "url" },
-      "greaterCairo": { "min": 3000, "max": 8000, "source": "url" },
-      "newCities": { "min": 1500, "max": 5000, "source": "url" },
-      "freeZones": { "min": 0, "max": 0, "note": "land is leased, not purchased", "source": "url" }
-    },
-    "constructionCostPerSqm": {
-      "lightIndustry": { "min": 8000, "max": 15000, "source": "url" },
-      "heavyIndustry": { "min": 15000, "max": 30000, "source": "url" },
-      "warehouse": { "min": 5000, "max": 10000, "source": "url" }
-    },
-    "readyUnitPricePerSqm": {
-      "min": 5000, "max": 25000, "source": "url"
-    },
-    "freeZoneSetupCosts": {
-      "registrationFee": 0,
-      "annualLeaseFeePerSqm": 0,
-      "minimumCapitalRequirement": 0,
-      "source": "url"
-    },
-    "laborCostMonthly": {
-      "unskilledWorker": { "min": 3500, "max": 5000 },
-      "skilledTechnician": { "min": 6000, "max": 12000 },
-      "engineer": { "min": 12000, "max": 25000 },
-      "source": "url"
-    },
-    "utilityAndOverheadMonthly": {
-      "electricity_per_kwh": 0,
-      "water_per_m3": 0,
-      "gas_per_m3": 0,
-      "source": "url"
-    },
-    "licensingAndPermits": {
-      "industrialLicense": 0,
-      "environmentalApproval": 0,
-      "buildingPermit": 0,
-      "source": "url"
-    }
-  },
-  "sources": ["url1", "url2", "url3"]
-}
-
-Fill in realistic EGP values based on your research. Use 0 only if you truly cannot find the data.`,
+For each data point you find, note the SOURCE URL. Fill in realistic EGP values. Use 0 only if you truly cannot find the data.`,
       [
         { type: "web_search_20250305" as const, name: "web_search", max_uses: 8 },
       ],
-      "Research Egyptian industrial costs. Return ONLY valid JSON, no markdown."
+      benchmarkToolSchema,
+      "Parse the researched Egyptian industrial cost data into structured benchmark figures.",
+      "You are an Egyptian industrial investment research analyst.",
     );
 
-    if (benchmarkResult.text) {
-      const raw = benchmarkResult.text.trim();
-      const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, null];
-      benchmarkData = jsonMatch[1]?.trim()
-        ?? (raw.substring(raw.indexOf("{"), raw.lastIndexOf("}") + 1) || raw);
-      console.log(`[dataAgent/industry] Benchmark research complete (${benchmarkData.length} chars).`);
+    if (benchmarkResult.result) {
+      const verified = IndustrialBenchmarksSchema.safeParse(benchmarkResult.result);
+      if (!verified.success) {
+        console.warn("[dataAgent/industry] REJECTED by verifier (benchmarks):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+      } else {
+        verifiedBenchmarks = verified.data;
+        console.log(`[dataAgent/industry] Benchmark research complete.`);
+      }
     }
 
     // Log usage
     if (benchmarkResult.usage) {
-      const costUsd =
-        benchmarkResult.usage.inputTokens * COST_PER_INPUT_TOKEN +
-        benchmarkResult.usage.outputTokens * COST_PER_OUTPUT_TOKEN;
+      const costUsd = estimateCost(benchmarkResult.usage.model, benchmarkResult.usage.inputTokens, benchmarkResult.usage.outputTokens);
       try {
         await ctx.runMutation(internal.usage.logApiUsage, {
-          provider: "anthropic",
+          provider: activeProviderName(),
           model: benchmarkResult.usage.model,
           purpose: "data_pipeline_industry",
           inputTokens: benchmarkResult.usage.inputTokens,
@@ -2450,7 +2289,7 @@ Fill in realistic EGP values based on your research. Use 0 only if you truly can
           totalTokens: benchmarkResult.usage.inputTokens + benchmarkResult.usage.outputTokens,
           costUsd,
           durationMs: benchmarkResult.usage.durationMs,
-          success: benchmarkResult.text !== null,
+          success: benchmarkResult.result !== null,
           timestamp: Date.now(),
         });
       } catch (logErr) {
@@ -2462,7 +2301,9 @@ Fill in realistic EGP values based on your research. Use 0 only if you truly can
   }
 
   // ── STEP 2: Apply benchmarks to estimate costs for unpriced opportunities ──
-  if (benchmarkData) {
+  if (verifiedBenchmarks) {
+    // Serialize benchmarks as a concise summary string for the estimate prompt
+    const benchmarkData = JSON.stringify(verifiedBenchmarks);
     try {
       const allOpps = await ctx.runQuery(internal.industry.getAllUnpriced, {});
       console.log(`[dataAgent/industry] Step 2: Estimating costs for ${allOpps.length} unpriced opportunities using benchmarks...`);
@@ -2472,7 +2313,12 @@ Fill in realistic EGP values based on your research. Use 0 only if you truly can
           `- "${o.nameEn}" | type: ${o.type} | sector: ${o.sector} | governorate: ${o.governorate ?? "unknown"} | area: ${o.unitAreaSqm ?? o.landAreaSqm ?? "unknown"} sqm | description: ${o.descriptionEn ?? "none"}`
         ).join("\n");
 
-        const estimateResult = await callClaudeWithServerTools(
+        const estimateToolSchema = zodToToolSchema(
+          "extract_cost_estimates",
+          "Extract startup cost estimates for Egyptian industrial opportunities using benchmark data.",
+          CostEstimatesSchema,
+        );
+        const estimateResult = await callLLMWebResearchStructured<z.infer<typeof CostEstimatesSchema>>(
           `You are an Egyptian industrial investment cost analyst. Using the RESEARCHED BENCHMARKS below, estimate total project startup costs for each opportunity.
 
 ## RESEARCHED COST BENCHMARKS (from Egyptian market data):
@@ -2481,90 +2327,25 @@ ${benchmarkData}
 ## OPPORTUNITIES TO ESTIMATE:
 ${oppSummary}
 
-## METHODOLOGY — For each opportunity, calculate:
-
-**For industrial_unit type:**
-- Unit purchase cost = area × ready unit price/sqm (from benchmarks)
-- Equipment cost = 30-50% of unit cost (varies by sector)
-- Working capital = 3 months of operating costs
-- Licensing = industrial license + environmental + building permit fees
-- Total = sum of above
-
-**For land_plot type:**
-- Land cost = area × land price/sqm for that governorate region
-- Construction cost = area × construction cost/sqm for industry type
-- Equipment cost = 40-60% of construction cost
-- Working capital = 3 months estimated operating costs
-- Licensing = all permit fees
-- Total = sum of above
-
-**For free_zone type:**
-- Setup cost = registration fees + first year lease
-- Construction/fitout cost = area × construction cost/sqm
-- Minimum capital requirement (from GAFI rules)
-- Equipment = sector-dependent
-- Total = sum of above
-
-## OUTPUT FORMAT — Return ONLY valid JSON (no markdown, no prose):
-{
-  "estimates": [
-    {
-      "nameEn": "exact project name",
-      "costEgp": 15000000,
-      "breakdown": {
-        "landOrUnit": 5000000,
-        "construction": 3000000,
-        "equipment": 4000000,
-        "workingCapital": 2000000,
-        "licensing": 500000,
-        "other": 500000
-      },
-      "methodology": "200 sqm unit × EGP 25,000/sqm = EGP 5M unit + EGP 4M equipment (textiles sector) + EGP 2M working capital",
-      "confidence": "medium",
-      "sourceRefs": ["benchmark source url"]
-    }
-  ]
-}
-
-IMPORTANT:
-- "confidence" must be "low" (rough order of magnitude) or "medium" (based on benchmark data for that region/type)
-- "methodology" must show the MATH — what was multiplied by what
-- All costs in EGP
-- Be realistic. A small industrial unit in Upper Egypt is NOT the same price as one in Cairo.`,
+## METHODOLOGY — For each opportunity, calculate startup cost using the benchmark data.
+- confidence must be "low" (rough estimate) or "medium" (based on benchmark data)
+- methodology must show the math
+- All costs in EGP`,
           [
             { type: "web_search_20250305" as const, name: "web_search", max_uses: 3 },
           ],
-          "Estimate industrial project costs using researched benchmarks. Return ONLY valid JSON."
+          estimateToolSchema,
+          "Parse the cost estimate reasoning into structured estimates for each opportunity.",
+          "You are an Egyptian industrial investment cost analyst.",
         );
 
-        if (estimateResult.text) {
-          try {
-            const jsonText = estimateResult.text.trim();
-            const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, null];
-            const jsonBlock = jsonMatch[1]?.trim();
-            const clean = jsonBlock
-              ?? (jsonText.substring(jsonText.indexOf("{"), jsonText.lastIndexOf("}") + 1) || jsonText);
-
-            const parsed = JSON.parse(clean) as {
-              estimates: Array<{
-                nameEn: string;
-                costEgp: number;
-                breakdown?: {
-                  landOrUnit?: number;
-                  construction?: number;
-                  equipment?: number;
-                  workingCapital?: number;
-                  licensing?: number;
-                  other?: number;
-                };
-                methodology?: string;
-                confidence?: string;
-                sourceRefs?: string[];
-              }>;
-            };
-
-            for (const est of parsed.estimates ?? []) {
-              if (!est.costEgp || typeof est.costEgp !== "number") continue;
+        if (estimateResult.result) {
+          const verified = CostEstimatesSchema.safeParse(estimateResult.result);
+          if (!verified.success) {
+            console.warn("[dataAgent/industry] REJECTED by verifier (estimates):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+          } else {
+            for (const est of verified.data.estimates) {
+              if (!est.costEgp) continue;
 
               const match = allOpps.find((o) => o.nameEn === est.nameEn);
               if (!match) continue;
@@ -2615,20 +2396,16 @@ IMPORTANT:
               }
             }
 
-            console.log(`[dataAgent/industry] Cost estimates applied for ${parsed.estimates?.length ?? 0} opportunities with breakdowns.`);
-          } catch (parseErr) {
-            console.warn(`[dataAgent/industry] Failed to parse cost estimates: ${parseErr}`);
+            console.log(`[dataAgent/industry] Cost estimates applied for ${verified.data.estimates.length} opportunities with breakdowns.`);
           }
         }
 
         // Log usage
         if (estimateResult.usage) {
-          const costUsd =
-            estimateResult.usage.inputTokens * COST_PER_INPUT_TOKEN +
-            estimateResult.usage.outputTokens * COST_PER_OUTPUT_TOKEN;
+          const costUsd = estimateCost(estimateResult.usage.model, estimateResult.usage.inputTokens, estimateResult.usage.outputTokens);
           try {
             await ctx.runMutation(internal.usage.logApiUsage, {
-              provider: "anthropic",
+              provider: activeProviderName(),
               model: estimateResult.usage.model,
               purpose: "data_pipeline_industry",
               inputTokens: estimateResult.usage.inputTokens,
@@ -2636,7 +2413,7 @@ IMPORTANT:
               totalTokens: estimateResult.usage.inputTokens + estimateResult.usage.outputTokens,
               costUsd,
               durationMs: estimateResult.usage.durationMs,
-              success: estimateResult.text !== null,
+              success: estimateResult.result !== null,
               timestamp: Date.now(),
             });
           } catch (logErr) {
@@ -2800,8 +2577,8 @@ export const runBackfillInvestmentHistory = internalAction({
  * Called by the cron job every 12 hours and can also be triggered manually.
  */
 export const orchestrateRefresh = internalAction({
-  args: {},
-  handler: async (ctx) => {
+  args: { force: v.optional(v.boolean()) },
+  handler: async (ctx, args) => {
     if (process.env.DISABLE_CRONS === "true") {
       console.log("[dataAgent] Crons disabled (DISABLE_CRONS=true), skipping.");
       return null;
@@ -2870,8 +2647,8 @@ export const orchestrateRefresh = internalAction({
       const lastTime = lastUpdated[category];
       const isEmpty = tableEmpty[category] ?? false;
 
-      // Skip if fresh AND not empty. Always refresh if table is empty.
-      if (!isEmpty && lastTime !== null && now - lastTime < STALE_THRESHOLD_MS) {
+      // Skip if fresh AND not empty (unless force=true). Always refresh if table is empty.
+      if (!args.force && !isEmpty && lastTime !== null && now - lastTime < STALE_THRESHOLD_MS) {
         console.log(
           `[dataAgent] Category "${category}" is fresh — skipping.`
         );
@@ -3030,16 +2807,15 @@ export const orchestrateRefresh = internalAction({
     });
     try {
       // Use Claude web_search to find current Egyptian news beyond RSS feeds
-      const newsResult = await callClaudeWithServerTools(
+      const newsToolSchema = zodToToolSchema(
+        "extract_news_headlines",
+        "Extract Egyptian news headlines from the research results.",
+        RawNewsListSchema,
+      );
+      const newsResult = await callLLMWebResearchStructured<z.infer<typeof RawNewsListSchema>>(
         `Search for the latest important Egyptian news from the past 24 hours. Include economic, political, and social news.
-
-Return ONLY a JSON array (no markdown, no explanation):
-[
-  {"title": "headline text", "url": "source url", "source": "outlet name"},
-  ...
-]
-
-Include 10-15 headlines. Prefer authoritative sources (Reuters, Bloomberg, Ahram, BBC, Al Jazeera).`,
+Include 10-15 headlines. Prefer authoritative sources (Reuters, Bloomberg, Ahram, BBC, Al Jazeera).
+For each headline, extract the title, URL, and source outlet name.`,
         [
           {
             type: "web_search_20250305",
@@ -3047,46 +2823,41 @@ Include 10-15 headlines. Prefer authoritative sources (Reuters, Bloomberg, Ahram
             max_uses: 3,
           },
         ],
-        "Return ONLY a JSON array of news headlines. No prose.",
+        newsToolSchema,
+        "Parse the researched news into structured headline items with title, url, and source fields.",
+        "You are a news extraction assistant for Egyptian current affairs.",
       );
 
       let headlinesInserted = 0;
-      if (newsResult.text) {
-        try {
-          let jsonStr = newsResult.text;
-          const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-          if (fence) jsonStr = fence[1];
-          // Extract array from possible prose
-          const arrMatch = jsonStr.match(/\[[\s\S]*\]/);
-          if (arrMatch) jsonStr = arrMatch[0];
-
-          const headlines = JSON.parse(jsonStr.trim()) as Array<{ title: string; url: string; source: string }>;
-          if (Array.isArray(headlines) && headlines.length > 0) {
-            const items = headlines
-              .filter((h) => h.title && h.url)
-              .map((h) => ({
-                title: h.title,
-                url: h.url,
-                sourceDomain: h.source ?? "unknown",
-                language: "English",
-                publishedAt: Date.now(),
-              }));
+      if (newsResult.result) {
+        const verified = RawNewsListSchema.safeParse(newsResult.result);
+        if (!verified.success) {
+          console.warn("[dataAgent/news] REJECTED by verifier:", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+        } else {
+          const items = verified.data.items
+            .filter((h) => h.title && h.url)
+            .map((h) => ({
+              title: h.title,
+              url: h.url,
+              sourceDomain: h.source ?? "unknown",
+              language: "English",
+              publishedAt: Date.now(),
+            }));
+          if (items.length > 0) {
             headlinesInserted = await ctx.runMutation(internal.news.upsertHeadlines, { items }) as number;
           }
-        } catch (parseErr) {
-          console.warn(`[dataAgent/news] Failed to parse news headlines: ${parseErr}`);
         }
       }
 
       // Log usage
       if (newsResult.usage) {
         const { inputTokens, outputTokens, model, durationMs } = newsResult.usage;
-        const costUsd = inputTokens * COST_PER_INPUT_TOKEN + outputTokens * COST_PER_OUTPUT_TOKEN;
+        const costUsd = estimateCost(model, inputTokens, outputTokens);
         try {
           await ctx.runMutation(internal.usage.logApiUsage, {
-            provider: "anthropic", model, purpose: "data_pipeline_news",
+            provider: activeProviderName(), model, purpose: "data_pipeline_news",
             inputTokens, outputTokens, totalTokens: inputTokens + outputTokens,
-            costUsd, durationMs, success: true, timestamp: Date.now(),
+            costUsd, durationMs, success: newsResult.result !== null, timestamp: Date.now(),
           });
         } catch { /* non-critical */ }
       }
@@ -3207,7 +2978,7 @@ export const deepScrapePass1 = internalAction({
     // Fetch GAFI free zones page
     // URL: https://www.gafi.gov.eg/English/StartaBusiness/InvestmentZones/Pages/FreeZones.aspx
     //
-    // For each, use callClaudeWithServerTools with web_fetch to get the page
+    // For each, use callLLMWebResearchStructured with web_search to get the page
     // and extract detailed structured data
 
     let totalUpdated = 0;
@@ -3215,101 +2986,38 @@ export const deepScrapePass1 = internalAction({
     // ── IDA Industrial Complexes (16 complexes, 4808 units) ──
     try {
       console.log("[deepScrape/pass1] Fetching IDA industrial complexes...");
-      const idaComplexResult = await callClaudeWithServerTools(
+      const idaComplexToolSchema = zodToToolSchema(
+        "extract_ida_complexes",
+        "Extract IDA industrial complex data and investment incentive structure from the research.",
+        IDAComplexesSchema,
+      );
+      const idaComplexResult = await callLLMWebResearchStructured<z.infer<typeof IDAComplexesSchema>>(
         `Fetch this page and extract ALL industrial complex data:
 URL: https://www.ida.gov.eg/ar/industrial-complexes
 
-For each complex, extract:
-- nameAr (Arabic name)
-- nameEn (English name/translation)
-- governorate (English)
-- governorateAr (Arabic)
-- totalUnits (number)
-- unitSizeRange (e.g. "48-200 sqm")
-- facilities (list of amenities: mosque, bank, restaurant, clinic, etc.)
-- sectors (what industries are in this complex)
-- description (brief description of the complex)
+For each complex, extract nameAr, nameEn, governorate, governorateAr, totalUnits, unitSizeRange, facilities, sectors, description.
+Use externalId pattern "ida-complex-{city}" (e.g. "ida-complex-sadat").
 
 Also fetch: https://www.ida.gov.eg/ar/incentives
-Extract the investment incentive structure:
-- Sector A governorates and their 50% tax deduction details
-- Sector B governorates and their 30% tax deduction details
-- Additional incentives (land discounts, customs, stamp duty)
-
-Return ONLY valid JSON:
-{
-  "complexes": [
-    {
-      "externalId": "ida-complex-sadat",
-      "nameAr": "مجمع السادات الصناعي",
-      "nameEn": "Al-Sadat Industrial Complex",
-      "governorate": "Menoufia",
-      "governorateAr": "المنوفية",
-      "totalUnits": 296,
-      "unitSizeRange": "48-200",
-      "facilities": ["mosque", "workshops", "restaurants", "clinic"],
-      "sectors": ["food_processing", "engineering", "textiles"],
-      "description": "Industrial complex in Sadat City with 296 units..."
-    }
-  ],
-  "incentives": {
-    "sectorA": {
-      "taxDeduction": "50%",
-      "duration": "7 years",
-      "governorates": ["list of Sector A governorates"],
-      "conditions": ["Min capital requirement", "other conditions"]
-    },
-    "sectorB": {
-      "taxDeduction": "30%",
-      "duration": "7 years",
-      "governorates": ["list of Sector B governorates"],
-      "conditions": []
-    },
-    "general": [
-      "2% unified customs on machinery",
-      "Stamp duty exemption 5 years",
-      "50% land cost rebate if production within 2 years"
-    ]
-  }
-}`,
+Extract the investment incentive structure including sectorA, sectorB, and general incentives.`,
         [
           { type: "web_search_20250305" as const, name: "web_search", max_uses: 3 },
           { type: "web_fetch_20250910" as const, name: "web_fetch", max_uses: 5 },
         ],
-        "Extract IDA industrial complex data. Return ONLY valid JSON."
+        idaComplexToolSchema,
+        "Parse the IDA research data into structured industrial complexes and incentives.",
+        "You are an Egyptian industrial investment data extraction specialist.",
       );
 
-      if (idaComplexResult.text) {
-        try {
-          const jsonText = idaComplexResult.text.trim();
-          const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, null];
-          const clean = jsonMatch[1]?.trim()
-            ?? (jsonText.substring(jsonText.indexOf("{"), jsonText.lastIndexOf("}") + 1) || jsonText);
-
-          const parsed = JSON.parse(clean) as {
-            complexes: Array<{
-              externalId: string;
-              nameAr: string;
-              nameEn: string;
-              governorate: string;
-              governorateAr?: string;
-              totalUnits?: number;
-              unitSizeRange?: string;
-              facilities?: string[];
-              sectors?: string[];
-              description?: string;
-            }>;
-            incentives?: {
-              sectorA?: { taxDeduction?: string; duration?: string; governorates?: string[]; conditions?: string[] };
-              sectorB?: { taxDeduction?: string; duration?: string; governorates?: string[]; conditions?: string[] };
-              general?: string[];
-            };
-          };
-
+      if (idaComplexResult.result) {
+        const verified = IDAComplexesSchema.safeParse(idaComplexResult.result);
+        if (!verified.success) {
+          console.warn("[deepScrape/pass1] REJECTED by verifier (IDA complexes):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+        } else {
           // Store incentives data as a shared reference
-          const incentivesJson = parsed.incentives ? JSON.stringify(parsed.incentives) : undefined;
+          const incentivesJson = verified.data.incentives ? JSON.stringify(verified.data.incentives) : undefined;
 
-          for (const complex of parsed.complexes ?? []) {
+          for (const complex of verified.data.complexes) {
             try {
               const minArea = complex.unitSizeRange ? parseInt(complex.unitSizeRange.split("-")[0]) : undefined;
 
@@ -3337,9 +3045,9 @@ Return ONLY valid JSON:
               console.warn(`[deepScrape/pass1] Failed to upsert complex ${complex.nameEn}: ${err}`);
             }
           }
-          console.log(`[deepScrape/pass1] IDA complexes: ${parsed.complexes?.length ?? 0} processed, ${totalUpdated} updated.`);
+          console.log(`[deepScrape/pass1] IDA complexes: ${verified.data.complexes.length} processed, ${totalUpdated} updated.`);
 
-          // Store incentives for later use by storing as a special "reference" record
+          // Store incentives for later use as a special "reference" record
           if (incentivesJson) {
             try {
               await ctx.runMutation(
@@ -3361,19 +3069,17 @@ Return ONLY valid JSON:
               console.warn(`[deepScrape/pass1] Failed to store incentives reference: ${refErr}`);
             }
           }
-        } catch (parseErr) {
-          console.warn(`[deepScrape/pass1] Failed to parse IDA complexes: ${parseErr}`);
         }
       }
 
       // Log API usage
       if (idaComplexResult.usage) {
-        const costUsd = idaComplexResult.usage.inputTokens * COST_PER_INPUT_TOKEN + idaComplexResult.usage.outputTokens * COST_PER_OUTPUT_TOKEN;
+        const costUsd = estimateCost(idaComplexResult.usage.model, idaComplexResult.usage.inputTokens, idaComplexResult.usage.outputTokens);
         await ctx.runMutation(internal.usage.logApiUsage, {
-          provider: "anthropic", model: idaComplexResult.usage.model, purpose: "data_pipeline_industry_deep",
+          provider: activeProviderName(), model: idaComplexResult.usage.model, purpose: "data_pipeline_industry_deep",
           inputTokens: idaComplexResult.usage.inputTokens, outputTokens: idaComplexResult.usage.outputTokens,
           totalTokens: idaComplexResult.usage.inputTokens + idaComplexResult.usage.outputTokens,
-          costUsd, durationMs: idaComplexResult.usage.durationMs, success: true, timestamp: Date.now(),
+          costUsd, durationMs: idaComplexResult.usage.durationMs, success: idaComplexResult.result !== null, timestamp: Date.now(),
         });
       }
     } catch (err) {
@@ -3383,17 +3089,17 @@ Return ONLY valid JSON:
     // ── GAFI Free Zones + Industrial Zones ──
     try {
       console.log("[deepScrape/pass1] Fetching GAFI zones data...");
-      const gafiResult = await callClaudeWithServerTools(
+      const gafiZonesToolSchema = zodToToolSchema(
+        "extract_gafi_zones",
+        "Extract GAFI free zone data, registration fees, and investment law framework.",
+        GAFIZonesSchema,
+      );
+      const gafiResult = await callLLMWebResearchStructured<z.infer<typeof GAFIZonesSchema>>(
         `Fetch these TWO pages and extract ALL zone data:
 
 PAGE 1: https://www.gafi.gov.eg/English/StartaBusiness/InvestmentZones/Pages/FreeZones.aspx
-Extract all 9 public free zones with:
-- nameAr, nameEn, governorate, governorateAr
-- totalArea (in sqm if available)
-- occupancyRate (if mentioned)
-- keyIndustries (list)
-- benefits (customs exemptions, tax exemptions, etc.)
-- description (what the zone offers)
+Extract all 9 public free zones with nameAr, nameEn, governorate, governorateAr, totalAreaSqm, keyIndustries, benefits, description.
+Use externalId pattern "gafi-fz-{city}" (e.g. "gafi-fz-alexandria").
 
 PAGE 2: https://www.gafi.gov.eg/English/StartaBusiness/InvestmentZones/Pages/Industrial-Zones.aspx
 Extract industrial zone data.
@@ -3402,69 +3108,22 @@ Also search for: "GAFI Egypt Suez Canal Economic Zone benefits tax rate"
 And: "Egypt Investment Law 72/2017 incentives by sector"
 And: "GAFI company registration fees Egypt 2025 2026"
 
-Return ONLY valid JSON:
-{
-  "freeZones": [
-    {
-      "externalId": "gafi-fz-alexandria",
-      "nameAr": "المنطقة الحرة بالإسكندرية (العامرية)",
-      "nameEn": "Alexandria (Amrya) Free Zone",
-      "governorate": "Alexandria",
-      "governorateAr": "الإسكندرية",
-      "totalAreaSqm": 5700000,
-      "keyIndustries": ["textiles", "electronics", "food_processing"],
-      "benefits": ["Custom duty exemption", "Sales tax exemption", "No profit repatriation restrictions"],
-      "description": "One of Egypt's largest free zones, 7km from Dekheila Port..."
-    }
-  ],
-  "registrationFees": {
-    "nameReservation": 114,
-    "gafiServiceFee": "0.1% of capital (min EGP 1000, max EGP 10000)",
-    "govRegistration": "0.25% of capital (capped EGP 10000)",
-    "chamberOfCommerce": "0.2% of capital (min EGP 129, max EGP 2105)",
-    "commercialRegistry": 64,
-    "minimumCapital": 1000
-  },
-  "investmentLaw": {
-    "sectorADeduction": "50%",
-    "sectorBDeduction": "30%",
-    "maxDeductionPeriod": "7 years",
-    "maxCapitalDeduction": "80%",
-    "suezCanalZoneTax": "10%",
-    "goldenLicenseTimeline": "20-30 working days"
-  }
-}`,
+Extract registration fees and investment law details as well.`,
         [
           { type: "web_search_20250305" as const, name: "web_search", max_uses: 5 },
           { type: "web_fetch_20250910" as const, name: "web_fetch", max_uses: 5 },
         ],
-        "Extract GAFI zone data and registration fees. Return ONLY valid JSON."
+        gafiZonesToolSchema,
+        "Parse the GAFI research data into structured free zones, registration fees, and investment law data.",
+        "You are an Egyptian investment zone data extraction specialist.",
       );
 
-      if (gafiResult.text) {
-        try {
-          const jsonText = gafiResult.text.trim();
-          const jsonMatch = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, null];
-          const clean = jsonMatch[1]?.trim()
-            ?? (jsonText.substring(jsonText.indexOf("{"), jsonText.lastIndexOf("}") + 1) || jsonText);
-
-          const parsed = JSON.parse(clean) as {
-            freeZones?: Array<{
-              externalId: string;
-              nameAr: string;
-              nameEn: string;
-              governorate?: string;
-              governorateAr?: string;
-              totalAreaSqm?: number;
-              keyIndustries?: string[];
-              benefits?: string[];
-              description?: string;
-            }>;
-            registrationFees?: Record<string, unknown>;
-            investmentLaw?: Record<string, unknown>;
-          };
-
-          for (const zone of parsed.freeZones ?? []) {
+      if (gafiResult.result) {
+        const verified = GAFIZonesSchema.safeParse(gafiResult.result);
+        if (!verified.success) {
+          console.warn("[deepScrape/pass1] REJECTED by verifier (GAFI zones):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+        } else {
+          for (const zone of verified.data.freeZones) {
             try {
               const sectorMap: Record<string, string> = {
                 textiles: "textiles", electronics: "engineering", food_processing: "food_processing",
@@ -3498,9 +3157,9 @@ Return ONLY valid JSON:
           }
 
           // Store registration fees + investment law as a reference record
-          if (parsed.registrationFees !== undefined || parsed.investmentLaw !== undefined) {
+          if (verified.data.registrationFees !== undefined || verified.data.investmentLaw !== undefined) {
             try {
-              const refData = JSON.stringify({ registrationFees: parsed.registrationFees, investmentLaw: parsed.investmentLaw });
+              const refData = JSON.stringify({ registrationFees: verified.data.registrationFees, investmentLaw: verified.data.investmentLaw });
               await ctx.runMutation(
                 internal.dataRefresh.upsertInvestmentOpportunity,
                 {
@@ -3521,19 +3180,17 @@ Return ONLY valid JSON:
             }
           }
 
-          console.log(`[deepScrape/pass1] GAFI zones: ${parsed.freeZones?.length ?? 0} processed.`);
-        } catch (parseErr) {
-          console.warn(`[deepScrape/pass1] Failed to parse GAFI zones: ${parseErr}`);
+          console.log(`[deepScrape/pass1] GAFI zones: ${verified.data.freeZones.length} processed.`);
         }
       }
 
       if (gafiResult.usage) {
-        const costUsd = gafiResult.usage.inputTokens * COST_PER_INPUT_TOKEN + gafiResult.usage.outputTokens * COST_PER_OUTPUT_TOKEN;
+        const costUsd = estimateCost(gafiResult.usage.model, gafiResult.usage.inputTokens, gafiResult.usage.outputTokens);
         await ctx.runMutation(internal.usage.logApiUsage, {
-          provider: "anthropic", model: gafiResult.usage.model, purpose: "data_pipeline_industry_deep",
+          provider: activeProviderName(), model: gafiResult.usage.model, purpose: "data_pipeline_industry_deep",
           inputTokens: gafiResult.usage.inputTokens, outputTokens: gafiResult.usage.outputTokens,
           totalTokens: gafiResult.usage.inputTokens + gafiResult.usage.outputTokens,
-          costUsd, durationMs: gafiResult.usage.durationMs, success: true, timestamp: Date.now(),
+          costUsd, durationMs: gafiResult.usage.durationMs, success: gafiResult.result !== null, timestamp: Date.now(),
         });
       }
     } catch (err) {
@@ -3567,10 +3224,15 @@ export const deepScrapePass2 = internalAction({
     }
 
     // ── Fetch IDA incentives PDF for real incentive data ──
-    let incentivesData = "";
+    let verifiedIncentives: z.infer<typeof InvestmentIncentivesSchema> | null = null;
     try {
       console.log("[deepScrape/pass2] Researching IDA investment incentives and licensing...");
-      const pdfResult = await callClaudeWithServerTools(
+      const incentivesToolSchema = zodToToolSchema(
+        "extract_investment_incentives",
+        "Extract Egypt's industrial investment incentives structure and licensing process.",
+        InvestmentIncentivesSchema,
+      );
+      const pdfResult = await callLLMWebResearchStructured<z.infer<typeof InvestmentIncentivesSchema>>(
         `Research Egypt's industrial investment incentives and licensing process. Search for ALL of the following:
 
 1. "هيئة التنمية الصناعية حوافز الاستثمار القطاع أ القطاع ب"
@@ -3581,74 +3243,33 @@ export const deepScrapePass2 = internalAction({
 
 Also try to fetch: https://www.ida.gov.eg/ar/incentives
 
-Extract the COMPLETE incentive structure:
-1. General incentives (applicable to all industrial projects)
-2. Sector A incentives (which governorates, what percentage, duration)
-3. Sector B incentives (which governorates, what percentage, duration)
-4. Additional benefits (land discounts, customs, stamp duty, worker training)
-5. Cash incentive program details
-6. Free zone specific benefits
-
-Return ONLY valid JSON:
-{
-  "generalIncentives": ["2% unified customs tariff on machinery", "Stamp duty exemption for 5 years", ...],
-  "sectorA": {
-    "taxDeduction": "50%",
-    "maxDuration": "7 years",
-    "maxCapDeduction": "80% of paid capital",
-    "governorates": ["Upper Egypt governorates", "border regions", "Suez Canal zone"],
-    "qualifyingActivities": ["labor-intensive", "SMEs", "renewable energy", ...]
-  },
-  "sectorB": {
-    "taxDeduction": "30%",
-    "maxDuration": "7 years",
-    "maxCapDeduction": "80% of paid capital",
-    "governorates": ["remaining areas"],
-    "qualifyingActivities": [...]
-  },
-  "additionalBenefits": [
-    "50% land cost rebate if production starts within 2 years",
-    "Free land for strategic projects",
-    ...
-  ],
-  "cashIncentive": {
-    "description": "Direct cash payment after tax settlement",
-    "maxRate": "45% of tax paid",
-    "condition": "75%+ foreign financing"
-  },
-  "licensingSteps": [
-    { "step": 1, "titleEn": "Company Formation", "titleAr": "تأسيس الشركة", "description": "...", "estimatedDays": 7, "estimatedFeeEgp": 1000 },
-    { "step": 2, "titleEn": "Select Industrial Activity", "titleAr": "اختيار النشاط الصناعي", "description": "...", "estimatedDays": 1, "estimatedFeeEgp": 0 },
-    { "step": 3, "titleEn": "Choose Location", "titleAr": "اختيار الموقع", "description": "...", "estimatedDays": 3, "estimatedFeeEgp": 0 },
-    { "step": 4, "titleEn": "Feasibility Study", "titleAr": "دراسة الجدوى", "description": "...", "estimatedDays": 30, "estimatedFeeEgp": 50000 },
-    { "step": 5, "titleEn": "Secure Financing", "titleAr": "تأمين التمويل", "description": "...", "estimatedDays": 30, "estimatedFeeEgp": 0 },
-    { "step": 6, "titleEn": "Execute Project", "titleAr": "تنفيذ المشروع", "description": "...", "estimatedDays": 180, "estimatedFeeEgp": 0 },
-    { "step": 7, "titleEn": "Obtain Operating License", "titleAr": "الحصول على ترخيص التشغيل", "description": "...", "estimatedDays": 30, "estimatedFeeEgp": 5000 }
-  ],
-  "freeZoneBenefits": ["Custom duty exemption on capital goods", "VAT exemption on imports/exports", "No profit repatriation restrictions", "1% service fee on goods value"]
-}`,
+Extract the COMPLETE incentive structure including general incentives, sector A/B incentives, additional benefits, cash incentive program, licensing steps (with Arabic titles), and free zone benefits.`,
         [
           { type: "web_search_20250305" as const, name: "web_search", max_uses: 8 },
           { type: "web_fetch_20250910" as const, name: "web_fetch", max_uses: 2 },
         ],
-        "Research Egyptian industrial investment incentives. Return ONLY valid JSON, no markdown fences, no prose."
+        incentivesToolSchema,
+        "Parse the researched Egyptian industrial investment incentives data into structured format with licensing steps.",
+        "You are an Egyptian industrial investment incentives research specialist.",
       );
 
-      if (pdfResult.text) {
-        const raw = pdfResult.text.trim();
-        const jsonMatch = raw.match(/```(?:json)?\s*([\s\S]*?)```/) ?? [null, null];
-        incentivesData = jsonMatch[1]?.trim()
-          ?? (raw.substring(raw.indexOf("{"), raw.lastIndexOf("}") + 1) || raw);
-        console.log(`[deepScrape/pass2] Incentives data extracted (${incentivesData.length} chars).`);
+      if (pdfResult.result) {
+        const verified = InvestmentIncentivesSchema.safeParse(pdfResult.result);
+        if (!verified.success) {
+          console.warn("[deepScrape/pass2] REJECTED by verifier (incentives):", verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "));
+        } else {
+          verifiedIncentives = verified.data;
+          console.log("[deepScrape/pass2] Incentives data extracted and verified.");
+        }
       }
 
       if (pdfResult.usage) {
-        const costUsd = pdfResult.usage.inputTokens * COST_PER_INPUT_TOKEN + pdfResult.usage.outputTokens * COST_PER_OUTPUT_TOKEN;
+        const costUsd = estimateCost(pdfResult.usage.model, pdfResult.usage.inputTokens, pdfResult.usage.outputTokens);
         await ctx.runMutation(internal.usage.logApiUsage, {
-          provider: "anthropic", model: pdfResult.usage.model, purpose: "data_pipeline_industry_deep",
+          provider: activeProviderName(), model: pdfResult.usage.model, purpose: "data_pipeline_industry_deep",
           inputTokens: pdfResult.usage.inputTokens, outputTokens: pdfResult.usage.outputTokens,
           totalTokens: pdfResult.usage.inputTokens + pdfResult.usage.outputTokens,
-          costUsd, durationMs: pdfResult.usage.durationMs, success: true, timestamp: Date.now(),
+          costUsd, durationMs: pdfResult.usage.durationMs, success: pdfResult.result !== null, timestamp: Date.now(),
         });
       }
     } catch (err) {
@@ -3656,64 +3277,52 @@ Return ONLY valid JSON:
     }
 
     // ── Apply incentives and licensing data to all opportunities ──
-    if (incentivesData) {
-      try {
-        const incentivesObj = JSON.parse(incentivesData) as {
-          generalIncentives?: string[];
-          sectorA?: { taxDeduction?: string; maxDuration?: string; governorates?: string[]; qualifyingActivities?: string[] };
-          sectorB?: { taxDeduction?: string; maxDuration?: string; governorates?: string[]; qualifyingActivities?: string[] };
-          additionalBenefits?: string[];
-          cashIncentive?: { description?: string; maxRate?: string; condition?: string };
-          licensingSteps?: Array<{ step: number; titleEn: string; titleAr: string; description: string; estimatedDays: number; estimatedFeeEgp: number }>;
-          freeZoneBenefits?: string[];
-        };
-        const licensingStepsEn = incentivesObj.licensingSteps ? JSON.stringify(incentivesObj.licensingSteps) : undefined;
-        const licensingStepsAr = licensingStepsEn; // Same structure with Arabic titles inside
+    if (verifiedIncentives) {
+      const incentivesObj = verifiedIncentives;
+      const licensingStepsEn = incentivesObj.licensingSteps ? JSON.stringify(incentivesObj.licensingSteps) : undefined;
+      const licensingStepsAr = licensingStepsEn; // Same structure with Arabic titles inside
 
-        // Determine incentives text based on opportunity type
-        for (const opp of oppsWithoutDetails) {
-          try {
-            let incentivesEn = "";
-            let incentivesAr = "";
+      // Determine incentives text based on opportunity type
+      for (const opp of oppsWithoutDetails) {
+        try {
+          let incentivesEn = "";
+          let incentivesAr = "";
 
-            if (opp.type === "free_zone") {
-              const fzBenefits = incentivesObj.freeZoneBenefits ?? [];
-              incentivesEn = `Free Zone Benefits:\n${fzBenefits.map((b: string) => `• ${b}`).join("\n")}`;
-              incentivesAr = `مزايا المنطقة الحرة:\n${fzBenefits.map((b: string) => `• ${b}`).join("\n")}`;
-            } else {
-              // Determine sector A or B based on governorate
-              const sectorAGovs = (incentivesObj.sectorA?.governorates ?? []).map((g: string) => g.toLowerCase());
-              const isSectorA = sectorAGovs.some((g: string) =>
-                opp.governorate?.toLowerCase().includes(g) || g.includes(opp.governorate?.toLowerCase() ?? "")
-              );
+          if (opp.type === "free_zone") {
+            const fzBenefits = incentivesObj.freeZoneBenefits ?? [];
+            incentivesEn = `Free Zone Benefits:\n${fzBenefits.map((b) => `• ${b}`).join("\n")}`;
+            incentivesAr = `مزايا المنطقة الحرة:\n${fzBenefits.map((b) => `• ${b}`).join("\n")}`;
+          } else {
+            // Determine sector A or B based on governorate
+            const sectorAGovs = (incentivesObj.sectorA?.governorates ?? []).map((g) => g.toLowerCase());
+            const isSectorA = sectorAGovs.some((g) =>
+              opp.governorate?.toLowerCase().includes(g) || g.includes(opp.governorate?.toLowerCase() ?? "")
+            );
 
-              const sector = isSectorA ? incentivesObj.sectorA : incentivesObj.sectorB;
-              const sectorLabel = isSectorA ? "A" : "B";
-              const general = (incentivesObj.generalIncentives ?? []).map((i: string) => `• ${i}`).join("\n");
-              const additional = (incentivesObj.additionalBenefits ?? []).map((b: string) => `• ${b}`).join("\n");
+            const sector = isSectorA ? incentivesObj.sectorA : incentivesObj.sectorB;
+            const sectorLabel = isSectorA ? "A" : "B";
+            const general = (incentivesObj.generalIncentives ?? []).map((i) => `• ${i}`).join("\n");
+            const additional = (incentivesObj.additionalBenefits ?? []).map((b) => `• ${b}`).join("\n");
 
-              incentivesEn = `Sector ${sectorLabel} Incentives (${sector?.taxDeduction ?? "30%"} tax deduction for ${sector?.maxDuration ?? "7 years"}):\n\nGeneral:\n${general}\n\nAdditional:\n${additional}`;
-              incentivesAr = `حوافز القطاع ${sectorLabel} (خصم ضريبي ${sector?.taxDeduction ?? "30%"} لمدة ${sector?.maxDuration ?? "7 سنوات"})`;
-            }
-
-            await ctx.runMutation(internal.dataRefresh.upsertInvestmentProjectDetail, {
-              opportunityId: opp._id,
-              incentivesEn: incentivesEn || undefined,
-              incentivesAr: incentivesAr || undefined,
-              licensingStepsEn: licensingStepsEn ?? undefined,
-              licensingStepsAr: licensingStepsAr ?? undefined,
-              sourceUrl: "https://www.ida.gov.eg/ar/incentives",
-              sanadLevel: 1,
-            });
-            totalUpdated++;
-          } catch (err) {
-            console.warn(`[deepScrape/pass2] Failed to enrich ${opp.nameEn}: ${err}`);
+            incentivesEn = `Sector ${sectorLabel} Incentives (${sector?.taxDeduction ?? "30%"} tax deduction for ${sector?.maxDuration ?? "7 years"}):\n\nGeneral:\n${general}\n\nAdditional:\n${additional}`;
+            incentivesAr = `حوافز القطاع ${sectorLabel} (خصم ضريبي ${sector?.taxDeduction ?? "30%"} لمدة ${sector?.maxDuration ?? "7 سنوات"})`;
           }
+
+          await ctx.runMutation(internal.dataRefresh.upsertInvestmentProjectDetail, {
+            opportunityId: opp._id,
+            incentivesEn: incentivesEn || undefined,
+            incentivesAr: incentivesAr || undefined,
+            licensingStepsEn: licensingStepsEn ?? undefined,
+            licensingStepsAr: licensingStepsAr ?? undefined,
+            sourceUrl: "https://www.ida.gov.eg/ar/incentives",
+            sanadLevel: 1,
+          });
+          totalUpdated++;
+        } catch (err) {
+          console.warn(`[deepScrape/pass2] Failed to enrich ${opp.nameEn}: ${err}`);
         }
-        console.log(`[deepScrape/pass2] Enriched ${totalUpdated} opportunities with incentives and licensing steps.`);
-      } catch (parseErr) {
-        console.warn(`[deepScrape/pass2] Failed to parse incentives JSON: ${parseErr}`);
       }
+      console.log(`[deepScrape/pass2] Enriched ${totalUpdated} opportunities with incentives and licensing steps.`);
     }
 
     console.log(`[deepScrape/pass2] Complete. Total enriched: ${totalUpdated}`);

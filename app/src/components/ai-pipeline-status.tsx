@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useQuery } from "convex/react";
 import { api } from "../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
+import type { Translations } from "@/lib/translations";
 // Card/CardContent available if needed for layout changes
 import { Skeleton } from "@/components/skeleton";
 import {
@@ -72,26 +73,27 @@ const STEP_NAMES_EN: Record<string, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatCountdown(ms: number, isAr: boolean, isRunning: boolean): string {
-  if (isRunning) return isAr ? "جارٍ التحديث الآن..." : "Refreshing now...";
-  if (ms <= 0) return isAr ? "جاهز للتحديث" : "Ready to refresh";
+function formatCountdown(ms: number, t: Translations, isRunning: boolean): string {
+  if (isRunning) return t.pipeline_refreshingNow;
+  if (ms <= 0) return t.pipeline_readyToRefresh;
 
   const totalSec = Math.floor(ms / 1000);
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);
   const s = totalSec % 60;
 
+  const isAr = t.siteName === "ميزان";
   if (isAr) {
     const pad = (n: number) => n.toString();
-    if (h > 0) return `التحديث التالي خلال ${pad(h)}س ${pad(m)}د ${pad(s)}ث`;
-    if (m > 0) return `التحديث التالي خلال ${pad(m)}د ${pad(s)}ث`;
-    return `التحديث التالي خلال ${pad(s)}ث`;
+    if (h > 0) return `${t.pipeline_nextRefreshIn} ${pad(h)}س ${pad(m)}د ${pad(s)}ث`;
+    if (m > 0) return `${t.pipeline_nextRefreshIn} ${pad(m)}د ${pad(s)}ث`;
+    return `${t.pipeline_nextRefreshIn} ${pad(s)}ث`;
   }
 
   const hStr = h > 0 ? `${h}h ` : "";
   const mStr = m > 0 ? `${m}m ` : "";
   const sStr = `${s}s`;
-  return `Next refresh in ${hStr}${mStr}${sStr}`;
+  return `${t.pipeline_nextRefreshIn} ${hStr}${mStr}${sStr}`;
 }
 
 function formatElapsed(startedAt: number | null | undefined, completedAt: number | null | undefined): string {
@@ -119,18 +121,18 @@ function StatusIcon({ status }: { status: StepStatus }) {
   }
 }
 
-function statusLabel(status: StepStatus, isAr: boolean): string {
+function statusLabel(status: StepStatus, t: Translations): string {
   switch (status) {
     case "pending":
-      return isAr ? "في الانتظار" : "Pending";
+      return t.pipeline_pending;
     case "running":
-      return isAr ? "جارٍ..." : "Running...";
+      return t.pipeline_running;
     case "success":
-      return isAr ? "نجح" : "Success";
+      return t.pipeline_success;
     case "failed":
-      return isAr ? "فشل" : "Failed";
+      return t.pipeline_failed;
     case "skipped":
-      return isAr ? "تخطى" : "Skipped";
+      return t.pipeline_skipped;
   }
 }
 
@@ -159,7 +161,7 @@ function useCountdown(lastCompletedAt: number | null, steps: PipelineStep[]): { 
 
 // ─── Pipeline Step Row ────────────────────────────────────────────────────────
 
-function StepRow({ step, isAr }: { step: PipelineStep; isAr: boolean }) {
+function StepRow({ step, isAr, t }: { step: PipelineStep; isAr: boolean; t: Translations }) {
   const name = isAr ? (STEP_NAMES_AR[step.step] ?? step.step) : (STEP_NAMES_EN[step.step] ?? step.step);
   const message = isAr ? (step.messageAr || step.message) : (step.message || "--");
   const elapsed = formatElapsed(step.startedAt, step.completedAt);
@@ -178,7 +180,7 @@ function StepRow({ step, isAr }: { step: PipelineStep; isAr: boolean }) {
           (step.status === "pending" || step.status === "skipped") && "text-muted-foreground",
         )}>
           <StatusIcon status={step.status} />
-          {statusLabel(step.status, isAr)}
+          {statusLabel(step.status, t)}
         </span>
       </td>
       <td className="px-4 py-2.5 text-xs text-muted-foreground max-w-[200px] truncate">
@@ -187,7 +189,7 @@ function StepRow({ step, isAr }: { step: PipelineStep; isAr: boolean }) {
           : (message || "--")}
         {step.recordsUpdated !== null && step.recordsUpdated > 0 && (
           <span className="ms-1.5 text-emerald-500/80">
-            ({step.recordsUpdated} {isAr ? "سجل" : "records"})
+            ({step.recordsUpdated} {t.pipeline_records})
           </span>
         )}
       </td>
@@ -201,7 +203,7 @@ function StepRow({ step, isAr }: { step: PipelineStep; isAr: boolean }) {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function AiPipelineStatus() {
-  const { lang, dir } = useLanguage();
+  const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
   // Attempt to load the query — may not exist yet
@@ -272,7 +274,7 @@ export function AiPipelineStatus() {
               <Bot size={14} className="text-primary opacity-70" />
             )}
             <span className="text-sm font-semibold">
-              {isAr ? "حالة تدفق البيانات (الذكاء الاصطناعي)" : "AI Data Pipeline"}
+              {t.pipeline_title}
             </span>
 
             {/* Status badges */}
@@ -280,22 +282,22 @@ export function AiPipelineStatus() {
               {hasActiveRun && (
                 <span className="inline-flex items-center gap-1 text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full bg-primary/15 text-primary">
                   <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                  {isAr ? "نشط" : "Live"}
+                  {t.pipeline_live}
                 </span>
               )}
               {failedCount > 0 && (
                 <span className="text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full bg-destructive/15 text-destructive">
-                  {failedCount} {isAr ? "فشل" : "failed"}
+                  {failedCount} {t.pipeline_failed}
                 </span>
               )}
               {!hasActiveRun && successCount > 0 && failedCount === 0 && (
                 <span className="text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-500">
-                  {isAr ? "مكتمل" : "Complete"}
+                  {t.pipeline_complete}
                 </span>
               )}
               {!hasActiveRun && successCount > 0 && (
                 <span className="text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-500">
-                  {isAr ? "LLM جاهز" : "LLM Ready"}
+                  {t.pipeline_llmReady}
                 </span>
               )}
             </div>
@@ -305,7 +307,7 @@ export function AiPipelineStatus() {
             {/* Countdown */}
             <span className="text-xs text-muted-foreground font-mono hidden sm:block" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
               <Clock size={10} className="inline me-1 opacity-60" />
-              {formatCountdown(msUntilNext, isAr, isRunning)}
+              {formatCountdown(msUntilNext, t, isRunning)}
             </span>
             {expanded ? (
               <ChevronUp size={14} className="text-muted-foreground" />
@@ -319,7 +321,7 @@ export function AiPipelineStatus() {
         <div className="sm:hidden px-5 pb-2 -mt-1">
           <span className="text-xs text-muted-foreground font-mono" style={{ direction: "ltr", unicodeBidi: "isolate" }}>
             <Clock size={10} className="inline me-1 opacity-60" />
-            {formatCountdown(msUntilNext, isAr, isRunning)}
+            {formatCountdown(msUntilNext, t, isRunning)}
           </span>
         </div>
 
@@ -330,22 +332,22 @@ export function AiPipelineStatus() {
               <thead>
                 <tr className="border-b border-border/40 bg-muted/30">
                   <th className="px-4 py-2 text-start text-[0.65rem] font-bold uppercase tracking-widest text-muted-foreground">
-                    {isAr ? "الخطوة" : "Step"}
+                    {t.pipeline_step}
                   </th>
                   <th className="px-4 py-2 text-start text-[0.65rem] font-bold uppercase tracking-widest text-muted-foreground">
-                    {isAr ? "الحالة" : "Status"}
+                    {t.pipeline_status}
                   </th>
                   <th className="px-4 py-2 text-start text-[0.65rem] font-bold uppercase tracking-widest text-muted-foreground">
-                    {isAr ? "الرسالة" : "Message"}
+                    {t.pipeline_message}
                   </th>
                   <th className="px-4 py-2 text-end text-[0.65rem] font-bold uppercase tracking-widest text-muted-foreground">
-                    {isAr ? "الوقت" : "Time"}
+                    {t.pipeline_time}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {progressSteps.map((step, i) => (
-                  <StepRow key={`${step.step}-${i}`} step={step} isAr={isAr} />
+                  <StepRow key={`${step.step}-${i}`} step={step} isAr={isAr} t={t} />
                 ))}
               </tbody>
             </table>
@@ -355,7 +357,7 @@ export function AiPipelineStatus() {
         {/* Empty state when expanded but no steps */}
         {expanded && progressSteps.length === 0 && (
           <div className="border-t border-border/40 px-5 py-6 text-center text-xs text-muted-foreground">
-            {isAr ? "لا توجد بيانات متاحة للمراحل" : "No pipeline step data available"}
+            {t.pipeline_noData}
           </div>
         )}
       </div>

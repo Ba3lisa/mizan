@@ -1,12 +1,10 @@
 "use node";
 // Shared council evaluation prompt used by all providers.
 
-import type { CouncilEvaluationContext, CouncilVoteResult } from "./types";
+import type { CouncilEvaluationContext } from "./types";
 
 export const COUNCIL_SYSTEM_PROMPT = `You are a data verification council member for Mizan, Egypt's government transparency platform.
 Your job is to evaluate proposed data changes and vote on whether they should be accepted.
-
-You MUST respond with valid JSON only — no markdown, no prose.
 
 Voting guidelines:
 - "approve" if the data appears correct and the source is credible
@@ -32,22 +30,6 @@ ${context.sourceUrl ? `Source URL: ${context.sourceUrl}` : "No source URL provid
 ${context.sourceContent ? `Source page content (truncated):\n${context.sourceContent.slice(0, 4000)}` : ""}
 ${context.issueBody ? `Original issue:\n${context.issueBody}` : ""}
 
-Respond with JSON: {"vote": "approve|reject|abstain", "confidence": "high|medium|low", "reasoning": "<max 500 chars>", "sourceVerified": true|false}`;
+Submit your vote using the provided tool.`;
 }
 
-export function parseCouncilVote(response: string): CouncilVoteResult | null {
-  try {
-    const parsed = JSON.parse(response) as Record<string, unknown>;
-    const vote =
-      parsed.vote === "approve" || parsed.vote === "reject" || parsed.vote === "abstain"
-        ? parsed.vote : "abstain";
-    const confidence =
-      parsed.confidence === "high" || parsed.confidence === "medium" || parsed.confidence === "low"
-        ? parsed.confidence : "low";
-    const reasoning = typeof parsed.reasoning === "string" ? parsed.reasoning.slice(0, 500) : "No reasoning provided";
-    const sourceVerified = typeof parsed.sourceVerified === "boolean" ? parsed.sourceVerified : false;
-    return { vote, confidence, reasoning, sourceVerified };
-  } catch {
-    return null;
-  }
-}

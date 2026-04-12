@@ -6,7 +6,10 @@
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
-import { callLLM as callClaude } from "./providers/registry";
+import { z } from "zod";
+import { callLLMStructuredWithUsage } from "./providers/registry";
+import { NameTransliterationSchema, zodToToolSchema } from "./schemas";
+import { verifyLLMOutput } from "./verify";
 
 const PARLIAMENT_BASE = "https://www.parliament.gov.eg/MembersDetails.aspx";
 
@@ -66,26 +69,31 @@ export const scrapeMemberBatch = internalAction({
 
     // Phase 2: One Claude call to transliterate Arabic names to English
     const nameList = rawMembers.map((m) => `${m.id}: ${m.nameAr}`).join("\n");
-    const claudeResponse = await callClaude(
-      `Transliterate these Arabic names to English. Return JSON array:
-[{"id": N, "nameEn": "English Name"}]
+
+    const toolSchema = zodToToolSchema(
+      "transliterate_names",
+      "Transliterate Arabic member names to English",
+      NameTransliterationSchema,
+    );
+
+    const { result: translitResult } = await callLLMStructuredWithUsage<z.infer<typeof NameTransliterationSchema>>(
+      `Transliterate these Arabic names to English. Each entry must include the numeric id and the English transliteration.
 Names:
 ${nameList}`,
-      "Transliterate Arabic names to English. JSON only, no markdown."
+      toolSchema,
+      "Transliterate Arabic names to English. Return every provided name.",
     );
 
     const englishNames: Record<number, string> = {};
-    if (claudeResponse) {
-      try {
-        let jsonStr = claudeResponse;
-        const fence = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-        if (fence) jsonStr = fence[1];
-        const parsed = JSON.parse(jsonStr.trim()) as Array<{ id: number; nameEn: string }>;
-        for (const entry of parsed) {
-          if (entry.id && entry.nameEn) englishNames[entry.id] = entry.nameEn;
+    if (translitResult) {
+      const verified = verifyLLMOutput(NameTransliterationSchema, translitResult, "parliament_transliteration");
+      if (verified.ok) {
+        for (const entry of verified.data.translations) {
+          const numId = Number(entry.id);
+          if (!isNaN(numId) && entry.nameEn) englishNames[numId] = entry.nameEn;
         }
-      } catch {
-        // If Claude fails, use Arabic names as English (better than nothing)
+      } else {
+        console.warn("[scraper] Transliteration rejected by verifier, falling back to Arabic names.");
       }
     }
 

@@ -274,29 +274,23 @@ export const upsertFiscalYear = internalMutation({
     sanadLevel: v.number(),
   },
   handler: async (ctx, args) => {
-    // Normalize year format: "2024/2025" → "2024-2025" to prevent duplicates
-    const normalizedYear = args.year.replace("/", "-");
-
-    // Try both the normalized form and the original to find existing records
-    let existing = await ctx.db
-      .query("fiscalYears")
-      .withIndex("by_year", (q) => q.eq("year", normalizedYear))
-      .unique();
-
-    if (!existing && normalizedYear !== args.year) {
-      existing = await ctx.db
-        .query("fiscalYears")
-        .withIndex("by_year", (q) => q.eq("year", args.year))
-        .unique();
+    // Strict validation: year MUST be "YYYY-YYYY" dash format.
+    // The pipeline verifier should catch this before it reaches here.
+    if (!/^\d{4}-\d{4}$/.test(args.year)) {
+      throw new Error(`Invalid fiscal year format "${args.year}" — must be "YYYY-YYYY" with dash separator`);
     }
 
+    const existing = await ctx.db
+      .query("fiscalYears")
+      .withIndex("by_year", (q) => q.eq("year", args.year))
+      .unique();
+
     if (!existing) {
-      // Derive conventional start/end dates from fiscal year string "YYYY-YYYY"
-      const parts = normalizedYear.split("-");
-      const startYear = parts[0] ?? normalizedYear;
-      const endYear = parts[1] ?? normalizedYear;
+      const parts = args.year.split("-");
+      const startYear = parts[0];
+      const endYear = parts[1];
       await ctx.db.insert("fiscalYears", {
-        year: normalizedYear,
+        year: args.year,
         startDate: `${startYear}-07-01`,
         endDate: `${endYear}-06-30`,
         totalRevenue: args.totalRevenue,

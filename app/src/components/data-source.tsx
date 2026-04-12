@@ -8,7 +8,7 @@ import { useLanguage } from "@/components/providers";
 type SourceCategory = "government" | "parliament" | "constitution" | "budget" | "debt" | "elections" | "economy" | "industry" | "general";
 
 export function DataSourceFooter({ category }: { category: SourceCategory }) {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
   const sources = useQuery(api.sources.getByCategory, { category });
 
@@ -17,7 +17,7 @@ export function DataSourceFooter({ category }: { category: SourceCategory }) {
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-6 pt-4 border-t border-border">
       <span className="text-xs text-muted-foreground">
-        {isAr ? "المصادر:" : "Sources:"}
+        {t.dataSource_sources}
       </span>
       {sources.map((s) => (
         <a

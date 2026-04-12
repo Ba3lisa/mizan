@@ -3,8 +3,15 @@
 // Uses raw fetch (no SDK) for minimal dependencies.
 
 import { extractClaudeText } from "../validators";
-import type { LLMProvider, LLMCallResult, ToolSchema, CouncilEvaluationContext, CouncilVoteResult } from "./types";
-import { COUNCIL_SYSTEM_PROMPT, buildCouncilPrompt, parseCouncilVote } from "./councilPrompt";
+import type { LLMProvider, LLMCallResult, ToolSchema, ServerToolDef, CouncilEvaluationContext, CouncilVoteResult } from "./types";
+import { COUNCIL_SYSTEM_PROMPT, buildCouncilPrompt } from "./councilPrompt";
+import { CouncilVoteSchema, zodToToolSchema } from "../schemas";
+
+const COUNCIL_VOTE_TOOL = zodToToolSchema(
+  "submit_council_vote",
+  "Submit a structured council vote evaluating a proposed data change for the Mizan platform.",
+  CouncilVoteSchema,
+);
 
 const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -166,14 +173,6 @@ export async function callClaudeStructured<T>(
 
 // ─── SERVER TOOLS (web_search + web_fetch) ─────────────────────────────────
 
-export interface ServerToolDef {
-  type: string;        // e.g. "web_search_20250305", "web_fetch_20250910"
-  name: string;        // e.g. "web_search", "web_fetch"
-  max_uses?: number;
-  allowed_domains?: string[];
-  blocked_domains?: string[];
-  max_content_tokens?: number;  // web_fetch only: limit fetched content size
-}
 
 /**
  * Call Claude with server-side tools (web_search, web_fetch).
@@ -249,9 +248,21 @@ export async function callClaudeWithServerTools(
 export async function evaluateDataChange(
   context: CouncilEvaluationContext
 ): Promise<CouncilVoteResult | null> {
-  const response = await callClaude(buildCouncilPrompt(context), COUNCIL_SYSTEM_PROMPT);
-  if (!response) return null;
-  return parseCouncilVote(response);
+  const { result } = await callClaudeStructuredWithUsage<unknown>(
+    buildCouncilPrompt(context),
+    COUNCIL_VOTE_TOOL,
+    COUNCIL_SYSTEM_PROMPT,
+  );
+  if (!result) return null;
+  const verified = CouncilVoteSchema.safeParse(result);
+  if (!verified.success) {
+    console.error(
+      "[anthropic/council] Zod validation failed:",
+      verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; "),
+    );
+    return null;
+  }
+  return verified.data;
 }
 
 // ─── WEB RESEARCH + STRUCTURED OUTPUT (two-step) ────────────────────────────
@@ -312,4 +323,9 @@ export const anthropicProvider: LLMProvider = {
   callLLM: callClaude,
   callLLMStructured: callClaudeStructured,
   evaluateDataChange,
+  callLLMWithUsage: callClaudeWithUsage,
+  callLLMStructuredWithUsage: callClaudeStructuredWithUsage,
+  supportsServerTools: true,
+  callLLMWithServerTools: callClaudeWithServerTools,
+  callLLMWebResearchStructured: callClaudeWebResearchStructured,
 };

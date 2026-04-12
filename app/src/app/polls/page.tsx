@@ -111,7 +111,7 @@ function CompletedPollCard({
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function PollsPage() {
-  const { lang, dir } = useLanguage();
+  const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
   const completedPolls = useQuery(api.polls.getCompletedPolls, { limit: 20 });
 
@@ -126,17 +126,15 @@ export default function PollsPage() {
             </div>
             <div>
               <p className="text-xs font-semibold text-primary uppercase tracking-widest">
-                {isAr ? "رأي المجتمع" : "Community Voice"}
+                {t.polls_communityVoice}
               </p>
               <h1 className="text-2xl md:text-3xl font-black">
-                {isAr ? "استطلاعات الرأي" : "Polls"}
+                {t.polls_title}
               </h1>
             </div>
           </div>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            {isAr
-              ? "استطلاع أسبوعي جديد يُنشأ تلقائياً بواسطة الذكاء الاصطناعي بناءً على البيانات الحية. صوّت بشكل مجهول — النتائج تُحدّث لحظياً."
-              : "A new weekly poll is AI-generated from live platform data. Vote anonymously — results update in real-time."}
+            {t.polls_description}
           </p>
         </div>
 
@@ -144,7 +142,7 @@ export default function PollsPage() {
           {/* Historical polls */}
           <div>
             <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">
-              {isAr ? "الاستطلاعات السابقة" : "Past Polls"}
+              {t.polls_pastPolls}
             </h2>
             {completedPolls === undefined ? (
               <div className="space-y-4">
@@ -155,7 +153,7 @@ export default function PollsPage() {
             ) : completedPolls.length === 0 ? (
               <Card className="border-border/60 bg-card/60">
                 <CardContent className="p-8 text-center text-muted-foreground text-sm">
-                  {isAr ? "لا توجد استطلاعات سابقة بعد" : "No completed polls yet"}
+                  {t.polls_noCompleted}
                 </CardContent>
               </Card>
             ) : (
@@ -170,7 +168,7 @@ export default function PollsPage() {
           {/* Active poll sidebar */}
           <div className="lg:sticky lg:top-20">
             <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-4">
-              {isAr ? "الاستطلاع الحالي" : "Current Poll"}
+              {t.polls_currentPoll}
             </h2>
             <DailyPoll />
           </div>

@@ -10,8 +10,7 @@ import { ParliamentTab } from "./_components/parliament-tab";
 // ─── Inner component (uses useSearchParams inside Suspense) ──────────────────
 
 function GovernmentPageInner() {
-  const { lang, dir } = useLanguage();
-  const isAr = lang === "ar";
+  const { t, dir } = useLanguage();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
   const defaultTab = tabParam === "parliament" ? "parliament" : "cabinet";
@@ -22,22 +21,20 @@ function GovernmentPageInner() {
         {/* Header */}
         <div className="mb-10">
           <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">
-            {isAr ? "السلطة التنفيذية" : "Executive & Legislative"}
+            {t.govPage_executiveLegislative}
           </p>
           <h1 className="text-3xl md:text-4xl font-black mb-2">
-            {isAr ? "الحكومة" : "Government"}
+            {t.navGovernment}
           </h1>
           <p className="text-muted-foreground text-sm max-w-lg">
-            {isAr
-              ? "الهيكل التنظيمي للسلطتين التنفيذية والتشريعية في جمهورية مصر العربية"
-              : "Organizational structure of the executive and legislative branches of the Arab Republic of Egypt"}
+            {t.govPage_structureDesc}
           </p>
         </div>
 
         <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="w-full grid grid-cols-2 mb-8">
-            <TabsTrigger value="cabinet">{isAr ? "الحكومة" : "Cabinet"}</TabsTrigger>
-            <TabsTrigger value="parliament">{isAr ? "البرلمان" : "Parliament"}</TabsTrigger>
+            <TabsTrigger value="cabinet">{t.govPage_cabinet}</TabsTrigger>
+            <TabsTrigger value="parliament">{t.navParliament}</TabsTrigger>
           </TabsList>
           <TabsContent value="cabinet">
             <CabinetTab />

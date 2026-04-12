@@ -123,7 +123,7 @@ const optionColors = [
 // ─── MAIN COMPONENT ──────────────────────────────────────────────────────────
 
 export function DailyPoll({ compact: _compact = false }: { compact?: boolean } = {}) {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
 
   const poll = useQuery(api.polls.getActivePoll);
@@ -206,14 +206,14 @@ export function DailyPoll({ compact: _compact = false }: { compact?: boolean } =
               <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
             </div>
             <span className="text-xs font-bold text-primary tracking-wide uppercase">
-              {isAr ? "استطلاع الأسبوع" : "Weekly Poll"}
+              {t.dailyPoll_weeklyPoll}
             </span>
             <span className={`text-[0.6rem] px-1.5 py-0.5 rounded-full font-medium ${catConfig.bgColor} ${catConfig.color}`}>
               {isAr ? catConfig.labelAr : catConfig.labelEn}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <PollCountdown expiresAt={poll.expiresAt} isAr={isAr} />
+            <PollCountdown expiresAt={poll.expiresAt} />
             {isCollapsed ? <ChevronDown size={14} className="text-muted-foreground" /> : <ChevronUp size={14} className="text-muted-foreground" />}
           </div>
         </button>
@@ -279,14 +279,14 @@ export function DailyPoll({ compact: _compact = false }: { compact?: boolean } =
               <div className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground/60">
                 <Users size={10} />
                 <span>
-                  {poll.totalVotes.toLocaleString()} {isAr ? "صوت" : "votes"}
+                  {poll.totalVotes.toLocaleString()} {t.dailyPoll_votes}
                 </span>
                 {poll.totalVotes >= 10 && (
                   <Flame size={10} className="text-orange-400/60 ml-1" />
                 )}
               </div>
               <span className="text-[0.55rem] text-muted-foreground/40">
-                {isAr ? "تصويت مجهول الهوية" : "Anonymous voting"}
+                {t.dailyPoll_anonymousVoting}
               </span>
             </div>
           </div>
@@ -396,14 +396,15 @@ function PollOption({
 
 // ─── COUNTDOWN ───────────────────────────────────────────────────────────────
 
-function PollCountdown({ expiresAt, isAr }: { expiresAt: number; isAr: boolean }) {
+function PollCountdown({ expiresAt }: { expiresAt: number }) {
+  const { t } = useLanguage();
   const { hours, minutes, seconds, isExpired } = useCountdown(expiresAt);
 
   if (isExpired) {
     return (
       <span className="text-[0.6rem] text-muted-foreground/60 flex items-center gap-1">
         <Clock size={9} />
-        {isAr ? "انتهى" : "Ended"}
+        {t.dailyPoll_ended}
       </span>
     );
   }

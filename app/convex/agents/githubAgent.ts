@@ -8,9 +8,17 @@ import { internalAction, ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { Id } from "../_generated/dataModel";
 
-import { callLLM as callClaude } from "./providers/registry";
+import { callLLMStructured } from "./providers/registry";
+import { GitHubIssueClassificationSchema, zodToToolSchema } from "./schemas";
+import type { GitHubIssueClassification } from "./schemas";
 import { classifySource } from "./council";
 import { sanitizeHtml, isUrlTrusted } from "../lib/urlValidator";
+
+const GITHUB_ISSUE_TOOL = zodToToolSchema(
+  "classify_github_issue",
+  "Classify a GitHub issue as a valid data correction or spam/off-topic, and extract the correction details.",
+  GitHubIssueClassificationSchema,
+);
 
 const GITHUB_REPO = "Ba3lisa/mizan";
 const GITHUB_API = "https://api.github.com";
@@ -162,28 +170,28 @@ async function processDataIssue(
     batchId,
   });
 
-  // Parse issue with Claude
-  const claudeResponse = await callClaude(
+  // Parse issue with structured LLM output
+  const rawClassification = await callLLMStructured<GitHubIssueClassification>(
     `You are a data verification assistant for an Egyptian government transparency platform called Mizan.
 
-Parse this GitHub issue and extract:
-1. page: which page the data is on (e.g., "budget", "debt", "parliament")
-2. dataPoint: what specific data point is being corrected
-3. currentValue: what value Mizan currently shows (if mentioned)
-4. correctValue: what the correct value should be
-5. sourceUrl: the URL proving the correct value
-6. confidence: "high" if they provided a specific source URL, "medium" if they described the source, "low" if no source
+Parse this GitHub issue and classify it as a valid data correction or spam/off-topic.
 
-Respond in JSON format only:
-{"page": "...", "dataPoint": "...", "currentValue": "...", "correctValue": "...", "sourceUrl": "...", "confidence": "high|medium|low"}
+For valid data corrections, extract:
+- page: which page the data is on (e.g., "budget", "debt", "parliament")
+- dataPoint: what specific data point is being corrected
+- currentValue: what value Mizan currently shows (if mentioned)
+- correctValue: what the correct value should be
+- sourceUrl: the URL proving the correct value
+- confidence: "high" if they provided a specific source URL, "medium" if they described the source, "low" if no source
 
-If the issue is not a valid data correction (spam, feature request, etc.), respond: {"valid": false, "reason": "..."}
+For spam, feature requests, or anything that is not a data correction, set valid=false and provide a reason.
 
 Issue title: ${issue.title}
-Issue body: ${issue.body}`
+Issue body: ${issue.body}`,
+    GITHUB_ISSUE_TOOL,
   );
 
-  if (!claudeResponse) {
+  if (!rawClassification) {
     await addComment(
       issue.number,
       "**Mizan AI Agent**: Unable to process this issue at this time. A maintainer will review it manually.\n\n_This is an automated response._"
@@ -191,23 +199,26 @@ Issue body: ${issue.body}`
     return;
   }
 
-  let parsed: Record<string, unknown>;
-  try {
-    parsed = JSON.parse(claudeResponse) as Record<string, unknown>;
-  } catch {
-    console.error(`[githubAgent] Failed to parse Claude response for issue #${issue.number}`);
+  const verified = GitHubIssueClassificationSchema.safeParse(rawClassification);
+  if (!verified.success) {
+    console.error(
+      `[githubAgent] Zod validation failed for issue #${issue.number}:`,
+      verified.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")
+    );
     return;
   }
 
+  const parsed: GitHubIssueClassification = verified.data;
+
   // Spam detection
-  if (parsed.valid === false) {
+  if (!parsed.valid) {
     await ctx.runMutation(internal.githubIssueQueries.updateIssueStatus, {
       issueNumber: issue.number,
       status: "spam" as const,
     });
     await addComment(
       issue.number,
-      `**Mizan AI Agent**: This issue doesn't appear to be a data correction.\n\nReason: ${String(parsed.reason ?? "unknown")}\n\nIf this is incorrect, please update the issue with more details about which data point needs correction and provide a source URL.\n\n_This is an automated response._`
+      `**Mizan AI Agent**: This issue doesn't appear to be a data correction.\n\nReason: ${parsed.reason ?? "unknown"}\n\nIf this is incorrect, please update the issue with more details about which data point needs correction and provide a source URL.\n\n_This is an automated response._`
     );
     await githubFetch(
       `/repos/${GITHUB_REPO}/issues/${issue.number}/labels`,
@@ -216,11 +227,11 @@ Issue body: ${issue.body}`
     return;
   }
 
-  const page = typeof parsed.page === "string" ? parsed.page : "government";
-  const dataPoint = typeof parsed.dataPoint === "string" ? parsed.dataPoint : "";
-  const correctValue = typeof parsed.correctValue === "string" ? parsed.correctValue : undefined;
-  const currentValue = typeof parsed.currentValue === "string" ? parsed.currentValue : undefined;
-  const rawSourceUrl = typeof parsed.sourceUrl === "string" ? parsed.sourceUrl : undefined;
+  const page = parsed.page ?? "government";
+  const dataPoint = parsed.dataPoint ?? "";
+  const correctValue = parsed.correctValue;
+  const currentValue = parsed.currentValue;
+  const rawSourceUrl = parsed.sourceUrl;
 
   // Validate source URL against the trusted-domain allowlist
   let sourceUrl: string | undefined;

@@ -117,7 +117,7 @@ function winnerColor(pct: number): string {
 // ─── Egypt Map ────────────────────────────────────────────────────────────────
 
 function EgyptMap() {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
   const [metric, setMetric] = useState<"turnout" | "winner">("turnout");
   const [hovered, setHovered] = useState<GovernorateResult | null>(null);
@@ -144,7 +144,7 @@ function EgyptMap() {
       {/* Metric toggle */}
       <div className="flex items-center gap-3 flex-wrap">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-          {isAr ? "تلوين بحسب" : "Color by"}
+          {t.elections_colorBy}
         </span>
         <div className="flex items-center gap-2">
           <button
@@ -156,7 +156,7 @@ function EgyptMap() {
                 : "border-border text-muted-foreground hover:border-border/80"
             )}
           >
-            {isAr ? "نسبة المشاركة" : "Voter Turnout"}
+            {t.elections_voterTurnout}
           </button>
           <button
             onClick={() => setMetric("winner")}
@@ -167,7 +167,7 @@ function EgyptMap() {
                 : "border-border text-muted-foreground hover:border-border/80"
             )}
           >
-            {isAr ? "نسبة الفائز" : "Winner Vote %"}
+            {t.elections_winnerVotePct}
           </button>
         </div>
       </div>
@@ -246,8 +246,8 @@ function EgyptMap() {
           >
             <p className="font-semibold text-foreground">{isAr ? hovered.nameAr : hovered.nameEn}</p>
             <div className="mt-1 space-y-0.5 text-muted-foreground">
-              <p>{isAr ? "نسبة المشاركة:" : "Turnout:"} <span className="font-mono text-foreground">{hovered.turnout}%</span></p>
-              <p>{isAr ? "نسبة الفائز:" : "Winner %:"} <span className="font-mono text-foreground">{hovered.winnerPct}%</span></p>
+              <p>{t.elections_turnoutLabel} <span className="font-mono text-foreground">{hovered.turnout}%</span></p>
+              <p>{t.elections_winnerPctLabel} <span className="font-mono text-foreground">{hovered.winnerPct}%</span></p>
             </div>
           </div>
         )}
@@ -262,10 +262,10 @@ function EgyptMap() {
           </span>
         </div>
         {metric === "turnout" && (
-          <span className="text-xs text-muted-foreground">{isAr ? "أفتح = أقل مشاركة" : "Lighter = lower turnout"}</span>
+          <span className="text-xs text-muted-foreground">{t.elections_lighterLowerTurnout}</span>
         )}
         {metric === "winner" && (
-          <span className="text-xs text-muted-foreground">{isAr ? "أغمق = نسبة أعلى" : "Darker = higher %"}</span>
+          <span className="text-xs text-muted-foreground">{t.elections_darkerHigherPct}</span>
         )}
       </div>
 
@@ -280,7 +280,7 @@ function EgyptMap() {
           </div>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-xs text-muted-foreground mb-1">{isAr ? "نسبة المشاركة" : "Voter Turnout"}</p>
+              <p className="text-xs text-muted-foreground mb-1">{t.elections_voterTurnout}</p>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-2xl font-bold text-foreground">{selected.turnout}%</span>
               </div>
@@ -289,7 +289,7 @@ function EgyptMap() {
               </div>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-1">{isAr ? "نسبة أصوات الفائز" : "Winner Vote Share"}</p>
+              <p className="text-xs text-muted-foreground mb-1">{t.elections_winnerVoteShare}</p>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-2xl font-bold text-foreground">{selected.winnerPct}%</span>
               </div>
@@ -307,7 +307,7 @@ function EgyptMap() {
 // ─── Presidential Election Card ───────────────────────────────────────────────
 
 function ElectionCard({ election }: { election: PresidentialElection }) {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
 
   return (
@@ -319,7 +319,7 @@ function ElectionCard({ election }: { election: PresidentialElection }) {
             <p className="text-xs text-muted-foreground mt-0.5">{isAr ? election.dateAr : election.dateEn}</p>
           </div>
           <div className="text-end">
-            <p className="text-xs text-muted-foreground">{isAr ? "نسبة المشاركة" : "Turnout"}</p>
+            <p className="text-xs text-muted-foreground">{t.elections_turnout}</p>
             <p className="font-mono text-lg font-bold text-foreground">{election.turnout}%</p>
           </div>
         </div>
@@ -355,7 +355,7 @@ function ElectionCard({ election }: { election: PresidentialElection }) {
         </div>
 
         <div className="mt-4 pt-3 border-t border-border flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{isAr ? "إجمالي الأصوات الصحيحة:" : "Valid votes:"}</span>
+          <span className="text-xs text-muted-foreground">{t.elections_validVotes}</span>
           <span className="font-mono text-xs text-foreground">{election.totalVotes.toLocaleString()}</span>
         </div>
       </CardContent>
@@ -366,7 +366,7 @@ function ElectionCard({ election }: { election: PresidentialElection }) {
 // ─── Parliamentary Summary ────────────────────────────────────────────────────
 
 function ParliamentarySummary() {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -376,12 +376,10 @@ function ParliamentarySummary() {
     <div className="flex flex-col gap-6">
       <div>
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-          {isAr ? "انتخابات مجلس النواب 2020" : "House of Representatives Election 2020"}
+          {t.elections_houseElection2020}
         </h3>
         <p className="text-xs text-muted-foreground">
-          {isAr
-            ? "نتائج انتخابات مجلس النواب المصري في نوفمبر–ديسمبر 2020"
-            : "Results of the Egyptian House of Representatives election, November–December 2020"}
+          {t.elections_houseElection2020Desc}
         </p>
       </div>
 
@@ -429,7 +427,7 @@ function ParliamentarySummary() {
       </div>
 
       <p className="text-xs text-muted-foreground font-mono">
-        {isAr ? `الإجمالي: ${total} مقعد` : `Total: ${total} seats`}
+        {t.elections_totalSeats} {total}
       </p>
     </div>
   );
@@ -438,7 +436,7 @@ function ParliamentarySummary() {
 // ─── Referendums Tab ─────────────────────────────────────────────────────────
 
 function ReferendumsTab() {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
 
   const referendums = [
@@ -500,7 +498,7 @@ function ReferendumsTab() {
                 <h3 className="font-bold text-base text-foreground">{isAr ? r.titleAr : r.titleEn}</h3>
               </div>
               <div className="text-end">
-                <p className="text-xs text-muted-foreground">{isAr ? "المشاركة" : "Turnout"}</p>
+                <p className="text-xs text-muted-foreground">{t.elections_turnout}</p>
                 <p className="font-mono text-sm font-bold text-foreground">{r.turnout}%</p>
               </div>
             </div>
@@ -550,7 +548,7 @@ interface ConvexElection {
 }
 
 export default function ElectionsPage() {
-  const { lang, dir } = useLanguage();
+  const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
   // ─── Wire to Convex ───────────────────────────────────────────────────────
@@ -583,24 +581,22 @@ export default function ElectionsPage() {
         {/* Page header */}
         <div>
           <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            {isAr ? "الديمقراطية المصرية" : "Egyptian Democracy"}
+            {t.elections_subtitle}
           </p>
           <h1 className="text-3xl font-bold text-foreground mb-1">
-            {isAr ? "الانتخابات المصرية" : "Egyptian Elections"}
+            {t.elections_title}
           </h1>
           <p className="text-muted-foreground">
-            {isAr
-              ? "نتائج الانتخابات الرئاسية والبرلمانية والاستفتاءات"
-              : "Presidential & parliamentary election results and referendums"}
+            {t.elections_description}
           </p>
         </div>
 
         {/* Main tabs */}
         <Tabs defaultValue="presidential">
           <TabsList className="mb-6">
-            <TabsTrigger value="presidential">{isAr ? "الرئاسية" : "Presidential"}</TabsTrigger>
-            <TabsTrigger value="parliamentary">{isAr ? "البرلمانية" : "Parliamentary"}</TabsTrigger>
-            <TabsTrigger value="referendums">{isAr ? "الاستفتاءات" : "Referendums"}</TabsTrigger>
+            <TabsTrigger value="presidential">{t.elections_presidential}</TabsTrigger>
+            <TabsTrigger value="parliamentary">{t.elections_parliamentary}</TabsTrigger>
+            <TabsTrigger value="referendums">{t.elections_referendums}</TabsTrigger>
           </TabsList>
 
           {/* Presidential tab */}
@@ -609,11 +605,11 @@ export default function ElectionsPage() {
               {/* Elections timeline */}
               <div>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                  {isAr ? "الانتخابات الرئاسية" : "Presidential Elections"} — 2014 · 2018 · 2024
+                  {t.elections_presidentialElections} — 2014 · 2018 · 2024
                 </h2>
                 <Skeleton name="elections-cards" loading={isLoading}>
                   {activePresidentialElections && activePresidentialElections.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-20">{isAr ? "لا توجد بيانات متاحة" : "No data available"}</p>
+                    <p className="text-center text-muted-foreground py-20">{t.common_noData}</p>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       {activePresidentialElections?.map((election) => (
@@ -627,12 +623,10 @@ export default function ElectionsPage() {
               {/* Egypt map */}
               <div>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  {isAr ? "النتائج حسب المحافظة — 2024" : "Results by Governorate — 2024"}
+                  {t.elections_resultsByGovernorate}
                 </h2>
                 <p className="text-xs text-muted-foreground mb-4">
-                  {isAr
-                    ? "انقر على محافظة لعرض تفاصيلها · مرر الفأرة للمعاينة"
-                    : "Click a governorate for details · hover to preview"}
+                  {t.elections_mapInstructions}
                 </p>
                 <EgyptMap />
               </div>
@@ -645,7 +639,7 @@ export default function ElectionsPage() {
               <ParliamentarySummary />
               <div>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                  {isAr ? "الخريطة الانتخابية البرلمانية — 2020" : "Parliamentary Electoral Map — 2020"}
+                  {t.elections_parliamentaryMap}
                 </h2>
                 <EgyptMap />
               </div>
@@ -657,10 +651,10 @@ export default function ElectionsPage() {
             <div className="flex flex-col gap-4">
               <div className="mb-2">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">
-                  {isAr ? "الاستفتاءات الدستورية" : "Constitutional Referendums"}
+                  {t.elections_constitutionalReferendums}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  {isAr ? "جميع الاستفتاءات الدستورية منذ 2011" : "All constitutional referendums since 2011"}
+                  {t.elections_referendumsSince2011}
                 </p>
               </div>
               <ReferendumsTab />

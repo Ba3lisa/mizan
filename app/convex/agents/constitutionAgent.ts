@@ -8,7 +8,10 @@
 import { internalAction } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
-import { callLLM as callClaude } from "./providers/registry";
+import { z } from "zod";
+import { callLLMStructuredWithUsage } from "./providers/registry";
+import { ConstitutionExtractionSchema, zodToToolSchema } from "./schemas";
+import { verifyLLMOutput } from "./verify";
 
 const CONSTITUTION_PDF_URL =
   "https://faolex.fao.org/docs/pdf/egy127542e.pdf";
@@ -32,16 +35,16 @@ async function extractPdfText(url: string): Promise<string> {
 
 // ─── ARTICLE EXTRACTION VIA CLAUDE ──────────────────────────────────────────
 
-interface ExtractedArticle {
+type ExtractedArticle = {
   articleNumber: number;
   textEn: string;
   partNumber: number;
   wasAmended2019: boolean;
   keywords: string[];
-}
+};
 
 /**
- * Uses Claude to structure raw PDF text into individual articles.
+ * Uses Claude structured output to parse raw PDF text into individual articles.
  * Processes in batches to stay within token limits.
  */
 async function extractArticlesFromText(
@@ -50,7 +53,7 @@ async function extractArticlesFromText(
   endArticle: number
 ): Promise<Array<ExtractedArticle>> {
   const systemPrompt = `You are a legal document parser for the Egyptian Constitution of 2014 (with 2019 amendments).
-Extract individual articles from the raw PDF text. Respond with valid JSON only — no markdown, no prose.
+Extract individual articles from the raw PDF text.
 
 The Egyptian Constitution has 247 articles organized into 6 parts:
 - Part 1: State (Articles 1-6)
@@ -63,47 +66,47 @@ The Egyptian Constitution has 247 articles organized into 6 parts:
 For each article, extract:
 - articleNumber (integer)
 - textEn (the FULL English text of the article, every word)
-- partNumber (1-6 based on the ranges above)
-- wasAmended2019 (true if the article mentions "amended" or was modified in 2019)
+- textAr (leave empty string — Arabic to be added separately)
+- part (part name as string, e.g. "Part 1: State")
+- isAmended (true if the article was modified in 2019)
 - keywords (3-5 relevant keywords in English)`;
 
   const prompt = `Extract articles ${startArticle} through ${endArticle} from this Egyptian Constitution text.
-Return a JSON array of objects. Include the COMPLETE text of each article — do not summarize or truncate.
+Include the COMPLETE text of each article — do not summarize or truncate.
 
 PDF Text (relevant section):
-${rawText.slice(0, 30000)}
+${rawText.slice(0, 30000)}`;
 
-Return: [{"articleNumber": N, "textEn": "full text...", "partNumber": N, "wasAmended2019": bool, "keywords": ["..."]}]`;
+  const toolSchema = zodToToolSchema(
+    "extract_constitution_articles",
+    "Extract individual articles from the Egyptian Constitution PDF text",
+    ConstitutionExtractionSchema,
+  );
 
-  const response = await callClaude(prompt, systemPrompt);
-  if (!response) return [];
+  const { result } = await callLLMStructuredWithUsage<z.infer<typeof ConstitutionExtractionSchema>>(
+    prompt,
+    toolSchema,
+    systemPrompt,
+  );
 
-  try {
-    const parsed = JSON.parse(response) as Array<Record<string, unknown>>;
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter(
-        (a) =>
-          typeof a.articleNumber === "number" &&
-          typeof a.textEn === "string" &&
-          a.textEn.length > 10
-      )
-      .map((a) => ({
-        articleNumber: a.articleNumber as number,
-        textEn: a.textEn as string,
-        partNumber:
-          typeof a.partNumber === "number" ? a.partNumber : getPartNumber(a.articleNumber as number),
-        wasAmended2019:
-          typeof a.wasAmended2019 === "boolean" ? a.wasAmended2019 : false,
-        keywords: Array.isArray(a.keywords)
-          ? (a.keywords as Array<string>).slice(0, 5)
-          : [],
-      }));
-  } catch {
-    console.error("[constitutionAgent] Failed to parse Claude response");
+  if (!result) {
+    console.warn(`[constitutionAgent] No structured result for articles ${startArticle}-${endArticle}.`);
     return [];
   }
+
+  const verified = verifyLLMOutput(ConstitutionExtractionSchema, result, "constitution");
+  if (!verified.ok) {
+    console.error(`[constitutionAgent] REJECTED by verifier for batch ${startArticle}-${endArticle}:`, verified.errors.join("; "));
+    return [];
+  }
+
+  return verified.data.articles.map((a) => ({
+    articleNumber: a.articleNumber,
+    textEn: a.textEn,
+    partNumber: getPartNumber(a.articleNumber),
+    wasAmended2019: a.isAmended ?? false,
+    keywords: a.keywords?.slice(0, 5) ?? [],
+  }));
 }
 
 function getPartNumber(articleNumber: number): number {

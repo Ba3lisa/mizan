@@ -21,7 +21,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 export default function MethodologyPage() {
-  const { lang, dir } = useLanguage();
+  const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
   return (
@@ -36,19 +36,15 @@ export default function MethodologyPage() {
             </div>
             <div>
               <p className="text-xs font-semibold text-primary uppercase tracking-widest">
-                {isAr ? "المنهجية" : "Methodology"}
+                {t.navMethodology}
               </p>
               <h1 className="text-2xl md:text-3xl font-black">
-                {isAr
-                  ? "كيف يجمع ميزان البيانات ويتحقق منها"
-                  : "How Mizan gathers and verifies data"}
+                {t.methodology_title}
               </h1>
             </div>
           </div>
           <p className="text-sm text-muted-foreground max-w-2xl">
-            {isAr
-              ? "ميزان منصة شفافية — البيانات نفسها يجب أن تكون شفافة. كل رقم على ميزان مدعوم بمصدر رسمي موثق."
-              : "Mizan is a transparency platform — the data itself must be transparent. Every number on Mizan is backed by a cited official source."}
+            {t.methodology_desc}
           </p>
         </div>
 
@@ -57,13 +53,11 @@ export default function MethodologyPage() {
           <div className="flex items-center gap-2 mb-2">
             <Bot size={16} className="text-primary" />
             <h2 className="text-base font-bold uppercase tracking-widest text-primary">
-              {isAr ? "١. وكيل البيانات الآلي" : "1. AI Data Agent"}
+              {t.methodology_aiAgentHeading}
             </h2>
           </div>
           <p className="text-sm text-muted-foreground mb-6 max-w-xl">
-            {isAr
-              ? "نظام آلي يعمل كل ٦ ساعات لجمع البيانات والتحقق منها من المصادر الرسمية."
-              : "An automated system running every 12 hours to collect and verify data from official sources."}
+            {t.methodology_aiAgentDesc}
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
@@ -128,12 +122,10 @@ export default function MethodologyPage() {
 
           <p className="text-xs text-muted-foreground flex items-center gap-1.5">
             <Clock size={11} />
-            {isAr
-              ? "لعرض سجل كامل لعمليات التحديث ومصادر البيانات، زر صفحة الشفافية."
-              : "To see the full audit log, tracked sources, and data health dashboard, visit the Transparency page."}
+            {t.methodology_transparencyLink}
             {" "}
             <Link href="/transparency" className="text-primary no-underline hover:underline font-medium">
-              {isAr ? "لوحة الشفافية ←" : "Transparency Dashboard →"}
+              {t.methodology_transparencyDashboard}
             </Link>
           </p>
         </section>
@@ -145,11 +137,11 @@ export default function MethodologyPage() {
           <div className="flex items-center gap-2 mb-2">
             <ThumbsUp size={16} className="text-primary" />
             <h2 className="text-base font-bold uppercase tracking-widest text-primary">
-              {isAr ? "٢. اقتراح تصحيح" : "2. Propose Corrections"}
+              {t.methodology_correctionsHeading}
             </h2>
           </div>
           <p className="text-sm text-muted-foreground mb-6 max-w-xl">
-            {isAr ? "وجدت خطأ؟ ساعدنا في تصحيحه." : "Found an error? Help us fix it."}
+            {t.methodology_correctionsDesc}
           </p>
 
           <div className="flex flex-col gap-4">
@@ -161,7 +153,7 @@ export default function MethodologyPage() {
                   rel="noopener noreferrer"
                 >
                   <GitBranch size={14} />
-                  {isAr ? "الإبلاغ عن خطأ في البيانات" : "Report a Data Error"}
+                  {t.methodology_reportDataError}
                   <ExternalLink size={12} />
                 </a>
               </Button>
@@ -172,7 +164,7 @@ export default function MethodologyPage() {
                   rel="noopener noreferrer"
                 >
                   <AlertTriangle size={14} />
-                  {isAr ? "الإبلاغ عن خلل" : "Report a Bug"}
+                  {t.methodology_reportBug}
                   <ExternalLink size={12} />
                 </a>
               </Button>
@@ -183,15 +175,13 @@ export default function MethodologyPage() {
                   rel="noopener noreferrer"
                 >
                   <ThumbsUp size={14} />
-                  {isAr ? "اقتراح ميزة جديدة" : "Request a Feature"}
+                  {t.methodology_requestFeature}
                   <ExternalLink size={12} />
                 </a>
               </Button>
             </div>
             <p className="text-xs text-muted-foreground max-w-lg">
-              {isAr
-                ? "سيتم مراجعة التقرير تلقائياً من قبل مجلس الذكاء الاصطناعي (LLM Council) الخاص بميزان. المصادر الحكومية (.gov.eg) لها الأولوية القصوى."
-                : "Your report will be automatically reviewed by the Mizan LLM Council. Government sources (.gov.eg) have the highest priority."}
+              {t.methodology_reviewNote}
             </p>
           </div>
         </section>
@@ -203,13 +193,11 @@ export default function MethodologyPage() {
           <div className="flex items-center gap-2 mb-2">
             <Shield size={16} className="text-primary" />
             <h2 className="text-base font-bold uppercase tracking-widest text-primary">
-              {isAr ? "٣. السند — مستويات الثقة المرجعية" : "3. Sanad — Reference Confidence"}
+              {t.methodology_sanadHeading}
             </h2>
           </div>
           <p className="text-sm text-muted-foreground mb-6 max-w-xl">
-            {isAr
-              ? "كل بيان على ميزان مصحوب بمستوى سند يوضح مصدره ودرجة الثقة فيه. عند وجود تعارض بين المصادر، نعرض جميع القيم."
-              : "Every data point on Mizan carries a Sanad level indicating its source and confidence. When sources disagree, we show all values."}
+            {t.methodology_sanadDesc}
           </p>
 
           <div className="space-y-1.5 mb-6">
@@ -245,12 +233,10 @@ export default function MethodologyPage() {
               <AlertTriangle size={16} className="text-amber-500 mt-0.5 shrink-0" />
               <div>
                 <p className="text-xs font-bold text-amber-600 dark:text-amber-400 mb-1">
-                  {isAr ? "ملاحظة الشفافية" : "Transparency Note"}
+                  {t.methodology_transparencyNote}
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  {isAr
-                    ? "تصنيف مستويات السند هو الجزء الوحيد في ميزان الذي يتضمن رأياً بشرياً. نعمل على تطوير نظام تقييم مستقل عبر مجلس نماذج الذكاء الاصطناعي لتقليل الاعتماد على التقدير البشري."
-                    : "Sanad level assignment is the only opinionated part of Mizan. We are working on automating this via the LLM Council to make the platform less opinion-dependent."}
+                  {t.methodology_transparencyNoteDesc}
                 </p>
               </div>
             </CardContent>

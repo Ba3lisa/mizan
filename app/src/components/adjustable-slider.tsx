@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Slider } from "@/components/ui/slider";
 
 interface AdjustableSliderProps {
   value: number;
@@ -19,7 +20,6 @@ export function AdjustableSlider({
   defaultMin,
   defaultMax,
   step = 1,
-  accentColor,
   formatLabel = (v) => String(v),
   className,
 }: AdjustableSliderProps) {
@@ -30,20 +30,18 @@ export function AdjustableSlider({
 
   return (
     <div className={className}>
-      <input
+      <Slider
         dir="ltr"
-        type="range"
         min={min}
         max={max}
         step={step}
-        value={Math.min(max, Math.max(min, value))}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-1.5 cursor-pointer"
-        style={accentColor ? { accentColor } : undefined}
+        value={[Math.min(max, Math.max(min, value))]}
+        onValueChange={([v]) => onChange(v)}
       />
-      <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono mt-0.5" dir="ltr">
+      <div className="flex justify-between text-[0.625rem] text-muted-foreground font-mono mt-1.5" dir="ltr">
         {editingMin ? (
           <input
+            name="slider-min"
             type="number"
             autoFocus
             defaultValue={min}
@@ -62,6 +60,7 @@ export function AdjustableSlider({
         )}
         {editingMax ? (
           <input
+            name="slider-max"
             type="number"
             autoFocus
             defaultValue={max}

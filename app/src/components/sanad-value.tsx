@@ -19,7 +19,7 @@ export function SanadValue({
   mode = "compact",
   className,
 }: SanadValueProps) {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
   const [isExpanded, setIsExpanded] = useState(mode === "expanded");
 
@@ -65,9 +65,7 @@ export function SanadValue({
             className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[0.6rem] font-medium hover:bg-emerald-500/20 transition-colors"
           >
             <Check size={9} />
-            {isAr
-              ? `مؤكد من ${agreeingSources.length} مصادر`
-              : `${agreeingSources.length} sources agree`}
+            {`${agreeingSources.length} ${t.sanad_sourcesAgree}`}
             {isExpanded ? <ChevronUp size={9} /> : <ChevronDown size={9} />}
           </button>
           {/* Score indicator */}
@@ -97,7 +95,7 @@ export function SanadValue({
               <>
                 <p className="text-[0.55rem] text-amber-600 dark:text-amber-400 flex items-center gap-1 pt-1">
                   <AlertTriangle size={8} />
-                  {isAr ? "مصادر أخرى تختلف:" : "Other sources differ:"}
+                  {t.sanad_otherSourcesDiffer}
                 </p>
                 {conflictingSources.map((s, i) => {
                   const config = SANAD_CONFIG[s.sanadLevel] ?? SANAD_CONFIG[4];
@@ -164,7 +162,7 @@ export function SanadValue({
       })}
       <p className="text-[0.55rem] text-amber-600 dark:text-amber-400 flex items-center gap-1">
         <AlertTriangle size={8} />
-        {isAr ? "مصادر متعددة — القيم تختلف" : "Multiple sources — values differ"}
+        {t.sanad_multipleSourcesDiffer}
       </p>
     </div>
   );

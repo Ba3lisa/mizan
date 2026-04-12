@@ -1,33 +1,42 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 /**
  * Like useState but persists to localStorage.
  * Key is prefixed with "mizan-tool-" to avoid collisions.
- * Falls back to initialValue if localStorage is unavailable or value is invalid.
+ * Always initializes with `initialValue` on both server and client
+ * to avoid hydration mismatch, then restores from localStorage in useEffect.
  */
 export function usePersistedState<T>(
   key: string,
   initialValue: T
 ): [T, (value: T | ((prev: T) => T)) => void] {
   const storageKey = `mizan-tool-${key}`;
+  const hydrated = useRef(false);
 
-  const [state, setState] = useState<T>(() => {
-    if (typeof window === "undefined") return initialValue;
+  // Always start with initialValue (SSR-safe)
+  const [state, setState] = useState<T>(initialValue);
+
+  // Restore from localStorage after hydration
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
     try {
       const stored = localStorage.getItem(storageKey);
-      if (stored === null) return initialValue;
-      return JSON.parse(stored) as T;
+      if (stored !== null) {
+        setState(JSON.parse(stored) as T);
+      }
     } catch {
-      return initialValue;
+      // localStorage unavailable — keep initialValue
     }
-  });
+  }, [storageKey]);
 
-  // Sync to localStorage on change
+  // Sync to localStorage on change (skip the initial hydration restore)
   useEffect(() => {
+    if (!hydrated.current) return;
     try {
       localStorage.setItem(storageKey, JSON.stringify(state));
     } catch {
-      // localStorage full or unavailable — ignore
+      // localStorage full or unavailable
     }
   }, [storageKey, state]);
 

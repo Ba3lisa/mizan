@@ -15,21 +15,23 @@ function slugToName(slug: string): string {
   return slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+type TranslationsMap = Record<string, string>;
+
 function getRoleLabel(
   role: string | undefined,
-  isAr: boolean
+  t: TranslationsMap
 ): string {
-  if (role === "president") return isAr ? "رئيس الجمهورية" : "President";
-  if (role === "prime_minister") return isAr ? "رئيس الوزراء" : "Prime Minister";
-  if (role === "governor") return isAr ? "محافظ" : "Governor";
-  if (role === "mp") return isAr ? "نائب" : "MP";
-  if (role === "senator") return isAr ? "عضو مجلس الشيوخ" : "Senator";
-  if (role === "speaker") return isAr ? "رئيس البرلمان" : "Speaker";
-  return isAr ? "وزير" : "Minister";
+  if (role === "president") return t.official_rolePresident;
+  if (role === "prime_minister") return t.official_rolePM;
+  if (role === "governor") return t.official_roleGovernor;
+  if (role === "mp") return t.official_roleMP;
+  if (role === "senator") return t.official_roleSenator;
+  if (role === "speaker") return t.official_roleSpeaker;
+  return t.official_roleMinister;
 }
 
 export default function OfficialPageClient({ slug }: { slug: string }) {
-  const { lang, dir } = useLanguage();
+  const { lang, dir, t } = useLanguage();
   const isAr = lang === "ar";
 
   const official = useQuery(api.seo.getOfficialBySlug, { slug });
@@ -44,20 +46,20 @@ export default function OfficialPageClient({ slug }: { slug: string }) {
 
   const displayTitle = official ? (isAr ? official.titleAr : official.titleEn) : "";
 
-  const roleLabel = getRoleLabel(official?.role, isAr);
+  const roleLabel = getRoleLabel(official?.role, t as unknown as TranslationsMap);
 
   if (notFound) {
     return (
       <div className="page-content" dir={dir}>
         <div className="container-page text-center py-20">
           <p className="text-muted-foreground text-sm">
-            {isAr ? "لم يتم العثور على المسؤول" : "Official not found"}
+            {t.official_notFound}
           </p>
           <Link
             href="/government"
             className="text-primary hover:underline text-sm mt-4 inline-block"
           >
-            {isAr ? "← العودة للحكومة" : "← Back to Government"}
+            {t.official_backToGov}
           </Link>
         </div>
       </div>
@@ -70,11 +72,11 @@ export default function OfficialPageClient({ slug }: { slug: string }) {
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground mb-8">
           <Link href="/" className="hover:text-foreground">
-            {isAr ? "الرئيسية" : "Home"}
+            {t.navHome}
           </Link>
           <ChevronRight size={10} />
           <Link href="/government" className="hover:text-foreground">
-            {isAr ? "الحكومة" : "Government"}
+            {t.navGovernment}
           </Link>
           <ChevronRight size={10} />
           <span className="text-foreground">{displayName}</span>
@@ -83,9 +85,8 @@ export default function OfficialPageClient({ slug }: { slug: string }) {
         <Skeleton name="official-profile" loading={isLoading}>
           {/* Direct-answer paragraph for GEO (ChatGPT/Perplexity extraction) */}
           <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-            {isAr
-              ? `${displayName} هو ${displayTitle} في جمهورية مصر العربية${official?.appointmentDate ? `، تم تعيينه في ${official.appointmentDate}` : ""}.`
-              : `${displayName} is the ${displayTitle} of the Arab Republic of Egypt${official?.appointmentDate ? `, appointed on ${official.appointmentDate}` : ""}.`}
+            {displayName} {t.official_isThe} {displayTitle} {t.official_ofEgypt}
+            {official?.appointmentDate ? `, ${t.official_appointedOn} ${official.appointmentDate}` : ""}.
           </p>
 
           {/* Profile card */}
@@ -118,7 +119,7 @@ export default function OfficialPageClient({ slug }: { slug: string }) {
 
                   {official?.appointmentDate && (
                     <p className="text-xs text-muted-foreground mt-3 font-mono">
-                      {isAr ? "تاريخ التعيين:" : "Appointed:"}{" "}
+                      {t.official_appointedLabel}{" "}
                       {official.appointmentDate}
                     </p>
                   )}
@@ -130,7 +131,7 @@ export default function OfficialPageClient({ slug }: { slug: string }) {
                       rel="noopener noreferrer"
                       className="text-xs text-primary hover:underline mt-2 inline-block"
                     >
-                      {isAr ? "المصدر الرسمي" : "Official source"} ↗
+                      {t.official_officialSource} ↗
                     </a>
                   )}
                 </div>
@@ -156,7 +157,7 @@ export default function OfficialPageClient({ slug }: { slug: string }) {
             className="text-sm text-primary hover:underline inline-flex items-center gap-1"
           >
             <ArrowLeft size={14} />
-            {isAr ? "عرض كل المسؤولين" : "View all officials"}
+            {t.official_viewAll}
           </Link>
         </Skeleton>
 

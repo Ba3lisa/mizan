@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Scale, Moon, Sun, Menu } from "lucide-react";
-import { useTheme, useLanguage, useCurrency } from "@/components/providers";
+import { useTheme, useLanguage } from "@/components/providers";
 import { cn } from "@/lib/utils";
 import { NAV_GROUPS } from "@/lib/navigation";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,6 @@ import {
 export function Header() {
   const { theme, toggleTheme } = useTheme();
   const { t, toggleLang, lang, dir } = useLanguage();
-  const isAr = lang === "ar";
-  const { currency, toggleCurrency } = useCurrency();
   const pathname = usePathname();
   const [scrolled, setScrolled] = useState(false);
 
@@ -33,6 +31,7 @@ export function Header() {
     return () => window.removeEventListener("scroll", h);
   }, []);
 
+  const isAr = lang === "ar";
   // --- Grouped Navigation (from shared config) ---
   const navGroups = NAV_GROUPS.map((g) => ({
     label: isAr ? g.ar : g.en,
@@ -56,7 +55,7 @@ export function Header() {
           <div className="w-8 h-8 rounded-lg bg-primary text-primary-foreground flex items-center justify-center transition-transform group-hover:scale-105">
             <Scale size={15} strokeWidth={2} />
           </div>
-          <span className="font-black text-lg tracking-tight">{lang === "ar" ? "ميزان" : "Mizan"}</span>
+          <span className="font-black text-lg tracking-tight">{t.siteName}</span>
         </Link>
 
         {/* Desktop Nav — NavigationMenu for smooth hover-intent UX */}
@@ -117,11 +116,8 @@ export function Header() {
 
         {/* Controls */}
         <div className="flex items-center gap-1.5 ms-auto">
-          <Button variant="ghost" size="sm" onClick={toggleCurrency} className="text-xs font-bold h-8 px-3 text-muted-foreground hover:text-foreground font-mono">
-            {currency === "EGP" ? "USD" : "EGP"}
-          </Button>
           <Button variant="ghost" size="sm" onClick={toggleLang} className="text-xs font-bold h-8 px-3 text-muted-foreground hover:text-foreground">
-            {lang === "ar" ? "En" : "ع"}
+            {t.toggleLang}
           </Button>
           <Button variant="ghost" size="icon" onClick={toggleTheme} className="h-8 w-8 text-muted-foreground hover:text-foreground">
             {theme === "dark" ? <Sun size={15} /> : <Moon size={15} />}
@@ -134,7 +130,7 @@ export function Header() {
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
                   <div className="w-6 h-6 rounded bg-primary text-primary-foreground flex items-center justify-center"><Scale size={12} strokeWidth={2} /></div>
-                  {lang === "ar" ? "ميزان" : "Mizan"}
+                  {t.siteName}
                 </SheetTitle>
               </SheetHeader>
               <Separator className="my-3" />

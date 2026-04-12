@@ -10,7 +10,10 @@
 import { internalAction, ActionCtx } from "../_generated/server";
 import { internal } from "../_generated/api";
 import { v } from "convex/values";
-import { callLLM as callClaude } from "./providers/registry";
+import { z } from "zod";
+import { callLLMStructuredWithUsage } from "./providers/registry";
+import { ParliamentCompositionSchema, zodToToolSchema } from "./schemas";
+import { verifyLLMOutput } from "./verify";
 
 const WIKI_URL =
   "https://en.wikipedia.org/wiki/2025_Egyptian_parliamentary_election";
@@ -91,42 +94,45 @@ async function loadCompositionFromWikipedia(ctx: ActionCtx) {
 
   if (!wikiText) return;
 
-  const response = await callClaude(
+  const toolSchema = zodToToolSchema(
+    "extract_parliament_composition",
+    "Extract Egyptian parliament party composition from election data",
+    ParliamentCompositionSchema,
+  );
+
+  const { result } = await callLLMStructuredWithUsage<z.infer<typeof ParliamentCompositionSchema>>(
     `Extract the 2025 Egyptian House of Representatives election results.
-Return JSON: {"parties": [{"nameEn": "...", "nameAr": "...", "seats": N, "color": "#hex"}]}
 Include ALL parties and independents. Total should be 596 seats.
 
 Text: ${wikiText}`,
-    "Extract Egyptian parliament election data. JSON only, no markdown."
+    toolSchema,
+    "Extract Egyptian parliament election data into structured format.",
   );
 
-  if (!response) return;
-
-  try {
-    let jsonStr = response;
-    const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (fenceMatch) jsonStr = fenceMatch[1];
-    const parsed = JSON.parse(jsonStr.trim()) as {
-      parties?: Array<{ nameEn: string; nameAr: string; seats: number; color: string }>;
-    };
-
-    if (parsed.parties && parsed.parties.length > 0) {
-      await ctx.runMutation(
-        internal.parliamentQueries.upsertParliamentComposition,
-        {
-          parties: parsed.parties.map((p) => ({
-            nameEn: p.nameEn,
-            nameAr: p.nameAr || p.nameEn,
-            seats: p.seats,
-            color: p.color || "#7F8C8D",
-            chamber: "house" as const,
-          })),
-          sourceUrl: WIKI_URL,
-        }
-      );
-      console.log(`[parliamentAgent] Loaded ${parsed.parties.length} parties from Wikipedia`);
-    }
-  } catch {
-    console.error("[parliamentAgent] Failed to parse Wikipedia data");
+  if (!result) {
+    console.warn("[parliamentAgent] No structured result from LLM.");
+    return;
   }
+
+  const verified = verifyLLMOutput(ParliamentCompositionSchema, result, "parliament");
+  if (!verified.ok) {
+    console.error("[parliamentAgent] REJECTED by verifier:", verified.errors.join("; "));
+    return;
+  }
+
+  const { parties } = verified.data;
+  await ctx.runMutation(
+    internal.parliamentQueries.upsertParliamentComposition,
+    {
+      parties: parties.map((p) => ({
+        nameEn: p.nameEn,
+        nameAr: p.nameAr || p.nameEn,
+        seats: p.seats,
+        color: p.color ?? "#7F8C8D",
+        chamber: "house" as const,
+      })),
+      sourceUrl: WIKI_URL,
+    }
+  );
+  console.log(`[parliamentAgent] Loaded ${parties.length} parties from Wikipedia`);
 }
