@@ -2,7 +2,7 @@
 // OpenAI provider for the Mizan agentic layer.
 // Uses raw fetch (no SDK) — works with GPT-4o, GPT-4o-mini, etc.
 
-import type { LLMProvider, LLMCallResult, ToolSchema, ServerToolDef, CouncilEvaluationContext, CouncilVoteResult } from "./types";
+import type { LLMProvider, LLMCallResult, ToolSchema, _ServerToolDef, CouncilEvaluationContext, CouncilVoteResult } from "./types";
 import { COUNCIL_SYSTEM_PROMPT, buildCouncilPrompt } from "./councilPrompt";
 import { CouncilVoteSchema, zodToToolSchema } from "../schemas";
 

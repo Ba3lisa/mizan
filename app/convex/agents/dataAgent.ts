@@ -18,7 +18,7 @@ import {
 import { callLLMStructured, callLLMWithUsage, callLLMStructuredWithUsage, callLLMWebResearchStructured, getPrimaryProvider } from "./providers/registry";
 import { estimateCost } from "../lib/tokenCost";
 import { BudgetDataSchema, BudgetWikipediaSchema, CabinetDataSchema, GovernorsDataSchema, IMFIndicatorsExtractionSchema, InterestRateSchema, BankRatesSchema, StockIndexSchema, RawNewsListSchema, IDAOpportunitiesSchema, GAFIOpportunitiesSchema, IndustrialBenchmarksSchema, CostEstimatesSchema, IDAComplexesSchema, GAFIZonesSchema, InvestmentIncentivesSchema, zodToToolSchema } from "./schemas";
-import { parseAndVerify } from "./verify";
+import { parseAndVerify as _parseAndVerify } from "./verify";
 import { z } from "zod";
 
 // ─── COST TRACKING ───────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ import { z } from "zod";
  * Call the primary LLM provider and log usage to apiUsageLog for the funding page.
  * Provider-agnostic — routes through the registry to whichever provider is active.
  */
-async function callPrimaryLLM(
+async function _callPrimaryLLM(
   ctx: ActionCtx,
   prompt: string,
   systemPrompt?: string,
