@@ -254,3 +254,39 @@ html[dir="ltr"] { font-family: var(--font-body); line-height: 1.65; }
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ─── Guide Tour: driver.js overrides ────────────────────────────────────
+   driver.js sets `.driver-active * { pointer-events: none }` which blocks
+   ALL page interaction. We override to make tours non-blocking. */
+
+.driver-active * {
+  pointer-events: auto !important;
+}
+.driver-popover, .driver-popover * {
+  pointer-events: auto !important;
+}
+
+/* Dark theme popover */
+.driver-popover.mizan-tour {
+  background: var(--card, #1a1a2e);
+  color: var(--foreground, #e0e0e0);
+  border: 1px solid var(--border, #333);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  padding: 12px 16px;
+  max-width: 280px;
+}
+.driver-popover.mizan-tour .driver-popover-title {
+  color: var(--foreground, #fff);
+  font-size: 13px;
+  font-weight: 700;
+}
+.driver-popover.mizan-tour .driver-popover-description {
+  color: var(--muted-foreground, #999);
+  font-size: 11px;
+  margin-top: 4px;
+}
+.driver-popover.mizan-tour .driver-popover-arrow-side-top { border-top-color: var(--card, #1a1a2e); }
+.driver-popover.mizan-tour .driver-popover-arrow-side-bottom { border-bottom-color: var(--card, #1a1a2e); }
+.driver-popover.mizan-tour .driver-popover-arrow-side-left { border-left-color: var(--card, #1a1a2e); }
+.driver-popover.mizan-tour .driver-popover-arrow-side-right { border-right-color: var(--card, #1a1a2e); }

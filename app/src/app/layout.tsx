@@ -5,6 +5,7 @@ import { Providers } from "@/components/providers";
 import { Header } from "@/components/header";
 import { Footer } from "@/components/footer";
 import { WebMcpRegistration } from "@/components/web-mcp";
+// import { GuideChat } from "@/components/guide-chat";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://mizanmasr.com"),
@@ -142,9 +143,12 @@ export default function RootLayout({
       </head>
       <body className="bg-background text-foreground font-sans min-h-screen antialiased">
         <Providers>
-          <Header />
-          <main>{children}</main>
-          <Footer />
+          <div id="mizan-app" className="transition-all duration-300">
+            <Header />
+            <main>{children}</main>
+            <Footer />
+          </div>
+          {/* <GuideChat /> — disabled for prod, enable locally */}
           <WebMcpRegistration />
         </Providers>
       </body>
