@@ -51,12 +51,12 @@ export function NewsTicker() {
     const el = scrollRef.current;
     if (el) {
       el.scrollTop += SCROLL_SPEED;
-      // Reset to top of first copy for seamless infinite loop
       const half = el.scrollHeight / 2;
       if (el.scrollTop >= half) {
         el.scrollTop -= half;
       }
     }
+    // eslint-disable-next-line react-hooks/immutability
     rafRef.current = requestAnimationFrame(tick);
   }, []);
 
