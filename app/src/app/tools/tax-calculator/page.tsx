@@ -222,25 +222,31 @@ export default function TaxCalculatorPage() {
   const _isLoading = convexBrackets === undefined || convexSpending === undefined;
 
   // All data from Convex -- no hardcoded fallbacks
-  const TAX_BRACKETS: Bracket[] = convexBrackets
-    ? convexBrackets.map((b) => ({
-        from: b.fromAmount,
-        to: b.toAmount ?? null,
-        rate: b.rate,
-      }))
-    : [];
+  const TAX_BRACKETS: Bracket[] = useMemo(() =>
+    convexBrackets
+      ? convexBrackets.map((b) => ({
+          from: b.fromAmount,
+          to: b.toAmount ?? null,
+          rate: b.rate,
+        }))
+      : [],
+    [convexBrackets]
+  );
 
   const personalExemption = convexBrackets?.[0]?.personalExemption ?? 0;
 
-  const SPENDING: SpendingCategory[] = convexSpending?.items
-    ? convexSpending.items.map((item, i) => ({
-        key: `sector_${i}`,
-        nameAr: item.sectorAr,
-        nameEn: item.sectorEn,
-        pct: item.percentageOfTotal,
-        color: SECTOR_COLORS[item.sectorEn] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length],
-      }))
-    : [];
+  const SPENDING: SpendingCategory[] = useMemo(() =>
+    convexSpending?.items
+      ? convexSpending.items.map((item, i) => ({
+          key: `sector_${i}`,
+          nameAr: item.sectorAr,
+          nameEn: item.sectorEn,
+          pct: item.percentageOfTotal,
+          color: SECTOR_COLORS[item.sectorEn] ?? FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+        }))
+      : [],
+    [convexSpending]
+  );
 
   const handleInput = useCallback((raw: string) => {
     setInputVal(raw);
@@ -257,7 +263,6 @@ export default function TaxCalculatorPage() {
   const healthAmount = (taxPaid * 4.7) / 100;
 
   // ─── WebMCP: expose tax calculator to AI agents ────────────────────────────
-  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const inputSchema = useMemo(() => ({
     type: "object" as const,
     properties: {
@@ -276,7 +281,6 @@ export default function TaxCalculatorPage() {
     description: "Calculate Egyptian income tax for a given annual salary. Returns tax amount, effective rate, and a breakdown showing how the tax is distributed across government budget sectors (debt service, education, health, etc.).",
     title: "Egypt Tax Calculator",
     inputSchema,
-    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     execute: useCallback((input: Record<string, unknown>) => {
       const sal = Number(input.annualSalary);
       if (!sal || sal < MIN_SALARY || sal > MAX_SALARY) {
@@ -307,7 +311,6 @@ export default function TaxCalculatorPage() {
           amountEgp: Math.round((tax * cat.pct) / 100),
         })),
       });
-    // eslint-disable-next-line react-hooks/preserve-manual-memoization
     }, [TAX_BRACKETS, SPENDING, personalExemption, setSalary, setInputVal]),
   });
 
