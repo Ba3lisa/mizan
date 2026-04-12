@@ -3328,3 +3328,13 @@ Extract the COMPLETE incentive structure including general incentives, sector A/
     console.log(`[deepScrape/pass2] Complete. Total enriched: ${totalUpdated}`);
   },
 });
+
+// Public trigger for manual pipeline runs (e.g. from CLI: npx convex run agents/dataAgent:triggerRefresh --prod)
+import { action } from "../_generated/server";
+export const triggerRefresh = action({
+  args: {},
+  handler: async (ctx) => {
+    await ctx.scheduler.runAfter(0, internal.agents.dataAgent.orchestrateRefresh, {});
+    return "Pipeline scheduled";
+  },
+});
