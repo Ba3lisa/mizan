@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useLanguage } from "@/components/providers";
 import { Newspaper, ExternalLink } from "lucide-react";
 
@@ -23,12 +23,17 @@ function relativeTime(epochMs: number): string {
   return `${days}d ago`;
 }
 
+const SCROLL_SPEED = 0.5; // pixels per frame
+
 export function NewsTicker() {
   const { lang } = useLanguage();
   const isAr = lang === "ar";
   const [headlines, setHeadlines] = useState<Headline[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hovered, setHovered] = useState(false);
   const fetchedRef = useRef(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef<number>(0);
 
   useEffect(() => {
     if (fetchedRef.current) return;
@@ -41,6 +46,26 @@ export function NewsTicker() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // JS-based auto-scroll via scrollTop for seamless loop + native scroll on hover
+  const tick = useCallback(() => {
+    const el = scrollRef.current;
+    if (el) {
+      el.scrollTop += SCROLL_SPEED;
+      // Reset to top of first copy for seamless infinite loop
+      const half = el.scrollHeight / 2;
+      if (el.scrollTop >= half) {
+        el.scrollTop -= half;
+      }
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  }, []);
+
+  useEffect(() => {
+    if (hovered || headlines.length === 0) return;
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [hovered, headlines.length, tick]);
 
   return (
     <div className="relative group/ticker h-full">
@@ -73,18 +98,18 @@ export function NewsTicker() {
             {isAr ? "لا توجد أخبار حالياً" : "No news available"}
           </div>
         ) : (
-          <div className="ticker-wrap relative flex-1 overflow-hidden">
+          <div className="relative flex-1 overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-6 z-10 pointer-events-none bg-gradient-to-b from-card/90 to-transparent" />
             <div
-              className="ticker-track flex flex-col"
-              style={{
-                animation: `ticker-scroll ${Math.max(25, headlines.length * 3)}s linear infinite`,
-                willChange: "transform",
-              }}
+              ref={scrollRef}
+              className="h-full overflow-y-auto scrollbar-thin"
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
             >
               {headlines.map((h, i) => (
                 <HeadlineCard key={i} headline={h} />
               ))}
+              {/* Duplicate for seamless infinite loop */}
               {headlines.map((h, i) => (
                 <HeadlineCard key={`dup-${i}`} headline={h} />
               ))}

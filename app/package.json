@@ -12,15 +12,10 @@
   },
   "dependencies": {
     "@convex-dev/auth": "^0.0.90",
-    "@deck.gl/react": "^9.2.11",
-    "@luma.gl/core": "^9.2.6",
-    "@luma.gl/webgl": "^9.2.6",
     "@nivo/core": "^0.99.0",
     "@nivo/sankey": "^0.99.0",
     "@tailwindcss/postcss": "^4.2.2",
     "@tanstack/react-table": "^8.21.3",
-    "@types/d3": "^7.4.3",
-    "@types/topojson-client": "^3.1.5",
     "@visx/axis": "^3.12.0",
     "@visx/gradient": "^3.12.0",
     "@visx/group": "^3.12.0",
@@ -32,9 +27,7 @@
     "clsx": "^2.1.0",
     "cmdk": "^1.1.1",
     "convex": "^1.19.0",
-    "d3": "^7.9.0",
     "date-fns": "^4.1.0",
-    "deck.gl": "^9.2.11",
     "framer-motion": "^12.38.0",
     "fuse.js": "^7.3.0",
     "lucide-react": "^0.460.0",
@@ -48,7 +41,6 @@
     "recharts": "^3.8.0",
     "sonner": "^2.0.0",
     "tailwind-merge": "^3.0.0",
-    "topojson-client": "^3.1.0",
     "zod": "^3.23.0"
   },
   "lint-staged": {
