@@ -51,6 +51,7 @@ function parseGuideActions(msg: UIMessage): GuideAction[] {
 
 async function triggerHighlight(selector: string, title: string, description: string) {
   const { driver } = await import("driver.js");
+  // @ts-expect-error CSS import handled by webpack
   await import("driver.js/dist/driver.css");
   const origScroll = window.scrollTo;
   const d = driver({
