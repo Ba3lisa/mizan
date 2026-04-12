@@ -1,0 +1,54 @@
+{
+  "spec": "webmcp/0.1",
+  "site": {
+    "name": "Mizan — Egypt's Government, Made Visible",
+    "version": "2026.04",
+    "description": "Transparency platform for Egyptian government data. Interactive financial tools powered by live data from World Bank, IMF, Ministry of Finance, IDA, and GAFI.",
+    "contact": "https://github.com/essamgouda97/mizan",
+    "pages": [
+      {
+        "url": "/tools/tax-calculator",
+        "title": "Egypt Tax Calculator",
+        "intents": ["calculate_egypt_tax"],
+        "description": "Calculate Egyptian income tax and see how your taxes are distributed across government budget sectors."
+      },
+      {
+        "url": "/tools/buy-vs-rent",
+        "title": "Buy vs Rent Calculator (Egypt)",
+        "intents": ["compare_buy_vs_rent"],
+        "description": "Compare total cost of buying vs renting a home in Egypt with mortgage, inflation, and EGP depreciation factors."
+      },
+      {
+        "url": "/tools/invest",
+        "title": "Egypt Investment Simulator",
+        "intents": ["simulate_egypt_investment"],
+        "description": "Simulate portfolio returns across Egyptian stocks, bank CDs, treasury bills, real estate, gold, and international indices."
+      },
+      {
+        "url": "/tools/mashroaak",
+        "title": "Mashrou'ak — Investment Opportunity Explorer",
+        "intents": ["search_egypt_investment_opportunities"],
+        "description": "Search real investment opportunities from IDA and GAFI — industrial units, land plots, free zones, and SME programs."
+      }
+    ],
+    "flows": [
+      {
+        "id": "personal_finance_analysis",
+        "description": "Complete personal financial analysis: calculate tax burden, compare buying vs renting, and simulate investment strategies",
+        "steps": [
+          { "intent": "calculate_egypt_tax", "page": "/tools/tax-calculator", "description": "First, calculate how much tax you pay and where it goes" },
+          { "intent": "compare_buy_vs_rent", "page": "/tools/buy-vs-rent", "description": "Then decide whether to buy or rent based on your situation" },
+          { "intent": "simulate_egypt_investment", "page": "/tools/invest", "description": "Finally, simulate investment strategies for your savings" }
+        ]
+      },
+      {
+        "id": "business_opportunity_finder",
+        "description": "Find investment opportunities matching your budget and simulate returns",
+        "steps": [
+          { "intent": "simulate_egypt_investment", "page": "/tools/invest", "description": "Understand expected returns for different capital amounts" },
+          { "intent": "search_egypt_investment_opportunities", "page": "/tools/mashroaak", "description": "Find real industrial and investment opportunities matching your budget" }
+        ]
+      }
+    ]
+  }
+}
