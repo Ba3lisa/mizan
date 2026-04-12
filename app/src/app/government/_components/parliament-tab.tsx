@@ -129,10 +129,12 @@ function InteractiveHemicycle({ chamber, parties }: { chamber: "house" | "senate
 
   const hoveredPartyData = hoveredSeat !== null ? parties.find(p => p.id === seats[hoveredSeat.idx]?.partyId) : null;
 
+  const { t } = useLanguage();
+
   if (seats.length === 0) {
     return (
       <p className="text-center text-muted-foreground py-20">
-        {isAr ? "لا توجد بيانات متاحة" : "No data available"}
+        {t.common_noData}
       </p>
     );
   }
@@ -201,7 +203,7 @@ function InteractiveHemicycle({ chamber, parties }: { chamber: "house" | "senate
               ) : (
                 <>
                   <p className="font-semibold text-foreground">{isAr ? hoveredPartyData.nameAr : hoveredPartyData.nameEn}</p>
-                  <p className="text-muted-foreground">{chamber === "house" ? hoveredPartyData.houseSeats : hoveredPartyData.senateSeats} {isAr ? "مقعد" : "seats"}</p>
+                  <p className="text-muted-foreground">{chamber === "house" ? hoveredPartyData.houseSeats : hoveredPartyData.senateSeats} {t.seats}</p>
                 </>
               )}
             </div>
@@ -222,10 +224,10 @@ function InteractiveHemicycle({ chamber, parties }: { chamber: "house" | "senate
               <p className="text-base font-bold text-foreground">
                 {memberInfo
                   ? (isAr ? memberInfo.nameAr : memberInfo.nameEn)
-                  : (isAr ? "عضو غير محدد" : "Unidentified member")}
+                  : t.parlTab_unidentifiedMember}
               </p>
               <p className="text-sm text-muted-foreground">
-                {partyData ? (isAr ? partyData.nameAr : partyData.nameEn) : (isAr ? "مستقل" : "Independent")}
+                {partyData ? (isAr ? partyData.nameAr : partyData.nameEn) : t.parlTab_independent}
               </p>
               {memberInfo?.govAr && (
                 <p className="text-xs text-muted-foreground/70 mt-1">{isAr ? memberInfo.govAr : memberInfo.govEn}</p>
@@ -273,7 +275,7 @@ function InteractiveHemicycle({ chamber, parties }: { chamber: "house" | "senate
 // ─── Party Distribution ───────────────────────────────────────────────────────
 
 function PartyDistribution({ chamber, parties, onPartyFilter }: { chamber: "house" | "senate"; parties: Party[]; onPartyFilter: (id: string) => void }) {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const isAr = lang === "ar";
   const [hoveredParty, setHoveredParty] = useState<string | null>(null);
 
@@ -285,7 +287,7 @@ function PartyDistribution({ chamber, parties, onPartyFilter }: { chamber: "hous
   if (parties.length === 0) {
     return (
       <p className="text-center text-muted-foreground py-20">
-        {isAr ? "لا توجد بيانات متاحة" : "No data available"}
+        {t.common_noData}
       </p>
     );
   }
@@ -295,7 +297,7 @@ function PartyDistribution({ chamber, parties, onPartyFilter }: { chamber: "hous
       {/* Stacked bar */}
       <div>
         <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
-          {isAr ? "التوزيع الحزبي" : "Party Distribution"} -- <span className="font-mono">{total}</span> {isAr ? "مقعد" : "seats"}
+          {t.partyDistribution} -- <span className="font-mono">{total}</span> {t.seats}
         </p>
         <div className="w-full h-10 rounded-lg overflow-hidden flex">
           {parties.map((p) => {
@@ -341,7 +343,7 @@ function PartyDistribution({ chamber, parties, onPartyFilter }: { chamber: "hous
               <div className="flex items-end justify-between">
                 <div>
                   <span className="font-mono text-2xl font-bold text-foreground tabular-nums">{seatCount}</span>
-                  <span className="text-xs text-muted-foreground ms-1">{isAr ? "مقعد" : "seats"}</span>
+                  <span className="text-xs text-muted-foreground ms-1">{t.seats}</span>
                 </div>
                 <span className="font-mono text-sm text-muted-foreground">{pct}%</span>
               </div>
@@ -433,7 +435,7 @@ function MemberDirectory({
       <Skeleton name="parliament-directory" loading={isLoading}>
         {realMembers.length === 0 ? (
           <p className="text-center text-muted-foreground py-12">
-            {isAr ? "جاري تحميل بيانات الأعضاء..." : "Loading member data..."}
+            {t.parlTab_loadingMembers}
           </p>
         ) : (
           <>
@@ -449,7 +451,7 @@ function MemberDirectory({
                     <div className="w-2 h-2 rounded-full mt-1.5 shrink-0" style={{ background: partyColor }} />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">{name}</p>
-                      <p className="text-xs text-muted-foreground truncate">{partyName ?? (isAr ? "مستقل" : "Independent")}</p>
+                      <p className="text-xs text-muted-foreground truncate">{partyName ?? t.parlTab_independent}</p>
                       {govName && <p className="text-[0.625rem] text-muted-foreground/70">{govName}</p>}
                       {m.constituency && <p className="text-[0.625rem] text-muted-foreground/50">{m.constituency}</p>}
                     </div>
@@ -462,13 +464,13 @@ function MemberDirectory({
             {totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-2">
                 <Button variant="outline" size="sm" onClick={() => setPage(Math.max(0, page - 1))} disabled={page === 0}>
-                  {isAr ? "السابق" : "Prev"}
+                  {t.common_prev}
                 </Button>
                 <span className="text-xs text-muted-foreground">
                   {page + 1} / {totalPages}
                 </span>
                 <Button variant="outline" size="sm" onClick={() => setPage(Math.min(totalPages - 1, page + 1))} disabled={page >= totalPages - 1}>
-                  {isAr ? "التالي" : "Next"}
+                  {t.common_next}
                 </Button>
               </div>
             )}
@@ -478,7 +480,7 @@ function MemberDirectory({
 
       <div className="flex items-center justify-between">
         <p className="text-xs text-muted-foreground">
-          {isAr ? `عرض ${realMembers.length} عضو` : `Showing ${realMembers.length} members`}
+          {t.parlTab_showing} {realMembers.length} {t.members}
         </p>
         <a href="https://parliament.gov.eg" target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
           parliament.gov.eg
@@ -491,7 +493,7 @@ function MemberDirectory({
 // ─── Committees Tab ───────────────────────────────────────────────────────────
 
 function CommitteesTab() {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const isAr = lang === "ar";
 
   const liveHouseCommittees = useQuery(api.parliament.listCommittees, { chamber: "house" });
@@ -503,7 +505,7 @@ function CommitteesTab() {
     <Skeleton name="parliament-committees" loading={isLoading}>
       <div className="flex flex-col gap-2">
         {!isLoading && (!liveHouseCommittees || liveHouseCommittees.length === 0) ? (
-          <p className="text-center text-muted-foreground py-20">{isAr ? "لا توجد بيانات متاحة" : "No data available"}</p>
+          <p className="text-center text-muted-foreground py-20">{t.common_noData}</p>
         ) : (
           (liveHouseCommittees ?? []).map((committee) => {
             const isExpanded = expandedId === committee._id;
@@ -521,7 +523,7 @@ function CommitteesTab() {
                         <Badge variant="secondary" className="text-xs">
                           {committee.type}
                         </Badge>
-                        <span className="text-xs text-muted-foreground font-mono">{""} {isAr ? "عضو" : "members"}</span>
+                        <span className="text-xs text-muted-foreground font-mono">{""} {t.members}</span>
                       </div>
                     </div>
                   </div>
@@ -531,7 +533,7 @@ function CommitteesTab() {
                 {isExpanded && (
                   <div className="px-5 pb-4 border-t border-border bg-muted/10">
                     <p className="text-xs text-muted-foreground mt-3">
-                      {isAr ? "عدد الأعضاء:" : "Members:"} {""}
+                      {t.parlTab_membersCount} {""}
                     </p>
                   </div>
                 )}
@@ -625,7 +627,7 @@ export function ParliamentTab() {
       {/* Sub-header */}
       <div>
         <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-          {isAr ? "السلطة التشريعية" : "Legislative Branch"}
+          {t.parlTab_legislativeBranch}
         </p>
         <p className="text-muted-foreground">{t.parliamentDesc}</p>
       </div>
@@ -634,11 +636,11 @@ export function ParliamentTab() {
       <Tabs value={chamber} onValueChange={(v) => setChamber(v as "house" | "senate")}>
         <TabsList className="mb-2">
           <TabsTrigger value="house">
-            {isAr ? "مجلس النواب" : "House"}{" "}
+            {t.parlTab_house}{" "}
             {houseSeats > 0 && <span className="ms-1.5 font-mono text-xs opacity-60">{houseSeats}</span>}
           </TabsTrigger>
           <TabsTrigger value="senate">
-            {isAr ? "مجلس الشيوخ" : "Senate"}{" "}
+            {t.senate}{" "}
             {senateSeats > 0 && <span className="ms-1.5 font-mono text-xs opacity-60">{senateSeats}</span>}
           </TabsTrigger>
         </TabsList>
@@ -659,30 +661,30 @@ export function ParliamentTab() {
               <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{houseCommitteeCount > 0 ? houseCommitteeCount : "--"}</p>
             </div>
             <div>
-              <p className="text-xs text-muted-foreground mb-1">{isAr ? "الأحزاب" : "Parties"}</p>
+              <p className="text-xs text-muted-foreground mb-1">{t.parlTab_parties}</p>
               <p className="font-mono text-3xl font-bold text-foreground tabular-nums">{parties.length > 0 ? parties.length : "--"}</p>
             </div>
           </div>
         </Skeleton>
 
         {parties.length === 0 && !isLoading ? (
-          <p className="text-center text-muted-foreground py-20">{isAr ? "لا توجد بيانات متاحة" : "No data available"}</p>
+          <p className="text-center text-muted-foreground py-20">{t.common_noData}</p>
         ) : (
           /* Sub-tabs */
-          <Tabs value={subTab} onValueChange={setSubTab}>
+          <Tabs data-guide="party-chart" value={subTab} onValueChange={setSubTab}>
             <TabsList className="mb-6">
-              <TabsTrigger value="hemicycle">{isAr ? "خريطة المقاعد" : "Seat Map"}</TabsTrigger>
-              <TabsTrigger value="distribution">{isAr ? "التوزيع الحزبي" : "Party Distribution"}</TabsTrigger>
-              <TabsTrigger value="directory">{isAr ? "دليل الأعضاء" : "Member Directory"}</TabsTrigger>
-              <TabsTrigger value="committees">{isAr ? "اللجان" : "Committees"}</TabsTrigger>
+              <TabsTrigger value="hemicycle">{t.hemicycle}</TabsTrigger>
+              <TabsTrigger value="distribution">{t.partyDistribution}</TabsTrigger>
+              <TabsTrigger value="directory">{t.memberDirectory}</TabsTrigger>
+              <TabsTrigger value="committees">{t.committees}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="hemicycle">
               <div className="max-w-3xl">
                 <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-                  {chamber === "house" ? (isAr ? "مجلس النواب" : "House of Representatives") : (isAr ? "مجلس الشيوخ" : "Senate")} --{" "}
+                  {chamber === "house" ? t.houseOfReps : t.senate} --{" "}
                   <span className="font-mono">{activeSeats}</span>{" "}
-                  {isAr ? "مقعد" : "seats"}
+                  {t.seats}
                 </p>
                 <Skeleton name="parliament-hemicycle" loading={isLoading}>
                   <InteractiveHemicycle chamber={chamber} parties={parties} />

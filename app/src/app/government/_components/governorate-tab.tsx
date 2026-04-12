@@ -141,6 +141,7 @@ function GovernorateDetail({
   governorateId: Id<"governorates">;
   isAr: boolean;
 }) {
+  const { t } = useLanguage();
   const governorate = useQuery(api.government.getGovernorate, { governorateId });
   const members = useQuery(api.parliament.getMembersByGovernorate, {
     governorateId,
@@ -177,7 +178,7 @@ function GovernorateDetail({
       {!isLoading && governorate === null ? (
         <Card className="border-border/60 bg-card/60">
           <CardContent className="p-8 text-center text-muted-foreground text-sm">
-            {isAr ? "لم يتم العثور على بيانات المحافظة" : "Governorate data not found"}
+            {t.govTab_govNotFound}
           </CardContent>
         </Card>
       ) : null}
@@ -205,7 +206,7 @@ function GovernorateDetail({
                     {governorate.population && (
                       <Badge variant="secondary" className="text-xs">
                         {(governorate.population / 1_000_000).toFixed(1)}M{" "}
-                        {isAr ? "نسمة" : "people"}
+                        {t.govTab_people}
                       </Badge>
                     )}
                   </div>
@@ -215,7 +216,7 @@ function GovernorateDetail({
                   <div className="flex items-center gap-3 flex-wrap">
                     <div>
                       <p className="text-[0.625rem] text-muted-foreground uppercase tracking-widest">
-                        {isAr ? "المحافظ" : "Governor"}
+                        {t.governor}
                       </p>
                       {governorName ? (
                         <>
@@ -224,13 +225,13 @@ function GovernorateDetail({
                           </p>
                           {governorAppointed && (
                             <p className="text-[0.625rem] text-muted-foreground font-mono">
-                              {isAr ? "عُيِّن:" : "Appointed:"} {governorAppointed}
+                              {t.govTab_appointed} {governorAppointed}
                             </p>
                           )}
                         </>
                       ) : (
                         <p className="text-sm text-muted-foreground/60">
-                          {isAr ? "غير متاح" : "Not available"}
+                          {t.govTab_notAvailable}
                         </p>
                       )}
                     </div>
@@ -243,7 +244,7 @@ function GovernorateDetail({
           {/* Key stats from pipeline with Sanad levels */}
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-              {isAr ? "المؤشرات الرئيسية" : "Key Indicators"}
+              {t.govTab_keyIndicators}
             </p>
             {stats && stats.length > 0 ? (
               <GovernorateStatsGrid stats={stats} isAr={isAr} />
@@ -260,9 +261,7 @@ function GovernorateDetail({
                 <div className="col-span-1 sm:col-span-2 rounded-xl p-4 border border-border/40 bg-card/40 flex items-center gap-3">
                   <Database size={14} className="text-muted-foreground/40 flex-shrink-0" />
                   <p className="text-[0.625rem] text-muted-foreground/60 leading-relaxed">
-                    {isAr
-                      ? "المزيد من الإحصائيات ستُضاف بواسطة وكيل البيانات"
-                      : "More stats will be added by the data agent"}
+                    {t.govTab_moreStatsComingSoon}
                   </p>
                 </div>
               </div>
@@ -272,14 +271,14 @@ function GovernorateDetail({
           {/* MPs / Senators */}
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-3">
-              {isAr ? "ممثلو المحافظة في البرلمان" : "Parliamentary Representatives"}
+              {t.govTab_parliamentaryReps}
             </p>
             {(members ?? []).length === 0 ? (
               <Card className="border-border/60 bg-card/60">
                 <CardContent className="p-8 text-center">
                   <Database size={18} className="mx-auto mb-2 text-muted-foreground/30" />
                   <p className="text-sm text-muted-foreground">
-                    {isAr ? "لا توجد بيانات برلمانية لهذه المحافظة" : "No parliamentary data for this governorate"}
+                    {t.govTab_noParliamentaryData}
                   </p>
                 </CardContent>
               </Card>
@@ -290,24 +289,16 @@ function GovernorateDetail({
                     ? isAr
                       ? member.official.nameAr
                       : member.official.nameEn
-                    : isAr
-                      ? "غير معروف"
-                      : "Unknown";
+                    : t.govTab_unknown;
                   const partyName = member.party
                     ? isAr
                       ? member.party.nameAr
                       : member.party.nameEn
-                    : isAr
-                      ? "مستقل"
-                      : "Independent";
+                    : t.parlTab_independent;
                   const chamberLabel =
                     member.chamber === "house"
-                      ? isAr
-                        ? "النواب"
-                        : "House"
-                      : isAr
-                        ? "الشيوخ"
-                        : "Senate";
+                      ? t.parlTab_house
+                      : t.senate;
 
                   return (
                     <Card key={member._id} className="border-border/60 bg-card/60">
@@ -342,7 +333,7 @@ function GovernorateDetail({
 // ─── Governorate Tab ──────────────────────────────────────────────────────────
 
 export function GovernorateTab() {
-  const { lang, dir } = useLanguage();
+  const { lang, dir, t } = useLanguage();
   const isAr = lang === "ar";
   const [selectedId, setSelectedId] = useState<string>("");
 
@@ -351,16 +342,14 @@ export function GovernorateTab() {
   const isLoading = governorates === undefined;
 
   return (
-    <div>
+    <div data-guide="governorates-list">
       {/* Sub-header */}
       <div className="mb-6">
         <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-1">
-          {isAr ? "بياناتك المحلية" : "Your Local Data"}
+          {t.govTab_yourLocalData}
         </p>
         <p className="text-muted-foreground text-sm max-w-lg">
-          {isAr
-            ? "اختر محافظتك لعرض البيانات المحلية — المحافظ، النواب، الإحصاءات الاجتماعية والاقتصادية"
-            : "Select your governorate to see local data — governor, MPs, social and economic stats"}
+          {t.govTab_selectDesc}
         </p>
       </div>
 
@@ -370,9 +359,7 @@ export function GovernorateTab() {
           <Select value={selectedId} onValueChange={setSelectedId} dir={dir}>
             <SelectTrigger className="w-full">
               <SelectValue
-                placeholder={
-                  isAr ? "اختر المحافظة..." : "Select a governorate..."
-                }
+                placeholder={t.govTab_selectPlaceholder}
               />
             </SelectTrigger>
             <SelectContent>
@@ -384,7 +371,7 @@ export function GovernorateTab() {
                 ))
               ) : (
                 <SelectItem value="_empty" disabled>
-                  {isAr ? "لا توجد بيانات" : "No data available"}
+                  {t.common_noData}
                 </SelectItem>
               )}
             </SelectContent>
@@ -398,9 +385,7 @@ export function GovernorateTab() {
           <CardContent className="p-12 text-center text-muted-foreground">
             <MapPin size={24} className="mx-auto mb-3 opacity-40" />
             <p className="text-sm">
-              {isAr
-                ? "اختر محافظة من القائمة أعلاه"
-                : "Select a governorate from the list above"}
+              {t.govTab_selectPrompt}
             </p>
           </CardContent>
         </Card>
@@ -412,12 +397,10 @@ export function GovernorateTab() {
           <CardContent className="p-12 text-center">
             <Database size={24} className="mx-auto mb-3 text-muted-foreground/40" />
             <p className="text-sm font-medium text-foreground mb-1">
-              {isAr ? "لا توجد بيانات بعد" : "No data available yet"}
+              {t.govTab_noDataYet}
             </p>
             <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-              {isAr
-                ? "سيتم تحميل بيانات المحافظات بواسطة وكيل البيانات"
-                : "Governorate data will be loaded by the data agent"}
+              {t.govTab_dataAgentWillLoad}
             </p>
           </CardContent>
         </Card>

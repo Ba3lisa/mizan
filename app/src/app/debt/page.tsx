@@ -4,7 +4,8 @@ import { useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
-import { useLanguage, useCurrency } from "@/components/providers";
+import { useLanguage } from "@/components/providers";
+import { fmtEGP, fmtUSD } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -61,17 +62,18 @@ const _REGIONAL_WB_CODES: Record<string, string> = {
 
 // ─── Debt Timeline SVG ────────────────────────────────────────────────────────
 
+const EGP_PER_USD = 50.0;
+
 function DebtTimeline() {
-  const { lang } = useLanguage();
-  const { symbol, fromUSD, fromEGP, fmt } = useCurrency();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
   const [hoveredYear, setHoveredYear] = useState<number | null>(null);
 
-  // External debt in USD billions, domestic in EGP billions — both converted to user's currency
-  const fmtExtB = (v: number) => `${symbol} ${fmt(fromUSD(v), { decimals: 1 })}B`;
-  const fmtDomB = (v: number) => `${symbol} ${fmt(fromEGP(v), { compact: true })}B`;
+  // External debt in USD billions, domestic in EGP billions
+  const fmtExtB = (v: number) => fmtUSD(v * 1e9, { decimals: 1, compact: true });
+  const fmtDomB = (v: number) => fmtEGP(v * 1e9, { compact: true });
   const fmtTotalB = (ext: number, dom: number) =>
-    `${symbol} ${fmt(fromUSD(ext) + fromEGP(dom), { compact: true })}B`;
+    `${fmtUSD(ext * 1e9 + (dom * 1e9) / EGP_PER_USD, { compact: true })} (approx.)`;
 
   const convexTimeline = useQuery(api.debt.getDebtTimeline);
   const isLoading = convexTimeline === undefined;
@@ -106,12 +108,12 @@ function DebtTimeline() {
   const innerW = svgW - padL - padR;
   const innerH = svgH - padT - padB;
 
-  // Convert both series to user's selected currency for comparable stacking
+  // Convert both series to USD billions for comparable stacking
   const convertedData = activeTimelineData.map((d) => ({
     ...d,
-    extConverted: fromUSD(d.externalDebt),
-    domConverted: fromEGP(d.domesticDebt),
-    totalConverted: fromUSD(d.externalDebt) + fromEGP(d.domesticDebt),
+    extConverted: d.externalDebt,
+    domConverted: d.domesticDebt / EGP_PER_USD,
+    totalConverted: d.externalDebt + d.domesticDebt / EGP_PER_USD,
   }));
 
   const maxTotal =
@@ -164,14 +166,14 @@ function DebtTimeline() {
 
   const hovered = hoveredYear != null ? convertedData.find((d) => d.year === hoveredYear) : null;
 
-  // Y-axis labels -- values are in billions, show with B suffix and currency symbol
-  const fmtAxisVal = (v: number) => `${symbol} ${Math.round(v)}B`;
+  // Y-axis labels -- values are in USD billions
+  const fmtAxisVal = (v: number) => `$${Math.round(v)}B`;
 
   return (
     <Skeleton name="debt-timeline" loading={isLoading}>
     <div className="flex flex-col gap-3">
       {!isLoading && activeTimelineData.length === 0 ? (
-        <p className="text-center text-muted-foreground py-20">{isAr ? "\u0644\u0627 \u062a\u0648\u062c\u062f \u0628\u064a\u0627\u0646\u0627\u062a \u0645\u062a\u0627\u062d\u0629" : "No data available"}</p>
+        <p className="text-center text-muted-foreground py-20">{t.common_noData}</p>
       ) : (
         <>
         <div className="overflow-x-auto">
@@ -293,19 +295,19 @@ function DebtTimeline() {
             <div className="flex items-center justify-between gap-3 mb-1">
               <span className="flex items-center gap-1.5 text-[0.65rem] text-[#C9A84C]">
                 <span className="w-1.5 h-1.5 rounded-sm bg-[#C9A84C] shrink-0" />
-                {isAr ? "خارجي" : "External"}
+                {t.debt_external}
               </span>
               <span className="font-mono text-[0.65rem] text-[#C9A84C]">{fmtExtB(hovered.externalDebt)}</span>
             </div>
             <div className="flex items-center justify-between gap-3 mb-1.5">
               <span className="flex items-center gap-1.5 text-[0.65rem] text-[#6C8EEF]">
                 <span className="w-1.5 h-1.5 rounded-sm bg-[#6C8EEF] shrink-0" />
-                {isAr ? "محلي" : "Domestic"}
+                {t.debt_domestic}
               </span>
               <span className="font-mono text-[0.65rem] text-[#6C8EEF]">{fmtDomB(hovered.domesticDebt)}</span>
             </div>
             <div className="border-t border-[#333A4A] pt-1 flex items-center justify-between gap-3">
-              <span className="text-[0.65rem] font-semibold text-[#E8ECF4]">{isAr ? "الإجمالي" : "Total"}</span>
+              <span className="text-[0.65rem] font-semibold text-[#E8ECF4]">{t.common_total}</span>
               <span className="font-mono text-[0.65rem] font-semibold text-[#E8ECF4]">{fmtTotalB(hovered.externalDebt, hovered.domesticDebt)}</span>
             </div>
           </div>
@@ -315,15 +317,15 @@ function DebtTimeline() {
         <div className="flex flex-wrap gap-5 text-xs text-muted-foreground">
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#C9A84C", opacity: 0.85 }} />
-            {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u062e\u0627\u0631\u062c\u064a (\u0628\u0627\u0644\u062f\u0648\u0644\u0627\u0631)" : `External Debt (USD)`}
+            {t.debt_externalUSD}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm inline-block" style={{ background: "#6C8EEF", opacity: 0.85 }} />
-            {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u0645\u062d\u0644\u064a (\u0628\u0627\u0644\u062c\u0646\u064a\u0647)" : `Domestic Debt (EGP)`}
+            {t.debt_domesticEGP}
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-6 h-0.5 rounded inline-block" style={{ background: "#E8ECF4" }} />
-            {isAr ? "\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a" : `Total (${symbol})`}
+            {t.debt_totalUSD}
           </span>
         </div>
         </>
@@ -340,8 +342,7 @@ function DebtTimeline() {
 // ─── Creditor Breakdown ───────────────────────────────────────────────────────
 
 function CreditorBreakdown() {
-  const { lang } = useLanguage();
-  const { symbol, fromUSD, fmt } = useCurrency();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
   const [sortBy, setSortBy] = useState<"amount">("amount");
 
@@ -350,7 +351,7 @@ function CreditorBreakdown() {
   const CREDITOR_COLORS = ["#6C8EEF", "#2EC4B6", "#C9A84C", "#E76F51", "#9B72CF", "#E5484D", "#525C72"];
 
   // Creditor amounts are in billions USD (same unit as debt records)
-  const fmtCreditor = (v: number) => `${symbol} ${fmt(fromUSD(v ?? 0), { decimals: 1 })}B`;
+  const fmtCreditor = (v: number) => fmtUSD((v ?? 0) * 1e9, { decimals: 1, compact: true });
 
   // Map creditors from Convex latest record
   const rawCreditors = convexLatest?.creditors ?? [];
@@ -376,13 +377,13 @@ function CreditorBreakdown() {
     <Skeleton name="debt-creditors" loading={isCreditorLoading}>
     <div className="flex flex-col gap-6">
       {!isCreditorLoading && sorted.length === 0 ? (
-        <p className="text-center text-muted-foreground py-20">{isAr ? "\u0644\u0627 \u062a\u0648\u062c\u062f \u0628\u064a\u0627\u0646\u0627\u062a \u0645\u062a\u0627\u062d\u0629" : "No data available"}</p>
+        <p className="text-center text-muted-foreground py-20">{t.common_noData}</p>
       ) : (
         <>
         {/* Sort label */}
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted-foreground">
-            {isAr ? "\u062a\u0631\u062a\u064a\u0628 \u062d\u0633\u0628:" : "Sort by:"}
+            {t.debt_sortBy}
           </span>
           <button
             onClick={() => setSortBy("amount")}
@@ -393,20 +394,20 @@ function CreditorBreakdown() {
                 : "bg-transparent text-muted-foreground border-border hover:border-primary/50"
             )}
           >
-            {isAr ? "\u0627\u0644\u0645\u0628\u0644\u063a" : "Amount"}
+            {t.debt_amount}
           </button>
         </div>
 
         {/* Debt type legend */}
         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
           {[
-            { type: "multilateral", en: "Multilateral", ar: "متعدد الأطراف", desc: isAr ? "منظمات دولية (البنك الدولي، صندوق النقد)" : "International orgs (World Bank, IMF)" },
-            { type: "bilateral", en: "Bilateral", ar: "ثنائي", desc: isAr ? "قروض حكومية مباشرة بين دولتين" : "Government-to-government loans" },
-            { type: "commercial", en: "Commercial", ar: "تجاري", desc: isAr ? "سندات وقروض من الأسواق المالية" : "Bonds and loans from financial markets" },
-          ].map((t) => (
-            <div key={t.type} className="flex items-start gap-1.5 bg-muted/30 rounded-md px-2.5 py-1.5">
-              <Badge variant="outline" className="text-[0.55rem] py-0 px-1.5 shrink-0 mt-0.5">{isAr ? t.ar : t.en}</Badge>
-              <span>{t.desc}</span>
+            { type: "multilateral", labelKey: "debt_multilateral" as const, descKey: "debt_multilateralDesc" as const },
+            { type: "bilateral", labelKey: "debt_bilateral" as const, descKey: "debt_bilateralDesc" as const },
+            { type: "commercial", labelKey: "debt_commercial" as const, descKey: "debt_commercialDesc" as const },
+          ].map((dt) => (
+            <div key={dt.type} className="flex items-start gap-1.5 bg-muted/30 rounded-md px-2.5 py-1.5">
+              <Badge variant="outline" className="text-[0.55rem] py-0 px-1.5 shrink-0 mt-0.5">{t[dt.labelKey]}</Badge>
+              <span>{t[dt.descKey]}</span>
             </div>
           ))}
         </div>
@@ -421,9 +422,7 @@ function CreditorBreakdown() {
                     {isAr ? (creditor.creditorNameAr ?? creditor.creditorName) : creditor.creditorName}
                   </span>
                   <Badge variant="outline" className="text-[0.55rem] ms-2 py-0 px-1.5">
-                    {isAr
-                      ? { multilateral: "متعدد الأطراف", bilateral: "ثنائي", commercial: "تجاري", other: "أخرى" }[creditor.creditorType] ?? creditor.creditorType
-                      : creditor.creditorType}
+                    {{ multilateral: t.debt_multilateral, bilateral: t.debt_bilateral, commercial: t.debt_commercial, other: t.debt_other }[creditor.creditorType] ?? creditor.creditorType}
                   </Badge>
                 </div>
                 <div className="text-right shrink-0">
@@ -437,18 +436,18 @@ function CreditorBreakdown() {
                 <div className="flex flex-wrap gap-4 mb-2 text-xs text-muted-foreground">
                   <span>
                     <span className="font-semibold text-foreground">{creditor.interestRate}%</span>
-                    {" "}{isAr ? "فائدة" : "interest"}
+                    {" "}{t.debt_interest}
                   </span>
                   {creditor.annualDebtService != null && (
                     <span>
                       <span className="font-semibold text-red-400">{fmtCreditor(creditor.annualDebtService)}</span>
-                      {" "}{isAr ? "فائدة سنوية" : "annual interest"}
+                      {" "}{t.debt_annualInterest}
                     </span>
                   )}
                   {creditor.maturityYears != null && (
                     <span>
                       <span className="font-semibold text-foreground">{creditor.maturityYears}</span>
-                      {" "}{isAr ? "سنة استحقاق" : "yr maturity"}
+                      {" "}{t.debt_yrMaturity}
                     </span>
                   )}
                 </div>
@@ -470,10 +469,10 @@ function CreditorBreakdown() {
             <CardContent className="pt-4 pb-4 flex items-center justify-between flex-wrap gap-3">
               <div>
                 <p className="text-sm font-semibold text-foreground">
-                  {isAr ? "إجمالي الفوائد السنوية المقدرة" : "Estimated Total Annual Interest"}
+                  {t.debt_estAnnualInterest}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {isAr ? "المبلغ المقدر الذي تدفعه مصر سنوياً كفوائد على الدين الخارجي" : "Estimated amount Egypt pays annually in interest on external debt"}
+                  {t.debt_estAnnualInterestDesc}
                 </p>
               </div>
               <p className="font-mono text-2xl font-bold text-red-400">
@@ -489,13 +488,13 @@ function CreditorBreakdown() {
             <TableHeader>
               <TableRow className="bg-muted/50">
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {isAr ? "\u0627\u0644\u062f\u0627\u0626\u0646" : "Creditor"}
+                  {t.debt_creditor}
                 </TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right">
-                  {isAr ? "\u0627\u0644\u0645\u0628\u0644\u063a \u0627\u0644\u0645\u062a\u0628\u0642\u064a" : "Outstanding"}
+                  {t.debt_outstanding}
                 </TableHead>
                 <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-right hidden md:table-cell">
-                  {isAr ? "% \u0645\u0646 \u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a" : "% of total"}
+                  {t.debt_pctOfTotal}
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -525,7 +524,7 @@ function CreditorBreakdown() {
               })}
               <TableRow className="bg-muted/30 border-t-2 border-border">
                 <TableCell>
-                  <span className="text-sm font-semibold text-foreground">{isAr ? "\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a" : "Total"}</span>
+                  <span className="text-sm font-semibold text-foreground">{t.common_total}</span>
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="font-mono font-semibold tabular-nums text-sm text-foreground">
@@ -553,7 +552,7 @@ function CreditorBreakdown() {
 // ─── Regional Comparison (static reference data — no Convex equivalent) ───────
 
 function RegionalComparison() {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
 
   // Use live Egypt debt-to-GDP from Convex instead of hardcoded value
@@ -575,10 +574,10 @@ function RegionalComparison() {
     <div className="flex flex-col gap-4 max-w-2xl">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {isAr ? "\u0627\u0644\u0645\u0642\u0627\u0631\u0646\u0629 \u0627\u0644\u0625\u0642\u0644\u064a\u0645\u064a\u0629" : "Regional Comparison"}
+          {t.debt_regionalComparison}
         </span>
         <span className="text-xs text-muted-foreground font-mono">
-          {isAr ? "\u0646\u0633\u0628\u0629 \u0627\u0644\u062f\u064a\u0646 / \u0627\u0644\u0646\u0627\u062a\u062c \u0627\u0644\u0645\u062d\u0644\u064a %" : "Debt-to-GDP %"}
+          {t.debt_debtToGDPPct}
         </span>
       </div>
 
@@ -631,9 +630,7 @@ function RegionalComparison() {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DebtPage() {
-  const { t, lang, dir } = useLanguage();
-  const { symbol, fromUSD, fromEGP, fmt } = useCurrency();
-  const isAr = lang === "ar";
+  const { t, dir } = useLanguage();
   const [activeTab, setActiveTab] = useState<"timeline" | "creditors" | "regional">("timeline");
 
   // Wire to Convex
@@ -661,15 +658,15 @@ export default function DebtPage() {
   })();
 
   // Values in DB are in billions (ext in USD B, dom in EGP B)
-  const fmtExtDebt = (v: number) => `${symbol} ${fmt(fromUSD(v), { decimals: 1 })}B`;
-  const fmtDomDebt = (v: number) => `${symbol} ${fmt(fromEGP(v), { compact: true })}B`;
+  const fmtExtDebt = (v: number) => fmtUSD(v * 1e9, { decimals: 1, compact: true });
+  const fmtDomDebt = (v: number) => fmtEGP(v * 1e9, { compact: true });
   const fmtTotalDebt = (ext: number, dom: number) =>
-    `${symbol} ${fmt(fromUSD(ext) + fromEGP(dom), { compact: true })}B`;
+    `${fmtUSD(ext * 1e9 + (dom * 1e9) / EGP_PER_USD, { compact: true })} (approx.)`;
 
   const tabs = [
-    { id: "timeline" as const, labelAr: "\u0645\u0633\u0627\u0631 \u0627\u0644\u062f\u064a\u0646", labelEn: "Timeline" },
-    { id: "creditors" as const, labelAr: "\u0627\u0644\u062f\u0627\u0626\u0646\u0648\u0646", labelEn: "Creditors" },
-    { id: "regional" as const, labelAr: "\u0645\u0642\u0627\u0631\u0646\u0629 \u0625\u0642\u0644\u064a\u0645\u064a\u0629", labelEn: "Regional" },
+    { id: "timeline" as const, labelKey: "debt_tabTimeline" as const },
+    { id: "creditors" as const, labelKey: "debt_tabCreditors" as const },
+    { id: "regional" as const, labelKey: "debt_tabRegional" as const },
   ];
 
   return (
@@ -679,10 +676,10 @@ export default function DebtPage() {
         {/* Header */}
         <div>
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            {isAr ? "\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u0627\u0644\u064a\u0629 \u0627\u0644\u0643\u0644\u064a\u0629" : "Macro-Financial Data"}
+            {t.debt_subtitle}
           </p>
           <h1 className="text-3xl font-bold text-foreground mb-1">
-            {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u0639\u0627\u0645" : "National Debt"}
+            {t.debt_title}
           </h1>
           <p className="text-sm text-muted-foreground">{t.debtDesc}</p>
         </div>
@@ -691,10 +688,10 @@ export default function DebtPage() {
         <Skeleton name="debt-key-metrics" loading={isPageLoading}>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {/* Total debt */}
-          <Card className="bg-card border-border md:col-span-1">
+          <Card data-guide="debt-total" className="bg-card border-border md:col-span-1">
             <CardContent className="pt-5 pb-5">
               <p className="text-xs text-muted-foreground mb-1">
-                {isAr ? "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u062f\u064a\u0646" : "Total Debt"}
+                {t.debt_totalDebt}
                 {latestRecord && ` ${latestRecord.year}`}
               </p>
               <p className="font-mono text-2xl font-bold tabular-nums text-foreground">
@@ -703,7 +700,7 @@ export default function DebtPage() {
                   : "\u2014"}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {isAr ? "\u062e\u0627\u0631\u062c\u064a + \u0645\u062d\u0644\u064a" : "External + Domestic"}
+                {t.debt_extPlusDom}
               </p>
             </CardContent>
           </Card>
@@ -713,7 +710,7 @@ export default function DebtPage() {
             <CardContent className="pt-5 pb-5">
               <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#C9A84C" }} />
-                {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u062e\u0627\u0631\u062c\u064a" : "External Debt"}
+                {t.debt_externalDebt}
               </p>
               <p className="font-mono text-2xl font-bold tabular-nums text-amber-400 flex items-center gap-1.5">
                 {latestRecord ? fmtExtDebt(latestRecord.externalDebt) : "\u2014"}
@@ -730,7 +727,7 @@ export default function DebtPage() {
             <CardContent className="pt-5 pb-5">
               <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-sm inline-block" style={{ background: "#6C8EEF" }} />
-                {isAr ? "\u0627\u0644\u062f\u064a\u0646 \u0627\u0644\u0645\u062d\u0644\u064a" : "Domestic Debt"}
+                {t.debt_domesticDebt}
               </p>
               <p className="font-mono text-2xl font-bold tabular-nums flex items-center gap-1.5" style={{ color: "#6C8EEF" }}>
                 {latestRecord ? fmtDomDebt(latestRecord.domesticDebt) : "\u2014"}
@@ -743,10 +740,10 @@ export default function DebtPage() {
           </Card>
 
           {/* Debt-to-GDP */}
-          <Card className="bg-card border-border">
+          <Card data-guide="debt-gdp-ratio" className="bg-card border-border">
             <CardContent className="pt-5 pb-5">
               <p className="text-xs text-muted-foreground mb-1">
-                {isAr ? "\u0646\u0633\u0628\u0629 \u0627\u0644\u062f\u064a\u0646 / \u0627\u0644\u0646\u0627\u062a\u062c" : "Debt-to-GDP"}
+                {t.debtToGDP}
               </p>
               <p className="font-mono text-2xl font-bold tabular-nums text-foreground flex items-center gap-1.5" dir="ltr">
                 {latestRecord ? `${latestRecord.debtToGDP}%` : "\u2014"}
@@ -774,13 +771,13 @@ export default function DebtPage() {
                     : "border-transparent text-muted-foreground hover:text-foreground hover:border-border"
                 )}
               >
-                {isAr ? tab.labelAr : tab.labelEn}
+                {t[tab.labelKey]}
               </button>
             ))}
           </div>
 
-          {activeTab === "timeline" && <DebtTimeline />}
-          {activeTab === "creditors" && <CreditorBreakdown />}
+          {activeTab === "timeline" && <div data-guide="debt-chart"><DebtTimeline /></div>}
+          {activeTab === "creditors" && <div data-guide="debt-creditors"><CreditorBreakdown /></div>}
           {activeTab === "regional" && <RegionalComparison />}
         </div>
 

@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 // usePersistedState removed — causes hydration mismatches with SSR
 import { useQuery } from "convex/react";
 import type { Id } from "../../../../convex/_generated/dataModel";
 import { api } from "../../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
+import { useWebMCPTool, mcpJSON } from "@/lib/webmcp";
 // All values in EGP — no currency conversion in this tool
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -186,9 +187,10 @@ interface OpportunityCardProps {
   fmt: (v: number, opts?: { decimals?: number; compact?: boolean }) => string;
   fromEGP: (egp: number) => number;
   symbol: string;
+  t: Record<string, string>;
 }
 
-function OpportunityCard({ opp, isAr, onSelect, fmt, fromEGP, symbol }: OpportunityCardProps) {
+function OpportunityCard({ opp, isAr, onSelect, fmt, fromEGP, symbol, t }: OpportunityCardProps) {
   const sectorColor = SECTOR_COLORS[opp.sector] ?? "#6b7280";
   const name = isAr ? opp.nameAr : opp.nameEn;
   const rawArea = opp.unitAreaSqm ?? opp.landAreaSqm;
@@ -233,10 +235,10 @@ function OpportunityCard({ opp, isAr, onSelect, fmt, fromEGP, symbol }: Opportun
                 }
               >
                 {opp.status === "available"
-                  ? isAr ? "متاح" : "Available"
+                  ? t.mashroaak_available
                   : opp.status === "under_development"
-                  ? isAr ? "قيد التطوير" : "In Development"
-                  : isAr ? "محجوز" : "Reserved"}
+                  ? t.mashroaak_inDevelopment
+                  : t.mashroaak_reserved}
               </Badge>
             )}
           </div>
@@ -265,7 +267,7 @@ function OpportunityCard({ opp, isAr, onSelect, fmt, fromEGP, symbol }: Opportun
                   {symbol} {fmt(fromEGP(opp.costEgp), { compact: true })}
                 </p>
               ) : (
-                <p className="text-xs text-muted-foreground">{isAr ? "السعر غير محدد" : "Price TBD"}</p>
+                <p className="text-xs text-muted-foreground">{t.mashroaak_priceTBD}</p>
               )}
             </div>
             <Badge
@@ -287,14 +289,12 @@ function OpportunityCard({ opp, isAr, onSelect, fmt, fromEGP, symbol }: Opportun
 
 // ─── EmptyState ───────────────────────────────────────────────────────────────
 
-function EmptyState({ isAr }: { isAr: boolean }) {
+function EmptyState({ label }: { label: string }) {
   return (
     <div className="col-span-full flex flex-col items-center justify-center py-16 text-center">
       <Briefcase size={40} className="text-muted-foreground/30 mb-4" />
       <p className="text-sm text-muted-foreground">
-        {isAr
-          ? "لا توجد فرص استثمارية متاحة حالياً — سيتم تحديث البيانات تلقائياً."
-          : "No investment opportunities yet — data will be updated automatically."}
+        {label}
       </p>
     </div>
   );
@@ -321,9 +321,11 @@ interface ResultsGridProps {
   fmt: (v: number, opts?: { decimals?: number; compact?: boolean }) => string;
   fromEGP: (egp: number) => number;
   symbol: string;
+  emptyLabel: string;
+  t: Record<string, string>;
 }
 
-function ResultsGrid({ opportunities, isAr, onSelect, fmt, fromEGP, symbol }: ResultsGridProps) {
+function ResultsGrid({ opportunities, isAr, onSelect, fmt, fromEGP, symbol, emptyLabel, t }: ResultsGridProps) {
   if (opportunities === undefined) {
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -335,13 +337,14 @@ function ResultsGrid({ opportunities, isAr, onSelect, fmt, fromEGP, symbol }: Re
   if (opportunities.length === 0) {
     return (
       <div className="grid grid-cols-1">
-        <EmptyState isAr={isAr} />
+        <EmptyState label={emptyLabel} />
       </div>
     );
   }
 
   return (
     <motion.div
+      data-guide="mashroaak-results"
       className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
       variants={containerVariants}
       initial="hidden"
@@ -356,6 +359,7 @@ function ResultsGrid({ opportunities, isAr, onSelect, fmt, fromEGP, symbol }: Re
           fmt={fmt}
           fromEGP={fromEGP}
           symbol={symbol}
+          t={t}
         />
       ))}
     </motion.div>
@@ -374,9 +378,10 @@ interface CapitalMatcherTabProps {
   inferredContext?: string | null;
   capital: number;
   setCapital: (v: number) => void;
+  t: Record<string, string>;
 }
 
-function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferredContext, capital, setCapital }: CapitalMatcherTabProps) {
+function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferredContext, capital, setCapital, t }: CapitalMatcherTabProps) {
   const [sector, setSector] = useState("");
   const [governorate, setGovernorate] = useState("");
 
@@ -398,7 +403,7 @@ function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferr
         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-amber-500/5 border border-amber-500/10 rounded-lg px-3 py-2">
           <Lightbulb size={12} className="text-amber-500 shrink-0" />
           <span>
-            {isAr ? "بناءً على استخدامك للأدوات الأخرى:" : "Based on your other tools:"}
+            {t.mashroaak_inferredContext}
             {" "}
             <span className="text-foreground font-medium">{inferredContext}</span>
           </span>
@@ -406,11 +411,11 @@ function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferr
       )}
 
       {/* Capital input */}
-      <Card className="border-amber-500/20 bg-amber-500/5">
+      <Card data-guide="capital-input" className="border-amber-500/20 bg-amber-500/5">
         <CardContent className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-foreground">
-              {isAr ? "رأس المال المتاح" : "Available Capital"}
+              {t.mashroaak_availableCapital}
             </p>
             <p className="text-lg font-bold text-amber-500">
               EGP {fmt(capital, { compact: true })}
@@ -447,7 +452,7 @@ function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferr
       {/* Filters */}
       <div className="flex flex-wrap gap-2 items-center">
         <p className="text-xs text-muted-foreground">
-          {isAr ? "تصفية:" : "Filter:"}
+          {t.mashroaak_filter}
         </p>
         <select
           value={sector}
@@ -455,7 +460,7 @@ function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferr
           className={selectClass}
           dir={isAr ? "rtl" : "ltr"}
         >
-          <option value="">{isAr ? "كل القطاعات" : "All Sectors"}</option>
+          <option value="">{t.mashroaak_allSectors}</option>
           {(stats?.sectors ?? []).map((s) => (
             <option key={s} value={s}>{getSectorLabel(s, isAr)}</option>
           ))}
@@ -466,7 +471,7 @@ function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferr
           className={selectClass}
           dir={isAr ? "rtl" : "ltr"}
         >
-          <option value="">{isAr ? "كل المحافظات" : "All Governorates"}</option>
+          <option value="">{t.mashroaak_allGovernorates}</option>
           {(stats?.governorates ?? []).map((g) => (
             <option key={g} value={g}>{g}</option>
           ))}
@@ -476,9 +481,7 @@ function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferr
       {/* Results count */}
       {opportunities !== undefined && opportunities.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          {isAr
-            ? `${opportunities.length} فرصة استثمارية بحد أقصى EGP ${fmt(capital, { compact: true })}`
-            : `${opportunities.length} opportunities within EGP ${fmt(capital, { compact: true })}`}
+          {opportunities.length} {t.mashroaak_opportunities} — EGP {fmt(capital, { compact: true })}
         </p>
       )}
 
@@ -490,6 +493,8 @@ function CapitalMatcherTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, inferr
         fmt={fmt}
         fromEGP={fromEGP}
         symbol={symbol}
+        emptyLabel={t.mashroaak_emptyState}
+        t={t}
       />
     </div>
   );
@@ -504,9 +509,10 @@ interface ProjectExplorerTabProps {
   fromEGP: (egp: number) => number;
   symbol: string;
   stats: Stats | undefined;
+  t: Record<string, string>;
 }
 
-function ProjectExplorerTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: ProjectExplorerTabProps) {
+function ProjectExplorerTab({ isAr, onSelect, fmt, fromEGP, symbol, stats, t }: ProjectExplorerTabProps) {
   const [search, setSearch] = useState("");
   const [sector, setSector] = useState("");
   const [governorate, setGovernorate] = useState("");
@@ -547,12 +553,14 @@ function ProjectExplorerTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: Pro
   return (
     <div className="space-y-4">
       {/* Search bar */}
+      <div data-guide="mashroaak-filters" className="space-y-4">
       <div className="relative">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
+          name="mashroaak-search"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          placeholder={isAr ? "ابحث عن مشروع..." : "Search projects..."}
+          placeholder={t.mashroaak_searchPlaceholder}
           className="pl-8 text-sm bg-background/60"
           dir={isAr ? "rtl" : "ltr"}
         />
@@ -566,7 +574,7 @@ function ProjectExplorerTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: Pro
           className={selectClass}
           dir={isAr ? "rtl" : "ltr"}
         >
-          <option value="">{isAr ? "كل القطاعات" : "All Sectors"}</option>
+          <option value="">{t.mashroaak_allSectors}</option>
           {(stats?.sectors ?? []).map((s) => (
             <option key={s} value={s}>{getSectorLabel(s, isAr)}</option>
           ))}
@@ -577,7 +585,7 @@ function ProjectExplorerTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: Pro
           className={selectClass}
           dir={isAr ? "rtl" : "ltr"}
         >
-          <option value="">{isAr ? "كل المحافظات" : "All Governorates"}</option>
+          <option value="">{t.mashroaak_allGovernorates}</option>
           {(stats?.governorates ?? []).map((g) => (
             <option key={g} value={g}>{g}</option>
           ))}
@@ -588,7 +596,7 @@ function ProjectExplorerTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: Pro
           className={selectClass}
           dir={isAr ? "rtl" : "ltr"}
         >
-          <option value="">{isAr ? "كل الأنواع" : "All Types"}</option>
+          <option value="">{t.mashroaak_allTypes}</option>
           {Object.entries(TYPE_LABELS).map(([k, v]) => (
             <option key={k} value={k}>{isAr ? v.ar : v.en}</option>
           ))}
@@ -599,10 +607,11 @@ function ProjectExplorerTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: Pro
           className={selectClass}
           dir={isAr ? "rtl" : "ltr"}
         >
-          <option value="">{isAr ? "كل المصادر" : "All Sources"}</option>
+          <option value="">{t.mashroaak_allSources}</option>
           <option value="ida">IDA</option>
           <option value="gafi">GAFI</option>
         </select>
+      </div>
       </div>
 
       {/* Results */}
@@ -613,6 +622,8 @@ function ProjectExplorerTab({ isAr, onSelect, fmt, fromEGP, symbol, stats }: Pro
         fmt={fmt}
         fromEGP={fromEGP}
         symbol={symbol}
+        emptyLabel={t.mashroaak_emptyState}
+        t={t}
       />
     </div>
   );
@@ -627,20 +638,20 @@ interface CostEntry {
 
 interface CostBreakdownChartProps {
   data: CostEntry[];
-  isAr: boolean;
   fmt: (v: number, opts?: { decimals?: number; compact?: boolean }) => string;
   fromEGP: (egp: number) => number;
   symbol: string;
+  costBreakdownLabel: string;
 }
 
-function CostBreakdownChart({ data, isAr, fmt, fromEGP, symbol }: CostBreakdownChartProps) {
+function CostBreakdownChart({ data, fmt, fromEGP, symbol, costBreakdownLabel }: CostBreakdownChartProps) {
   const chartData = data.filter((d) => d.value > 0);
   if (chartData.length === 0) return null;
 
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-        {isAr ? "تفاصيل التكاليف" : "Cost Breakdown"}
+        {costBreakdownLabel}
       </p>
       <div className="flex gap-4 items-center">
         <ResponsiveContainer width={120} height={120}>
@@ -695,9 +706,10 @@ interface ProjectDetailTabProps {
   fmt: (v: number, opts?: { decimals?: number; compact?: boolean }) => string;
   fromEGP: (egp: number) => number;
   symbol: string;
+  t: Record<string, string>;
 }
 
-function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: ProjectDetailTabProps) {
+function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol, t }: ProjectDetailTabProps) {
   // Cast string to Convex Id — the value is always a valid Id from the query results
   const result = useQuery(api.industry.getProjectDetail, {
     opportunityId: projectId as Id<"investmentOpportunities">,
@@ -717,10 +729,10 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
     return (
       <div className="text-center py-12">
         <p className="text-sm text-muted-foreground">
-          {isAr ? "المشروع غير موجود." : "Project not found."}
+          {t.mashroaak_notFound}
         </p>
         <button onClick={onBack} className="mt-4 text-xs text-amber-500 hover:underline">
-          {isAr ? "رجوع" : "Go back"}
+          {t.mashroaak_goBack}
         </button>
       </div>
     );
@@ -732,12 +744,12 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
   const sectorColor = SECTOR_COLORS[opp.sector] ?? "#6b7280";
 
   const costEntries: CostEntry[] = [
-    { name: isAr ? "تكلفة الأرض" : "Land", value: detail?.landCostEgp ?? 0 },
-    { name: isAr ? "الإنشاءات" : "Construction", value: detail?.constructionCostEgp ?? 0 },
-    { name: isAr ? "المعدات" : "Equipment", value: detail?.equipmentCostEgp ?? 0 },
-    { name: isAr ? "العمالة" : "Labor", value: detail?.laborCostEgp ?? 0 },
-    { name: isAr ? "رسوم الترخيص" : "Licensing", value: detail?.licensingFeesEgp ?? 0 },
-    { name: isAr ? "رأس المال العامل" : "Working Capital", value: detail?.workingCapitalEgp ?? 0 },
+    { name: t.mashroaak_land, value: detail?.landCostEgp ?? 0 },
+    { name: t.mashroaak_construction, value: detail?.constructionCostEgp ?? 0 },
+    { name: t.mashroaak_equipment, value: detail?.equipmentCostEgp ?? 0 },
+    { name: t.mashroaak_labor, value: detail?.laborCostEgp ?? 0 },
+    { name: t.mashroaak_licensing, value: detail?.licensingFeesEgp ?? 0 },
+    { name: t.mashroaak_workingCapital, value: detail?.workingCapitalEgp ?? 0 },
   ];
 
   return (
@@ -753,7 +765,7 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
         className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-amber-500 transition-colors"
       >
         <ArrowLeft size={12} />
-        {isAr ? "رجوع إلى النتائج" : "Back to results"}
+        {t.mashroaak_backToResults}
       </button>
 
       {/* Project header */}
@@ -793,7 +805,7 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
           <Card className="border-amber-500/20 bg-amber-500/5">
             <CardContent className="p-3">
               <p className="text-[0.6rem] text-muted-foreground uppercase tracking-wide mb-1">
-                {isAr ? "التكلفة الإجمالية" : "Total Cost"}
+                {t.mashroaak_totalCost}
               </p>
               <p className="text-sm font-bold text-amber-500">
                 {symbol} {fmt(fromEGP(opp.costEgp), { compact: true })}
@@ -805,7 +817,7 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
           <Card className="border-border/50 bg-card/50">
             <CardContent className="p-3">
               <p className="text-[0.6rem] text-muted-foreground uppercase tracking-wide mb-1">
-                {isAr ? "المساحة" : "Area"}
+                {t.mashroaak_area}
               </p>
               <p className="text-sm font-bold text-foreground">
                 {formatArea(opp.unitAreaSqm ?? opp.landAreaSqm)}
@@ -817,7 +829,7 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
           <Card className="border-border/50 bg-card/50">
             <CardContent className="p-3">
               <p className="text-[0.6rem] text-muted-foreground uppercase tracking-wide mb-1">
-                {isAr ? "العمالة" : "Employees"}
+                {t.mashroaak_employees}
               </p>
               <p className="text-sm font-bold text-foreground flex items-center gap-1">
                 <Users size={12} className="text-muted-foreground" />
@@ -830,10 +842,10 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
           <Card className="border-border/50 bg-card/50">
             <CardContent className="p-3">
               <p className="text-[0.6rem] text-muted-foreground uppercase tracking-wide mb-1">
-                {isAr ? "فترة الاسترداد" : "Payback Period"}
+                {t.mashroaak_paybackPeriod}
               </p>
               <p className="text-sm font-bold text-foreground">
-                {detail.paybackPeriodYears} {isAr ? "سنوات" : "yrs"}
+                {detail.paybackPeriodYears} {t.common_yr}
               </p>
             </CardContent>
           </Card>
@@ -846,20 +858,20 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
           <CardContent className="p-4">
             <CostBreakdownChart
               data={costEntries}
-              isAr={isAr}
               fmt={fmt}
               fromEGP={fromEGP}
               symbol={symbol}
+              costBreakdownLabel={t.mashroaak_costBreakdown}
             />
             {detail.expectedProfitMarginPct && (
               <div className="mt-3 pt-3 border-t border-border/40 flex flex-wrap gap-4 text-xs">
                 <div>
-                  <span className="text-muted-foreground">{isAr ? "هامش الربح المتوقع: " : "Expected Margin: "}</span>
+                  <span className="text-muted-foreground">{t.mashroaak_expectedMargin} </span>
                   <span className="font-semibold text-emerald-500">{detail.expectedProfitMarginPct}%</span>
                 </div>
                 {detail.expectedRevenueEgp && (
                   <div>
-                    <span className="text-muted-foreground">{isAr ? "الإيرادات المتوقعة: " : "Expected Revenue: "}</span>
+                    <span className="text-muted-foreground">{t.mashroaak_expectedRevenue} </span>
                     <span className="font-semibold">{symbol} {fmt(fromEGP(detail.expectedRevenueEgp), { compact: true })}</span>
                   </div>
                 )}
@@ -881,15 +893,15 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
                 <>
                   <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
                     {isMethodology
-                      ? (isAr ? "منهجية تقدير التكلفة" : "Cost Estimation Methodology")
-                      : (isAr ? "الحوافز الاستثمارية" : "Investment Incentives")}
+                      ? t.mashroaak_costEstMethodology
+                      : t.mashroaak_investIncentives}
                   </p>
                   <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">
                     {text.replace(/^(Estimation methodology:|منهجية التقدير:)\s*/i, "")}
                   </p>
                   {isMethodology && (
                     <p className="text-xs text-muted-foreground mt-1 italic">
-                      {isAr ? "* تقدير ذكاء اصطناعي — ليس سعرًا رسميًا" : "* AI estimate — not an official price"}
+                      {t.mashroaak_aiEstimate}
                     </p>
                   )}
                 </>
@@ -910,7 +922,7 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
           <Card className="border-border/50">
             <CardContent className="p-4 space-y-3">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                {isAr ? "خطوات الترخيص" : "Licensing Steps"}
+                {t.mashroaak_licensingSteps}
               </p>
               {steps.length > 0 ? (
                 <div className="space-y-2">
@@ -928,7 +940,7 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
                         )}
                         <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
                           {s.estimatedDays != null && (
-                            <span>{isAr ? `~${s.estimatedDays} يوم` : `~${s.estimatedDays} days`}</span>
+                            <span>~{s.estimatedDays} {t.mashroaak_days}</span>
                           )}
                           {s.estimatedFeeEgp != null && s.estimatedFeeEgp > 0 && (
                             <span>EGP {fmt(s.estimatedFeeEgp, { compact: true })}</span>
@@ -955,7 +967,7 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
           rel="noopener noreferrer"
           className="hover:text-amber-500 transition-colors hover:underline"
         >
-          {isAr ? "عرض المصدر الرسمي" : "View official source"}
+          {t.mashroaak_viewSource}
         </a>
       </div>
     </motion.div>
@@ -965,7 +977,8 @@ function ProjectDetailTab({ projectId, isAr, onBack, fmt, fromEGP, symbol }: Pro
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function MashroaakPage() {
-  const { lang } = useLanguage();
+  const { t, lang } = useLanguage();
+  // Translation helper for keys not yet in translations.ts — will be added in a follow-up
   const fmtEgp = (value: number, opts?: { decimals?: number; compact?: boolean }) => {
     const d = opts?.decimals ?? (value >= 100 ? 0 : 1);
     if (opts?.compact && Math.abs(value) >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(d)}B`;
@@ -1052,6 +1065,58 @@ export default function MashroaakPage() {
 
   const tabTriggerClass = "text-xs data-[state=active]:bg-amber-500/15 data-[state=active]:text-amber-500";
 
+  // ─── WebMCP: expose opportunity search to AI agents ────────────────────────
+  const mashroaakSchema = useMemo(() => ({
+    type: "object" as const,
+    properties: {
+      maxCapitalEgp: {
+        type: "number",
+        description: "Maximum investment budget in EGP. The tool will show opportunities that fit within this budget. Common presets: 500000, 1000000, 5000000, 50000000, 500000000, 1000000000.",
+        minimum: 0,
+      },
+      view: {
+        type: "string",
+        enum: ["matcher", "explore"],
+        description: "Which tab to show: 'matcher' filters by budget (default), 'explore' shows full search/filter interface",
+      },
+    },
+    required: [],
+  }), []);
+
+  useWebMCPTool({
+    name: "search_egypt_investment_opportunities",
+    description: "Explore real investment opportunities in Egypt from IDA (Industrial Development Authority) and GAFI (General Authority for Investment). Set a capital budget to filter matching industrial units, land plots, free zones, and SME programs. Returns available statistics: total opportunities, sectors, governorates, and cost ranges. The page UI updates to show matching results.",
+    title: "Mashrou'ak - Egypt Investment Explorer",
+    inputSchema: mashroaakSchema,
+    execute: useCallback((input: Record<string, unknown>) => {
+      // Set capital budget if provided
+      if (input.maxCapitalEgp) {
+        setCapital(Number(input.maxCapitalEgp));
+      }
+
+      // Switch to requested tab
+      const view = (input.view as string) || "matcher";
+      setActiveTab(view);
+
+      return mcpJSON({
+        capitalBudgetEgp: input.maxCapitalEgp ?? capital,
+        activeView: view,
+        currency: "EGP",
+        availableData: statsData ? {
+          totalOpportunities: statsData.total,
+          byType: statsData.byType,
+          bySector: statsData.bySector,
+          byGovernorate: statsData.byGovernorate,
+          bySource: statsData.bySource,
+          sectors: statsData.sectors.map((s) => ({ key: s, label: getSectorLabel(s, false) })),
+          governorates: statsData.governorates,
+          costRange: statsData.costRange,
+        } : "loading",
+        hint: "The page is now showing results. Use the 'explore' view for full text search and multi-filter controls. Use 'matcher' view to filter by capital budget.",
+      });
+    }, [statsData, capital, setCapital, setActiveTab]),
+  });
+
   return (
     <div className="page-content">
     <div className="container-page space-y-6">
@@ -1065,15 +1130,13 @@ export default function MashroaakPage() {
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-bold text-foreground flex items-center gap-2 flex-wrap">
-              {isAr ? "مشروعك" : "Mashrou'ak"}
+              {t.mashroaak_title}
               <span className="text-base font-normal text-muted-foreground">
-                {isAr ? "— فرصتك الاستثمارية في مصر" : "— Your Investment Opportunity in Egypt"}
+                {t.mashroaak_tagline}
               </span>
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {isAr
-                ? "استكشف الفرص الصناعية والاستثمارية من هيئة التنمية الصناعية (IDA) وهيئة الاستثمار (GAFI)"
-                : "Explore industrial and investment opportunities from IDA and GAFI"}
+              {t.mashroaak_subtitle}
             </p>
           </div>
         </div>
@@ -1084,17 +1147,17 @@ export default function MashroaakPage() {
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-1.5">
               <Building2 size={12} className="text-amber-500" />
               <span className="font-semibold text-foreground">{statsData.total.toLocaleString()}</span>
-              <span>{isAr ? "فرصة استثمارية" : "opportunities"}</span>
+              <span>{t.mashroaak_opportunities}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-1.5">
               <Layers size={12} className="text-amber-500" />
               <span className="font-semibold text-foreground">{statsData.sectors.length}</span>
-              <span>{isAr ? "قطاع" : "sectors"}</span>
+              <span>{t.mashroaak_sectors}</span>
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/30 rounded-lg px-3 py-1.5">
               <MapPin size={12} className="text-amber-500" />
               <span className="font-semibold text-foreground">{statsData.governorates.length}</span>
-              <span>{isAr ? "محافظة" : "governorates"}</span>
+              <span>{t.mashroaak_governorates}</span>
             </div>
           </div>
         )}
@@ -1102,6 +1165,7 @@ export default function MashroaakPage() {
 
       {/* Tabs */}
       <Tabs
+        data-guide="mashroaak-tabs"
         value={activeTab}
         onValueChange={(v) => {
           if (v !== "detail") setSelectedProjectId(null);
@@ -1110,14 +1174,14 @@ export default function MashroaakPage() {
       >
         <TabsList className="h-auto flex flex-wrap gap-1 bg-muted/40 p-1">
           <TabsTrigger value="matcher" className={tabTriggerClass}>
-            {isAr ? "المطابقة برأس المال" : "Capital Matcher"}
+            {t.mashroaak_capitalMatcher}
           </TabsTrigger>
           <TabsTrigger value="explorer" className={tabTriggerClass}>
-            {isAr ? "استكشاف المشاريع" : "Project Explorer"}
+            {t.mashroaak_projectExplorer}
           </TabsTrigger>
           {selectedProjectId && (
             <TabsTrigger value="detail" className={tabTriggerClass}>
-              {isAr ? "تفاصيل المشروع" : "Project Detail"}
+              {t.mashroaak_projectDetail}
             </TabsTrigger>
           )}
         </TabsList>
@@ -1133,6 +1197,7 @@ export default function MashroaakPage() {
             inferredContext={inferredContext}
             capital={capital}
             setCapital={setCapital}
+            t={t}
           />
         </TabsContent>
 
@@ -1144,6 +1209,7 @@ export default function MashroaakPage() {
             fromEGP={fromEGP}
             symbol={symbol}
             stats={statsData}
+            t={t}
           />
         </TabsContent>
 
@@ -1156,6 +1222,7 @@ export default function MashroaakPage() {
               fmt={fmt}
               fromEGP={fromEGP}
               symbol={symbol}
+              t={t}
             />
           </TabsContent>
         )}
@@ -1164,17 +1231,13 @@ export default function MashroaakPage() {
       {/* Disclaimer */}
       <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-4 text-sm text-muted-foreground space-y-1">
         <p className="font-medium text-foreground text-xs uppercase tracking-wide">
-          {isAr ? "إخلاء مسؤولية" : "Disclaimer"}
+          {t.common_disclaimer}
         </p>
         <p className="text-xs leading-relaxed">
-          {isAr
-            ? "هذه الأداة تعتمد على بحث آلي بالذكاء الاصطناعي وتقديرات مبنية على بيانات السوق المتاحة. التكاليف والحوافز المعروضة قد لا تعكس الأسعار الفعلية أو الشروط الحالية. يُرجى دائمًا استشارة متخصص والتواصل مباشرة مع هيئة التنمية الصناعية أو هيئة الاستثمار قبل اتخاذ أي قرار استثماري."
-            : "This tool relies on AI-powered research and estimates based on available market data. Costs and incentives shown may not reflect actual prices or current terms. Always consult a professional and contact IDA or GAFI directly before making any investment decision."}
+          {t.mashroaak_disclaimerP1}
         </p>
         <p className="text-xs leading-relaxed">
-          {isAr
-            ? "البيانات المشار إليها بـ \"تقدير ذكاء اصطناعي\" هي تقديرات تقريبية وليست أسعارًا رسمية."
-            : "Data marked as AI-estimated are approximate projections, not official prices."}
+          {t.mashroaak_disclaimerP2}
         </p>
       </div>
 

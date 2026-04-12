@@ -426,6 +426,7 @@ interface HeroCardProps {
 }
 
 function HeroCard({ meta, record, isAr, index }: HeroCardProps) {
+  const { t } = useLanguage();
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
     indicator: meta.key,
   });
@@ -493,7 +494,7 @@ function HeroCard({ meta, record, isAr, index }: HeroCardProps) {
             </p>
             {meta.highlight && (
               <span className="text-[0.55rem] font-mono px-1.5 py-0.5 rounded border border-[#C9A84C]/40 text-[#C9A84C] bg-[#C9A84C]/8 uppercase tracking-wider">
-                {isAr ? "رئيسي" : "LIVE"}
+                {t.economy_live}
               </span>
             )}
           </div>
@@ -529,7 +530,7 @@ function HeroCard({ meta, record, isAr, index }: HeroCardProps) {
                   </span>
                 )}
                 <span className="text-[0.6rem] text-muted-foreground/60">
-                  {comparisonYear ? (isAr ? `مقارنة بـ ${comparisonYear}` : `vs ${comparisonYear}`) : (isAr ? "من السنة الماضية" : "vs last year")} · {displayYear}
+                  {comparisonYear ? `${t.economy_vs} ${comparisonYear}` : t.economy_vsLastYear} · {displayYear}
                 </span>
               </div>
               {values.length >= 2 && (
@@ -557,6 +558,7 @@ function HeroCard({ meta, record, isAr, index }: HeroCardProps) {
 // ─── GDP & Growth Chart ───────────────────────────────────────────────────────
 
 function GdpGrowthChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }) {
+  const { t } = useLanguage();
   const gdpNominal = useQuery(api.economy.getIndicatorTimeline, { indicator: "gdp_nominal" });
   const gdpGrowth = useQuery(api.economy.getIndicatorTimeline, { indicator: "gdp_growth" });
 
@@ -580,6 +582,7 @@ function GdpGrowthChart({ isAr, fromYear }: { isAr: boolean; fromYear: number })
 
   return (
     <motion.div
+      data-guide="gdp-chart"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.2 }}
@@ -588,16 +591,16 @@ function GdpGrowthChart({ isAr, fromYear }: { isAr: boolean; fromYear: number })
       <div className="flex items-center gap-3 mb-4">
         <div className="h-4 w-1 rounded-full bg-[#C9A84C]" />
         <h3 className="text-xs font-bold uppercase tracking-widest text-foreground">
-          {isAr ? "الناتج المحلي والنمو" : "GDP & Growth"}
+          {t.economy_gdpAndGrowth}
         </h3>
         <div className="flex items-center gap-3 ms-auto">
           <span className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
             <span className="inline-block w-3 h-0.5 rounded bg-[#C9A84C]" />
-            {isAr ? "الناتج (مليار $)" : "GDP (B USD)"}
+            {t.economy_gdpBillionUsd}
           </span>
           <span className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
             <span className="inline-block w-3 h-0.5 rounded bg-[#2EC4B6]" />
-            {isAr ? "نسبة النمو %" : "Growth %"}
+            {t.economy_growthPct}
           </span>
         </div>
       </div>
@@ -660,7 +663,7 @@ function GdpGrowthChart({ isAr, fromYear }: { isAr: boolean; fromYear: number })
                   stroke={COLORS.gold}
                   strokeWidth={2}
                   fill="url(#gdpGrad)"
-                  name={isAr ? "الناتج المحلي" : "GDP (B USD)"}
+                  name={t.economy_gdpBillionUsd}
                   animationDuration={1500}
                   dot={false}
                   activeDot={{ r: 4, stroke: COLORS.gold, strokeWidth: 2, fill: "hsl(var(--background))" }}
@@ -672,7 +675,7 @@ function GdpGrowthChart({ isAr, fromYear }: { isAr: boolean; fromYear: number })
                   stroke={COLORS.green}
                   strokeWidth={2}
                   fill="url(#growthGrad)"
-                  name={isAr ? "نسبة النمو %" : "Growth %"}
+                  name={t.economy_growthPct}
                   animationDuration={1500}
                   dot={false}
                   activeDot={{ r: 4, stroke: COLORS.green, strokeWidth: 2, fill: "hsl(var(--background))" }}
@@ -689,6 +692,7 @@ function GdpGrowthChart({ isAr, fromYear }: { isAr: boolean; fromYear: number })
 // ─── Inflation & Exchange Rate Chart ─────────────────────────────────────────
 
 function InflationExchangeChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }) {
+  const { t } = useLanguage();
   const inflation = useQuery(api.economy.getIndicatorTimeline, { indicator: "inflation" });
   const exchange = useQuery(api.economy.getIndicatorTimeline, { indicator: "exchange_rate" });
 
@@ -712,6 +716,7 @@ function InflationExchangeChart({ isAr, fromYear }: { isAr: boolean; fromYear: n
 
   return (
     <motion.div
+      data-guide="inflation-chart"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.6, delay: 0.35 }}
@@ -720,16 +725,16 @@ function InflationExchangeChart({ isAr, fromYear }: { isAr: boolean; fromYear: n
       <div className="flex items-center gap-3 mb-4">
         <div className="h-4 w-1 rounded-full bg-[#E5484D]" />
         <h3 className="text-xs font-bold uppercase tracking-widest text-foreground">
-          {isAr ? "التضخم وسعر الصرف" : "Inflation & Exchange Rate"}
+          {t.economy_inflationAndExchange}
         </h3>
         <div className="flex items-center gap-3 ms-auto">
           <span className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
             <span className="inline-block w-3 h-0.5 rounded bg-[#E5484D]" />
-            {isAr ? "التضخم %" : "Inflation %"}
+            {t.economy_inflationPct}
           </span>
           <span className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
             <span className="inline-block w-3 h-0.5 rounded bg-[#6C8EEF]" />
-            {isAr ? "جنيه/دولار" : "EGP/USD"}
+            {t.economy_egpUsd}
           </span>
         </div>
       </div>
@@ -781,7 +786,7 @@ function InflationExchangeChart({ isAr, fromYear }: { isAr: boolean; fromYear: n
                   dataKey="inflation"
                   stroke={COLORS.red}
                   strokeWidth={2}
-                  name={isAr ? "التضخم %" : "Inflation %"}
+                  name={t.economy_inflationPct}
                   animationDuration={1500}
                   dot={false}
                   activeDot={{ r: 4, stroke: COLORS.red, strokeWidth: 2, fill: "hsl(var(--background))" }}
@@ -792,7 +797,7 @@ function InflationExchangeChart({ isAr, fromYear }: { isAr: boolean; fromYear: n
                   dataKey="exchange"
                   stroke={COLORS.blue}
                   strokeWidth={2}
-                  name={isAr ? "سعر الصرف" : "Exchange Rate"}
+                  name={t.economy_exchangeRate}
                   animationDuration={1500}
                   dot={false}
                   activeDot={{ r: 4, stroke: COLORS.blue, strokeWidth: 2, fill: "hsl(var(--background))" }}
@@ -810,6 +815,7 @@ function InflationExchangeChart({ isAr, fromYear }: { isAr: boolean; fromYear: n
 // ─── Money Flows Stacked Chart ────────────────────────────────────────────────
 
 function MoneyFlowsChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }) {
+  const { t } = useLanguage();
   const remittances = useQuery(api.economy.getIndicatorTimeline, { indicator: "remittances" });
   const fdi = useQuery(api.economy.getIndicatorTimeline, { indicator: "fdi_inflows" });
   const tourism = useQuery(api.economy.getIndicatorTimeline, { indicator: "tourism_receipts" });
@@ -855,14 +861,14 @@ function MoneyFlowsChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }
       <div className="flex items-center gap-3 mb-4">
         <div className="h-4 w-1 rounded-full bg-[#9B72CF]" />
         <h3 className="text-xs font-bold uppercase tracking-widest text-foreground">
-          {isAr ? "تدفقات الدخل الوطني" : "Income Flows"}
+          {t.economy_incomeFlows}
         </h3>
         <div className="flex flex-wrap items-center gap-3 ms-auto">
           {[
-            { color: COLORS.teal, label: isAr ? "تحويلات" : "Remittances" },
-            { color: COLORS.purple, label: isAr ? "استثمار أجنبي" : "FDI" },
-            { color: COLORS.orange, label: isAr ? "سياحة" : "Tourism" },
-            { color: COLORS.gold, label: isAr ? "السويس" : "Suez" },
+            { color: COLORS.teal, label: t.economy_remittances },
+            { color: COLORS.purple, label: t.economy_fdi },
+            { color: COLORS.orange, label: t.economy_tourism },
+            { color: COLORS.gold, label: t.economy_suez },
           ].map((item) => (
             <span key={item.label} className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
               <span className="inline-block w-3 h-0.5 rounded" style={{ background: item.color }} />
@@ -922,7 +928,7 @@ function MoneyFlowsChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }
                   strokeWidth={1.5}
                   fill="url(#remGrad)"
                   stackId="flows"
-                  name={isAr ? "تحويلات" : "Remittances"}
+                  name={t.economy_remittances}
                   animationDuration={1500}
                   dot={false}
                 />
@@ -933,7 +939,7 @@ function MoneyFlowsChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }
                   strokeWidth={1.5}
                   fill="url(#fdiGrad)"
                   stackId="flows"
-                  name={isAr ? "استثمار أجنبي" : "FDI"}
+                  name={t.economy_fdi}
                   animationDuration={1500}
                   dot={false}
                 />
@@ -944,7 +950,7 @@ function MoneyFlowsChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }
                   strokeWidth={1.5}
                   fill="url(#tourGrad)"
                   stackId="flows"
-                  name={isAr ? "سياحة" : "Tourism"}
+                  name={t.economy_tourism}
                   animationDuration={1500}
                   dot={false}
                 />
@@ -955,7 +961,7 @@ function MoneyFlowsChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }
                   strokeWidth={1.5}
                   fill="url(#suezGrad)"
                   stackId="flows"
-                  name={isAr ? "السويس" : "Suez"}
+                  name={t.economy_suez}
                   animationDuration={1500}
                   dot={false}
                 />
@@ -971,11 +977,12 @@ function MoneyFlowsChart({ isAr, fromYear }: { isAr: boolean; fromYear: number }
 // ─── Empty Chart Placeholder ──────────────────────────────────────────────────
 
 function EmptyChart({ isAr }: { isAr: boolean }) {
+  const { t } = useLanguage();
   return (
     <div className="h-[280px] flex flex-col items-center justify-center gap-2 border border-dashed border-border/40 rounded-xl">
       <Database size={18} className="text-muted-foreground/25" />
       <p className="text-xs text-muted-foreground/40">
-        {isAr ? "لا توجد بيانات بعد" : "No data available yet"}
+        {t.economy_noDataYet}
       </p>
     </div>
   );
@@ -993,6 +1000,7 @@ interface MoneyFlowCardProps {
 }
 
 function MoneyFlowCard({ meta, record, isAr, accentColor, expanded, onToggle }: MoneyFlowCardProps) {
+  const { t } = useLanguage();
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
     indicator: meta.key,
   });
@@ -1041,7 +1049,7 @@ function MoneyFlowCard({ meta, record, isAr, accentColor, expanded, onToggle }: 
           <div className="flex flex-col items-start gap-1 mt-2 mb-3">
             <Database size={14} className="text-muted-foreground/25" />
             <p className="text-[0.6rem] text-muted-foreground/40">
-              {isAr ? "لا توجد بيانات" : "No data"}
+              {t.common_noDataShort}
             </p>
           </div>
         ) : (
@@ -1171,6 +1179,7 @@ function MoneyFlowCard({ meta, record, isAr, accentColor, expanded, onToggle }: 
 // ─── IMF Forecast Bar Chart (proper Recharts BarChart) ───────────────────────
 
 function ImfForecastChart({ meta, record, isAr }: { meta: IndicatorMeta; record: IndicatorRecord | null; isAr: boolean }) {
+  const { t } = useLanguage();
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
     indicator: meta.key,
   });
@@ -1205,11 +1214,11 @@ function ImfForecastChart({ meta, record, isAr }: { meta: IndicatorMeta; record:
         <div className="flex items-center gap-3 mb-2">
           <span className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
             <span className="inline-block w-3 h-2 rounded-sm" style={{ background: COLORS.gold }} />
-            {isAr ? "فعلي" : "Actual"}
+            {t.economy_actual}
           </span>
           <span className="flex items-center gap-1.5 text-[0.6rem] text-muted-foreground">
             <span className="inline-block w-3 h-2 rounded-sm opacity-55" style={{ background: COLORS.blue }} />
-            {isAr ? "توقع" : "Forecast"}
+            {t.economy_forecast}
           </span>
         </div>
 
@@ -1251,8 +1260,8 @@ function ImfForecastChart({ meta, record, isAr }: { meta: IndicatorMeta; record:
                     formatter={(v, _name, props) => [
                       typeof v === "number" ? `${v.toFixed(1)}%` : String(v),
                       (props as { payload?: { isForecast?: boolean } }).payload?.isForecast
-                        ? (isAr ? "توقع" : "Forecast")
-                        : (isAr ? "فعلي" : "Actual"),
+                        ? t.economy_forecast
+                        : t.economy_actual,
                     ]}
                     cursor={{ fill: "hsl(var(--border))", fillOpacity: 0.15 }}
                   />
@@ -1295,6 +1304,7 @@ function NationalStat({
   record: IndicatorRecord | null;
   isAr: boolean;
 }) {
+  const { t } = useLanguage();
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
     indicator: meta.key,
   });
@@ -1331,7 +1341,7 @@ function NationalStat({
                 {yoyChange > 0 ? "+" : ""}{yoyChange.toFixed(1)}
               </span>
               <span className="text-[0.55rem] text-muted-foreground/40">
-                {isAr ? "مقارنة بالسنة السابقة" : "YoY"}
+                {t.economy_yoy}
               </span>
             </div>
           )}
@@ -1358,6 +1368,7 @@ interface IndicatorCardWithTimelineProps {
 }
 
 function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
+  const { t } = useLanguage();
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
     indicator: meta.key,
   });
@@ -1398,7 +1409,7 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
                 variant="outline"
                 className="text-[0.55rem] mt-1 border-[#C9A84C]/40 text-[#C9A84C] px-1.5 py-0"
               >
-                {isAr ? "مميز" : "Featured"}
+                {t.economy_featured}
               </Badge>
             )}
           </div>
@@ -1419,7 +1430,7 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
         {!record ? (
           <div className="flex items-center gap-2 py-4">
             <Database size={14} className="text-muted-foreground/25" />
-            <p className="text-xs text-muted-foreground/40">{isAr ? "لا توجد بيانات" : "No data"}</p>
+            <p className="text-xs text-muted-foreground/40">{t.common_noDataShort}</p>
           </div>
         ) : (
           <>
@@ -1513,6 +1524,7 @@ function MarketCard({ meta, record, isAr }: IndicatorCardWithTimelineProps) {
 // ─── Key Rate Card (CBE, T-Bill, Mortgage) ────────────────────────────────────
 
 function KeyRateCard({ meta, record, isAr }: { meta: IndicatorMeta; record: IndicatorRecord | null; isAr: boolean }) {
+  const { t } = useLanguage();
   const timelineRecords = useQuery(api.economy.getIndicatorTimeline, {
     indicator: meta.key,
   });
@@ -1535,7 +1547,7 @@ function KeyRateCard({ meta, record, isAr }: { meta: IndicatorMeta; record: Indi
         {!record ? (
           <div className="flex items-center gap-2 py-2">
             <Database size={14} className="text-muted-foreground/25" />
-            <p className="text-[0.6rem] text-muted-foreground/40">{isAr ? "لا توجد بيانات" : "No data"}</p>
+            <p className="text-[0.6rem] text-muted-foreground/40">{t.common_noDataShort}</p>
           </div>
         ) : (
           <>
@@ -1549,7 +1561,7 @@ function KeyRateCard({ meta, record, isAr }: { meta: IndicatorMeta; record: Indi
                   {yoyChange > 0 ? "+" : ""}{yoyChange.toFixed(1)}
                 </span>
                 <span className="text-[0.55rem] text-muted-foreground/40">
-                  {isAr ? "من السنة الماضية" : "vs last year"}
+                  {t.economy_vsLastYear}
                 </span>
               </div>
             )}
@@ -1577,6 +1589,7 @@ function KeyRateCard({ meta, record, isAr }: { meta: IndicatorMeta; record: Indi
 // ─── AI Narrative Section ─────────────────────────────────────────────────────
 
 function AiNarrativeSection({ isAr }: { isAr: boolean }) {
+  const { t } = useLanguage();
   const reports = useQuery(api.lineage.listResearchReports, {
     category: "economy",
   });
@@ -1590,7 +1603,7 @@ function AiNarrativeSection({ isAr }: { isAr: boolean }) {
       <div className="flex items-center gap-2 mb-4">
         <BrainCircuit size={14} className="text-primary/60" />
         <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-          {isAr ? "تحليل الذكاء الاصطناعي" : "AI Economic Analysis"}
+          {t.economy_aiAnalysis}
         </h2>
         {latestReport && (
           <span className="ms-auto text-[0.6rem] text-muted-foreground/50 font-mono">
@@ -1652,13 +1665,13 @@ function AiNarrativeSection({ isAr }: { isAr: boolean }) {
                   {latestReport.agentModel}
                 </Badge>
                 <span className="text-[0.6rem] text-muted-foreground/50">
-                  {isAr ? "المصادر المفحوصة:" : "Sources checked:"}{" "}
+                  {t.economy_sourcesChecked}{" "}
                   {latestReport.sourcesChecked.length}
                 </span>
                 {latestReport.discrepanciesFound > 0 && (
                   <Badge variant="outline" className="text-[0.6rem] border-amber-500/30 text-amber-400">
                     {latestReport.discrepanciesFound}{" "}
-                    {isAr ? "تناقضات" : "discrepancies"}
+                    {t.economy_discrepancies}
                   </Badge>
                 )}
               </div>
@@ -1672,10 +1685,8 @@ function AiNarrativeSection({ isAr }: { isAr: boolean }) {
 
 // ─── Section Label ────────────────────────────────────────────────────────────
 
-function SectionLabel({ en, ar, isAr, accentColor = "hsl(var(--primary))" }: {
-  en: string;
-  ar: string;
-  isAr: boolean;
+function SectionLabel({ label, accentColor = "hsl(var(--primary))" }: {
+  label: string;
   accentColor?: string;
 }) {
   return (
@@ -1687,7 +1698,7 @@ function SectionLabel({ en, ar, isAr, accentColor = "hsl(var(--primary))" }: {
           style={{ background: accentColor }}
         />
         <span className="text-[0.65rem] font-bold uppercase tracking-[0.15em] text-muted-foreground">
-          {isAr ? ar : en}
+          {label}
         </span>
       </div>
       <div className="h-px flex-1 bg-gradient-to-l from-border/60 to-transparent" />
@@ -1715,7 +1726,7 @@ function getFromYear(range: TimeRange): number {
 }
 
 export default function EconomyPage() {
-  const { lang, dir } = useLanguage();
+  const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
 
   const [timeRange, setTimeRange] = useState<TimeRange>("all");
@@ -1755,17 +1766,15 @@ export default function EconomyPage() {
           <div className="flex items-start gap-3 mb-3">
             <div className="flex flex-col">
               <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[#C9A84C] mb-1">
-                {isAr ? "المؤشرات الاقتصادية" : "Economic Indicators"}
+                {t.economy_subtitle}
               </p>
               <h1 className="text-3xl md:text-4xl font-black tracking-tight">
-                {isAr ? "مصر في أرقام" : "Egypt at a Glance"}
+                {t.economy_title}
               </h1>
             </div>
           </div>
           <p className="text-muted-foreground text-sm max-w-xl leading-relaxed">
-            {isAr
-              ? "مؤشرات اقتصادية رئيسية مرتبطة بمصادرها الرسمية — البنك الدولي، البنك المركزي، صندوق النقد الدولي"
-              : "Key economic indicators with full source attribution — World Bank, CBE, IMF DataMapper"}
+            {t.economy_description}
           </p>
         </motion.div>
 
@@ -1774,13 +1783,11 @@ export default function EconomyPage() {
 
         {/* ── Hero Metrics (4 cards) ──────────────────────────────────────── */}
         <SectionLabel
-          en="Key Metrics"
-          ar="المؤشرات الرئيسية"
-          isAr={isAr}
+          label={t.economy_keyMetrics}
           accentColor={COLORS.gold}
         />
         <Skeleton name="economy-key-metrics" loading={isLoading}>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
+          <div data-guide="econ-indicators" className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-2">
             {KEY_METRICS.map((meta, i) => (
               <HeroCard
                 key={meta.key}
@@ -1795,16 +1802,14 @@ export default function EconomyPage() {
 
         {/* ── Interactive Time-Series Charts ──────────────────────────────── */}
         <SectionLabel
-          en="Historical Trends"
-          ar="الاتجاهات التاريخية"
-          isAr={isAr}
+          label={t.economy_historicalTrends}
           accentColor={COLORS.green}
         />
 
         {/* Time range selector */}
         <div className={`flex items-center gap-2 mb-4 ${isAr ? "justify-end" : "justify-start"}`}>
           <span className="text-[0.6rem] uppercase tracking-wider text-muted-foreground/60 me-1">
-            {isAr ? "الفترة الزمنية:" : "Time range:"}
+            {t.economy_timeRange}
           </span>
           {TIME_RANGE_OPTIONS.map((opt) => (
             <button
@@ -1833,13 +1838,11 @@ export default function EconomyPage() {
 
         {/* ── Money Flows Grid ─────────────────────────────────────────────── */}
         <SectionLabel
-          en="Money Flows"
-          ar="تدفقات المال"
-          isAr={isAr}
+          label={t.economy_moneyFlows}
           accentColor={COLORS.purple}
         />
         <p className="text-[0.65rem] text-muted-foreground/50 mb-3 -mt-2">
-          {isAr ? "انقر على أي بطاقة لعرض الرسم البياني الكامل" : "Click any card to expand its full chart"}
+          {t.economy_clickToExpand}
         </p>
         <Skeleton name="economy-money-flows" loading={isLoading}>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-2">
@@ -1859,13 +1862,11 @@ export default function EconomyPage() {
 
         {/* ── Markets ──────────────────────────────────────────────────────── */}
         <SectionLabel
-          en="Markets"
-          ar="الأسواق المالية"
-          isAr={isAr}
+          label={t.economy_markets}
           accentColor={COLORS.gold}
         />
         <Skeleton name="economy-markets" loading={isLoading}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
+          <div data-guide="exchange-rate" className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-2">
             {MARKETS.map((meta) => (
               <MarketCard
                 key={meta.key}
@@ -1879,9 +1880,7 @@ export default function EconomyPage() {
 
         {/* ── Key Rates ────────────────────────────────────────────────────── */}
         <SectionLabel
-          en="Key Interest Rates"
-          ar="أسعار الفائدة الرئيسية"
-          isAr={isAr}
+          label={t.economy_keyInterestRates}
           accentColor={COLORS.purple}
         />
         <Skeleton name="economy-key-rates" loading={isLoading}>
@@ -1899,9 +1898,7 @@ export default function EconomyPage() {
 
         {/* ── National Profile ─────────────────────────────────────────────── */}
         <SectionLabel
-          en="National Profile"
-          ar="الملف الوطني"
-          isAr={isAr}
+          label={t.economy_nationalProfile}
           accentColor={COLORS.blue}
         />
         <Skeleton name="economy-national-profile" loading={isLoading}>
@@ -1919,9 +1916,7 @@ export default function EconomyPage() {
 
         {/* ── Debt Burden ──────────────────────────────────────────────────── */}
         <SectionLabel
-          en="Debt Burden"
-          ar="عبء الدين"
-          isAr={isAr}
+          label={t.economy_debtBurden}
           accentColor={COLORS.red}
         />
         <Skeleton name="economy-debt-burden" loading={isLoading}>
@@ -1941,10 +1936,10 @@ export default function EconomyPage() {
               <Card className="border-border/40 bg-card/20 hover:border-[#C9A84C]/30 hover:bg-card/40 transition-all h-full group">
                 <CardContent className="p-5 flex flex-col justify-between h-full min-h-[130px]">
                   <p className="text-xs text-muted-foreground font-medium">
-                    {isAr ? "استكشاف تفاصيل الدين الوطني" : "Explore full debt breakdown"}
+                    {t.economy_exploreDebt}
                   </p>
                   <div className="flex items-center gap-1.5 text-[#C9A84C]/70 group-hover:text-[#C9A84C] text-sm font-semibold mt-4 transition-colors">
-                    {isAr ? "صفحة الدين" : "Debt Page"}
+                    {t.economy_debtPage}
                     <ArrowRight size={14} />
                   </div>
                 </CardContent>
@@ -1955,9 +1950,7 @@ export default function EconomyPage() {
 
         {/* ── IMF Forecasts ─────────────────────────────────────────────────── */}
         <SectionLabel
-          en="IMF Forecasts (through 2030)"
-          ar="توقعات صندوق النقد الدولي (حتى 2030)"
-          isAr={isAr}
+          label={t.economy_imfForecasts}
           accentColor={COLORS.blue}
         />
         <Skeleton name="economy-imf" loading={isLoading}>

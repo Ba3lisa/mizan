@@ -6,7 +6,7 @@ import { DataSourceFooter } from "@/components/data-source";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
-import { useCurrency } from "@/components/providers";
+import { fmtEGP } from "@/lib/format";
 import {
   Select,
   SelectContent,
@@ -62,12 +62,13 @@ const DEFICIT_COLOR = "#C9A84C";
 // ─── Mobile Flow Diagram (interactive) ──────────────────────────────────────
 
 function MobileBudgetFlow({
-  revenueData, spendingData, isAr, fmtAmount,
+  revenueData, spendingData, isAr, fmtAmount, t,
 }: {
   revenueData: BudgetCategory[];
   spendingData: BudgetCategory[];
   isAr: boolean;
   fmtAmount: (v: number) => string;
+  t: ReturnType<typeof useLanguage>["t"];
 }) {
   // Which node is tapped/selected — null means nothing selected (show all)
   const [selected, setSelected] = useState<{ side: "rev" | "sp"; idx: number } | null>(null);
@@ -157,18 +158,18 @@ function MobileBudgetFlow({
       {/* Header */}
       <div className="flex items-center justify-between px-1" dir={isAr ? "rtl" : "ltr"}>
         <div>
-          <span className="text-xs font-bold" style={{ color: REVENUE_COLOR }}>{isAr ? "الإيرادات" : "Revenue"}</span>
+          <span className="text-xs font-bold" style={{ color: REVENUE_COLOR }}>{t.budget_revenue}</span>
           <span className="font-mono text-[0.65rem] text-emerald-500 ms-2">{fmtAmount(totalRev)}</span>
         </div>
         <div>
-          <span className="text-xs font-bold" style={{ color: SPENDING_COLOR }}>{isAr ? "المصروفات" : "Spending"}</span>
+          <span className="text-xs font-bold" style={{ color: SPENDING_COLOR }}>{t.budget_spending}</span>
           <span className="font-mono text-[0.65rem] text-red-400 ms-2">{fmtAmount(totalSp)}</span>
         </div>
       </div>
 
       {/* Tap hint */}
       <p className="text-[0.6rem] text-muted-foreground/50 text-center">
-        {isAr ? "اضغط على أي عنصر لتتبع تدفق الأموال" : "Tap any item to trace money flow"}
+        {t.budget_tapHint}
       </p>
 
       {/* Selected node tooltip */}
@@ -303,7 +304,7 @@ function MobileBudgetFlow({
       {/* Deficit */}
       {totalSp > totalRev && (
         <div className="border-t border-border pt-3 flex items-baseline justify-between px-1" dir={isAr ? "rtl" : "ltr"}>
-          <span className="text-xs font-semibold" style={{ color: DEFICIT_COLOR }}>{isAr ? "العجز" : "Deficit"}</span>
+          <span className="text-xs font-semibold" style={{ color: DEFICIT_COLOR }}>{t.deficit}</span>
           <span className="font-mono text-sm font-bold" style={{ color: DEFICIT_COLOR }}>{fmtAmount(totalSp - totalRev)}</span>
         </div>
       )}
@@ -314,8 +315,7 @@ function MobileBudgetFlow({
 // ─── Desktop Sankey Diagram ─────────────────────────────────────────────────
 
 function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCategory[]; spendingData: BudgetCategory[] }) {
-  const { lang } = useLanguage();
-  const { symbol, fromEGP, fmt } = useCurrency();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
 
   // Build nivo sankey data: revenue sources → "Revenue" node → "Spending" node → spending categories
@@ -351,7 +351,7 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
   const validLinks = links.filter(l => l.source !== l.target && l.value > 0);
 
   const totalBudget = spendingData.reduce((s, r) => s + r.amount, 0);
-  const fmtAmount = (v: number) => `${fmt(fromEGP(v * 1e9), { compact: true })} ${symbol}`;
+  const fmtAmount = (v: number) => fmtEGP(v * 1e9, { compact: true });
   const _fmtPct = (v: number) => totalBudget > 0 ? `${((v / totalBudget) * 100).toFixed(1)}%` : "";
 
   const [isMobile, setIsMobile] = useState(false);
@@ -365,7 +365,7 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
   if (nodes.length === 0 || validLinks.length === 0) {
     return (
       <div className="flex items-center justify-center h-[400px] text-muted-foreground text-sm">
-        {isAr ? "لا توجد بيانات ميزانية متاحة بعد" : "No budget data available yet"}
+        {t.budget_noData}
       </div>
     );
   }
@@ -378,6 +378,7 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
         spendingData={spendingData}
         isAr={isAr}
         fmtAmount={fmtAmount}
+        t={t}
       />
     );
   }
@@ -453,27 +454,17 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
 // ─── Year Comparison Chart ────────────────────────────────────────────────────
 
 function YearComparisonChart() {
-  const { lang } = useLanguage();
-  const { fromEGP, fmt } = useCurrency();
-  const isAr = lang === "ar";
+  const { t } = useLanguage();
 
   // Use Convex fiscal years for year comparison -- no hardcoded data
   const convexFYs = useQuery(api.budget.listFiscalYears);
-  const chartData = (() => {
-    if (!convexFYs) return [];
-    // Deduplicate by start year (e.g. "2024-2025" and "2024/2025" both → "2024")
-    // Prefer the entry with higher totals (more complete data)
-    const byYear = new Map<string, { year: string; revenue: number; spending: number }>();
-    for (const fy of convexFYs) {
-      const key = fy.year.replace("/", "-").slice(0, 4);
-      const entry = { year: key, revenue: fy.totalRevenue ?? 0, spending: fy.totalExpenditure ?? 0 };
-      const prev = byYear.get(key);
-      if (!prev || entry.revenue + entry.spending > prev.revenue + prev.spending) {
-        byYear.set(key, entry);
-      }
-    }
-    return Array.from(byYear.values());
-  })();
+  const chartData = convexFYs
+    ? convexFYs.map((fy) => ({
+        year: fy.year.slice(0, 4),
+        revenue: fy.totalRevenue ?? 0,
+        spending: fy.totalExpenditure ?? 0,
+      }))
+    : [];
 
   const svgW = 600;
   const svgH = 260;
@@ -487,7 +478,7 @@ function YearComparisonChart() {
   if (chartData.length === 0) {
     return (
       <div className="flex items-center justify-center h-[260px] text-muted-foreground text-sm">
-        {isAr ? "لا توجد بيانات مقارنة متاحة" : "No comparison data available"}
+        {t.budget_noComparisonData}
       </div>
     );
   }
@@ -501,16 +492,16 @@ function YearComparisonChart() {
     <div className="flex flex-col gap-3">
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {isAr ? "مقارنة سنة بعد سنة (مليار)" : "Year-over-Year Comparison (B)"}
+          {t.budget_yoyComparison}
         </p>
         <div className="flex items-center gap-4 text-xs text-muted-foreground">
           <span className="flex items-center gap-1">
             <span className="inline-block w-3 h-2" style={{ background: REVENUE_COLOR }} />
-            {isAr ? "إيرادات" : "Revenue"}
+            {t.budget_revenue}
           </span>
           <span className="flex items-center gap-1">
             <span className="inline-block w-3 h-2" style={{ background: SPENDING_COLOR }} />
-            {isAr ? "مصروفات" : "Spending"}
+            {t.budget_spending}
           </span>
         </div>
       </div>
@@ -521,7 +512,7 @@ function YearComparisonChart() {
           {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
             const y = padT + innerH * (1 - frac);
             const val = Math.round(maxVal * frac);
-            const labelVal = fmt(fromEGP(val * 1e9), { compact: true, decimals: 0 });
+            const labelVal = fmtEGP(val * 1e9, { compact: true, decimals: 0 });
             return (
               <g key={frac}>
                 <line x1={padL} y1={y} x2={svgW - padR} y2={y} stroke="#252A36" strokeWidth={0.5} />
@@ -539,8 +530,8 @@ function YearComparisonChart() {
             const expH = (yr.spending / maxVal) * innerH;
             const revX = cx - barW - gap / 2;
             const expX = cx + gap / 2;
-            const revLabel = fmt(fromEGP(yr.revenue * 1e9), { compact: true, decimals: 0 });
-            const expLabel = fmt(fromEGP(yr.spending * 1e9), { compact: true, decimals: 0 });
+            const revLabel = fmtEGP(yr.revenue * 1e9, { compact: true, decimals: 0 });
+            const expLabel = fmtEGP(yr.spending * 1e9, { compact: true, decimals: 0 });
 
             return (
               <g key={yr.year}>
@@ -569,9 +560,7 @@ function YearComparisonChart() {
 // ─── Per Capita Section ───────────────────────────────────────────────────────
 
 function PerCapitaSection({ year: _year, spendingData, revenueData, populationOverride }: { year: FiscalYear; spendingData?: BudgetCategory[]; revenueData?: BudgetCategory[]; populationOverride?: number }) {
-  const { lang } = useLanguage();
-  const { symbol, fromEGP, fmt } = useCurrency();
-  const isAr = lang === "ar";
+  const { t } = useLanguage();
 
   const pop = populationOverride ?? 0;
   const activeSpending = spendingData ?? [];
@@ -583,26 +572,22 @@ function PerCapitaSection({ year: _year, spendingData, revenueData, populationOv
 
   const items = [
     {
-      labelAr: "نصيبك من الإيرادات",
-      labelEn: "Your share of revenue",
+      labelKey: "budget_shareRevenue" as const,
       amountEGP: (totalRevenue * 1e9) / pop,
       color: "#4DCCB3",
     },
     {
-      labelAr: "نصيبك من الإنفاق",
-      labelEn: "Your share of spending",
+      labelKey: "budget_shareSpending" as const,
       amountEGP: (totalSpending * 1e9) / pop,
       color: "#E07070",
     },
     {
-      labelAr: "نصيبك من خدمة الدين",
-      labelEn: "Your share of debt service",
+      labelKey: "budget_shareDebtService" as const,
       amountEGP: (debtService * 1e9) / pop,
       color: DEBT_SERVICE_COLOR,
     },
     {
-      labelAr: "نصيبك من التعليم",
-      labelEn: "Your share of education",
+      labelKey: "budget_shareEducation" as const,
       amountEGP: (education * 1e9) / pop,
       color: DEFICIT_COLOR,
     },
@@ -611,19 +596,17 @@ function PerCapitaSection({ year: _year, spendingData, revenueData, populationOv
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
       {items.map((item) => {
-        const converted = fromEGP(item.amountEGP);
-        const formatted = fmt(converted, { compact: converted >= 1000 });
         return (
-          <Card key={item.labelEn} className="bg-card border-border">
+          <Card key={item.labelKey} className="bg-card border-border">
             <CardContent className="pt-4 pb-4">
               <p className="text-xs text-muted-foreground mb-1">
-                {isAr ? item.labelAr : item.labelEn}
+                {t[item.labelKey]}
               </p>
               <p className="font-mono text-xl font-bold tabular-nums" style={{ color: item.color }}>
-                {symbol}{formatted}
+                {fmtEGP(item.amountEGP, { compact: item.amountEGP >= 1000 })}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {isAr ? "سنوياً لكل مواطن" : "per person / year"}
+                {t.budget_perPersonYear}
               </p>
             </CardContent>
           </Card>
@@ -648,8 +631,7 @@ function BreakdownTable({
   labelHeader: string;
   accentColor: string;
 }) {
-  const { lang } = useLanguage();
-  const { symbol, fromEGP, fmt } = useCurrency();
+  const { t, lang } = useLanguage();
   const isAr = lang === "ar";
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -664,13 +646,13 @@ function BreakdownTable({
               {labelHeader}
             </TableHead>
             <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-end">
-              {isAr ? "المبلغ" : "Amount"}
+              {t.budget_amount}
             </TableHead>
             <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-end">
-              {isAr ? "% من الإجمالي" : "% of total"}
+              {t.budget_pctOfTotal}
             </TableHead>
             <TableHead className="text-xs font-semibold uppercase tracking-wider text-muted-foreground text-end hidden sm:table-cell">
-              {isAr ? "% من الناتج" : "% of GDP"}
+              {t.budget_pctOfGDP}
             </TableHead>
           </TableRow>
         </TableHeader>
@@ -680,7 +662,7 @@ function BreakdownTable({
             const gdpPct = ((item.amount / gdp) * 100).toFixed(1);
             const isDebt = item.nameEn === "Debt Service";
             const isTop = sorted[0].nameEn === item.nameEn;
-            const displayAmount = `${fmt(fromEGP(item.amount * 1e9), { compact: true })} ${symbol}`;
+            const displayAmount = fmtEGP(item.amount * 1e9, { compact: true });
             const hasSubItems = (item.subItems?.length ?? 0) > 0;
             const isExpanded = expanded === item.nameEn;
 
@@ -706,7 +688,7 @@ function BreakdownTable({
                     </span>
                     {isTop && isDebt && (
                       <Badge variant="destructive" className="text-xs px-1 py-0">
-                        {isAr ? "الأكبر" : "Largest"}
+                        {t.budget_largest}
                       </Badge>
                     )}
                     {hasSubItems && (
@@ -735,7 +717,7 @@ function BreakdownTable({
               // Sub-item rows
               ...(isExpanded && item.subItems
                 ? item.subItems.map((sub) => {
-                    const subDisplay = `${fmt(fromEGP(sub.amount * 1e9), { compact: true })} ${symbol}`;
+                    const subDisplay = fmtEGP(sub.amount * 1e9, { compact: true });
                     const subPct = ((sub.amount / total) * 100).toFixed(1);
                     const subGdpPct = ((sub.amount / gdp) * 100).toFixed(1);
                     return (
@@ -766,11 +748,11 @@ function BreakdownTable({
           {/* Totals row */}
           <TableRow className="bg-muted/30 border-t-2 border-border">
             <TableCell>
-              <span className="text-sm font-semibold text-foreground">{isAr ? "الإجمالي" : "Total"}</span>
+              <span className="text-sm font-semibold text-foreground">{t.common_total}</span>
             </TableCell>
             <TableCell className="text-end">
               <span className="font-mono font-semibold tabular-nums text-sm text-foreground">
-                {symbol}{fmt(fromEGP(total * 1e9), { compact: true })}
+                {fmtEGP(total * 1e9, { compact: true })}
               </span>
             </TableCell>
             <TableCell className="text-end">
@@ -791,9 +773,7 @@ function BreakdownTable({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BudgetPage() {
-  const { t, lang, dir } = useLanguage();
-  const { symbol, fromEGP, fmt } = useCurrency();
-  const isAr = lang === "ar";
+  const { t, dir } = useLanguage();
 
   const [selectedYearStr, setSelectedYearStr] = useState<string>("");
 
@@ -802,27 +782,16 @@ export default function BudgetPage() {
   const populationTimeline = useQuery(api.economy.getIndicatorTimeline, { indicator: "population" });
   const _isLoading = convexFiscalYears === undefined;
 
-  // Sort newest first for dropdown, deduplicate by normalized year (e.g. "2024-2025" vs "2024/2025")
-  // Prefer the record with higher totals (more budget items linked)
-  const sortedFYs = (() => {
-    if (!convexFiscalYears) return [];
-    const byNormalized = new Map<string, (typeof convexFiscalYears)[number]>();
-    for (const fy of convexFiscalYears) {
-      const key = fy.year.replace("/", "-");
-      const prev = byNormalized.get(key);
-      if (!prev || (fy.totalRevenue ?? 0) + (fy.totalExpenditure ?? 0) > (prev.totalRevenue ?? 0) + (prev.totalExpenditure ?? 0)) {
-        byNormalized.set(key, fy);
-      }
-    }
-    return Array.from(byNormalized.values()).sort((a, b) => b.year.localeCompare(a.year));
-  })();
+  // Sort newest first for dropdown
+  const sortedFYs = convexFiscalYears
+    ? [...convexFiscalYears].sort((a, b) => b.year.localeCompare(a.year))
+    : [];
 
   // Default to latest fiscal year
   const effectiveYear = selectedYearStr || sortedFYs[0]?.year || "";
 
-  // Find the selected fiscal year from Convex (try exact match, then normalized)
-  const selectedFY = sortedFYs.find((fy) => fy.year === effectiveYear)
-    ?? sortedFYs.find((fy) => fy.year.replace("/", "-") === effectiveYear.replace("/", "-"));
+  // Find the selected fiscal year from Convex
+  const selectedFY = sortedFYs.find((fy) => fy.year === effectiveYear);
 
   const yearOptions = sortedFYs.map((fy) => fy.year);
 
@@ -876,9 +845,9 @@ export default function BudgetPage() {
 
   const debtServicePct = ((activeSpending.find((s) => s.nameEn === "Debt Service" || s.nameEn.includes("Debt"))?.amount ?? 0) / totalSpending * 100).toFixed(1);
 
-  const revenueDisplay = `${symbol}${fmt(fromEGP(totalRevenue * 1e9), { compact: true })}`;
-  const spendingDisplay = `${symbol}${fmt(fromEGP(totalSpending * 1e9), { compact: true })}`;
-  const deficitDisplay = `${symbol}${fmt(fromEGP(Math.abs(deficit) * 1e9), { compact: true })}`;
+  const revenueDisplay = fmtEGP(totalRevenue * 1e9, { compact: true });
+  const spendingDisplay = fmtEGP(totalSpending * 1e9, { compact: true });
+  const deficitDisplay = fmtEGP(Math.abs(deficit) * 1e9, { compact: true });
 
   return (
     <div className="page-content" dir={dir}>
@@ -888,10 +857,10 @@ export default function BudgetPage() {
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              {isAr ? "الموازنة العامة للدولة" : "General State Budget"}
+              {t.budget_subtitle}
             </p>
             <h1 className="text-3xl font-bold text-foreground mb-1">
-              {isAr ? "الموازنة العامة" : "National Budget"}
+              {t.budget_title}
             </h1>
             <p className="text-sm text-muted-foreground">{t.budgetDesc}</p>
           </div>
@@ -905,7 +874,7 @@ export default function BudgetPage() {
               <SelectContent>
                 {(yearOptions.length > 0 ? yearOptions : FISCAL_YEARS).map((y) => (
                   <SelectItem key={y} value={y} className="text-sm font-mono">
-                    {y.replace("/", "-")}
+                    {y}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -914,7 +883,7 @@ export default function BudgetPage() {
         </div>
 
         {/* ── Key Metrics ── */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div data-guide="budget-summary" className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Revenue */}
           <Card className="bg-card border-border">
             <CardContent className="pt-5 pb-5">
@@ -927,7 +896,7 @@ export default function BudgetPage() {
                 {selectedFY?.sanadLevel && <SanadBadge sanadLevel={selectedFY.sanadLevel} sourceUrl={selectedFY?.sourceUrl} />}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {((totalRevenue / gdp) * 100).toFixed(1)}% {isAr ? "من الناتج المحلي" : "of GDP"}
+                {((totalRevenue / gdp) * 100).toFixed(1)}% {t.budget_ofGDP}
               </p>
             </CardContent>
           </Card>
@@ -944,13 +913,13 @@ export default function BudgetPage() {
                 {selectedFY?.sanadLevel && <SanadBadge sanadLevel={selectedFY.sanadLevel} sourceUrl={selectedFY?.sourceUrl} />}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {((totalSpending / gdp) * 100).toFixed(1)}% {isAr ? "من الناتج المحلي" : "of GDP"}
+                {((totalSpending / gdp) * 100).toFixed(1)}% {t.budget_ofGDP}
               </p>
             </CardContent>
           </Card>
 
           {/* Deficit */}
-          <Card className="bg-card border border-yellow-900/30">
+          <Card data-guide="budget-deficit" className="bg-card border border-yellow-900/30">
             <CardContent className="pt-5 pb-5">
               <div className="flex items-center gap-1.5 mb-2">
                 <TrendingDown size={13} style={{ color: DEFICIT_COLOR }} />
@@ -961,7 +930,7 @@ export default function BudgetPage() {
                 {selectedFY?.sanadLevel && <SanadBadge sanadLevel={selectedFY.sanadLevel} sourceUrl={selectedFY?.sourceUrl} />}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {((deficit / gdp) * 100).toFixed(1)}% {isAr ? "من الناتج المحلي" : "of GDP"}
+                {((deficit / gdp) * 100).toFixed(1)}% {t.budget_ofGDP}
               </p>
             </CardContent>
           </Card>
@@ -970,23 +939,19 @@ export default function BudgetPage() {
         {/* ── Debt Service Alert ── */}
         <div className="rounded-lg border border-border bg-card px-5 py-4">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            {isAr
-              ? `خدمة الدين تمثل ${debtServicePct}% من إجمالي الإنفاق — وهي أكبر بند في الميزانية، وتتجاوز الإنفاق على التعليم والصحة والدفاع مجتمعة.`
-              : `Debt service represents ${debtServicePct}% of total expenditure — the single largest budget item, exceeding education, health, and defence combined.`}
+            {t.budget_debtServiceAlert.replace("{pct}", debtServicePct)}
           </p>
           <DataSourceFooter category="budget" />
         </div>
 
         {/* ── CanadaSpends Visualization ── */}
-        <Card className="bg-card border-border">
+        <Card data-guide="budget-flow" className="bg-card border-border">
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold text-foreground">
-              {isAr ? "توزيع الموازنة — إيرادات ومصروفات" : "Budget Breakdown — Revenue & Spending"}
+              {t.budget_breakdownTitle}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              {isAr
-                ? "ارتفاع كل كتلة يعكس حجمها بالنسبة للإجمالي"
-                : "Each block's height is proportional to its share of the total"}
+              {t.budget_breakdownDesc}
             </p>
           </CardHeader>
           <CardContent>
@@ -1004,7 +969,7 @@ export default function BudgetPage() {
               items={activeRevenue}
               total={totalRevenue}
               gdp={gdp}
-              labelHeader={isAr ? "المصدر" : "Source"}
+              labelHeader={t.budget_source}
               accentColor={REVENUE_COLOR}
             />
           </div>
@@ -1016,17 +981,17 @@ export default function BudgetPage() {
               items={activeSpending}
               total={totalSpending}
               gdp={gdp}
-              labelHeader={isAr ? "البند" : "Item"}
+              labelHeader={t.budget_item}
               accentColor={SPENDING_COLOR}
             />
           </div>
         </div>
 
         {/* ── Year-over-Year Comparison ── */}
-        <Card className="bg-card border-border">
+        <Card data-guide="budget-comparison" className="bg-card border-border">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold text-foreground">
-              {isAr ? "المقارنة السنوية" : "Year-over-Year Comparison"}
+              {t.budget_yoyTitle}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1039,13 +1004,11 @@ export default function BudgetPage() {
           <div className="flex items-center gap-2 mb-4">
             <Users size={16} className="text-primary" />
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              {isAr ? "حصة الفرد من الميزانية" : "Your Share of the Budget"}
+              {t.budget_perCapitaTitle}
             </p>
           </div>
           <p className="text-sm text-muted-foreground mb-4">
-            {isAr
-              ? `بتقسيم الميزانية على ${(population / 1_000_000).toFixed(0)} مليون مواطن:`
-              : `Dividing the budget across ${(population / 1_000_000).toFixed(0)}M citizens:`}
+            {t.budget_perCapitaDesc.replace("{pop}", (population / 1_000_000).toFixed(0))}
           </p>
           <PerCapitaSection year={selectedYearStr as FiscalYear} spendingData={activeSpending} revenueData={activeRevenue} populationOverride={population} />
         </div>

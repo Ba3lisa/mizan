@@ -179,7 +179,7 @@ function ArticleRow({
               href={`/constitution/article/${article.number}`}
               className="text-xs text-primary hover:underline inline-flex items-center gap-1"
             >
-              {isAr ? `عرض المادة ${article.number} كاملة ←` : `View Article ${article.number} →`}
+              {t.constitutionPage_viewArticle.replace("{n}", String(article.number))}
             </Link>
 
             {/* Cross-references */}
@@ -304,7 +304,7 @@ export default function ConstitutionPage() {
         {/* Page header */}
         <div>
           <p className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-            {isAr ? "2014 · تعديلات 2019" : "2014 · Amended 2019"}
+            {t.constitutionPage_yearLabel}
           </p>
           <h1 className="text-3xl font-bold text-foreground mb-2">{t.constitutionTitle}</h1>
           <p className="text-muted-foreground">{t.constitutionDesc}</p>
@@ -313,19 +313,19 @@ export default function ConstitutionPage() {
         {/* Quick stats — borderless */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-t border-border">
           <div>
-            <p className="text-xs text-muted-foreground mb-1">{isAr ? "إجمالي المواد" : "Total Articles"}</p>
+            <p className="text-xs text-muted-foreground mb-1">{t.constitutionPage_totalArticles}</p>
             <p className="font-mono text-3xl font-bold tabular-nums">247</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-1">{isAr ? "معدّلة 2019" : "Amended 2019"}</p>
+            <p className="text-xs text-muted-foreground mb-1">{t.constitutionPage_amendedLabel}</p>
             <p className="font-mono text-3xl font-bold tabular-nums">{amendedCount}</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-1">{isAr ? "الأبواب" : "Parts"}</p>
+            <p className="text-xs text-muted-foreground mb-1">{t.constitutionPage_parts}</p>
             <p className="font-mono text-3xl font-bold tabular-nums">6</p>
           </div>
           <div>
-            <p className="text-xs text-muted-foreground mb-1">{isAr ? "صدر" : "Enacted"}</p>
+            <p className="text-xs text-muted-foreground mb-1">{t.constitutionPage_enacted}</p>
             <p className="font-mono text-3xl font-bold tabular-nums">2014</p>
           </div>
         </div>
@@ -351,7 +351,7 @@ export default function ConstitutionPage() {
                       : "text-muted-foreground hover:bg-muted/50"
                   )}
                 >
-                  {isAr ? "جميع الأبواب" : "All Parts"}
+                  {t.constitutionPage_allParts}
                 </button>
                 {parts.map((p) => (
                   <button
@@ -365,7 +365,7 @@ export default function ConstitutionPage() {
                     )}
                   >
                     <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5" style={{ background: p.color }} />
-                    {isAr ? p.titleAr : p.titleEn}
+                    {lang === "ar" ? p.titleAr : p.titleEn}
                   </button>
                 ))}
                 </>
@@ -378,7 +378,7 @@ export default function ConstitutionPage() {
           <div className="flex-1 min-w-0 flex flex-col gap-4">
 
             {/* Search + filter row */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div data-guide="search" className="flex flex-col sm:flex-row gap-3">
               <div className="relative flex-1">
                 <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                 <Input
@@ -418,7 +418,7 @@ export default function ConstitutionPage() {
                 className="cursor-pointer"
                 onClick={() => setSelectedPart(null)}
               >
-                {isAr ? "الكل" : "All"}
+                {t.all}
               </Badge>
               {parts.map((p) => (
                 <Badge
@@ -442,9 +442,9 @@ export default function ConstitutionPage() {
             {/* Result count */}
             <div className="flex items-center justify-between">
               <p className="text-xs text-muted-foreground">
-                {isAr
-                  ? `عرض ${filteredArticles.length} مادة من ${allArticles.length}`
-                  : `Showing ${filteredArticles.length} of ${allArticles.length} articles`}
+                {t.constitutionPage_showingCount
+                  .replace("{shown}", String(filteredArticles.length))
+                  .replace("{total}", String(allArticles.length))}
               </p>
               <a
                 href="https://presidency.eg"
@@ -457,7 +457,7 @@ export default function ConstitutionPage() {
             </div>
 
             {/* Article list */}
-            <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
+            <div data-guide="articles-list" className="rounded-lg border border-border divide-y divide-border overflow-hidden">
               {filteredArticles.length === 0 ? (
                 <div className="py-12 text-center text-sm text-muted-foreground">
                   {t.noResults}

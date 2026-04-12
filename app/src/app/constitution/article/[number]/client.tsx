@@ -13,11 +13,11 @@ import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
 function ArticleNav({
-  current: current,
-  isAr,
+  current,
+  t,
 }: {
   current: number;
-  isAr: boolean;
+  t: ReturnType<typeof useLanguage>["t"];
 }) {
   const hasPrev = current > 1;
   const hasNext = current < 247;
@@ -30,7 +30,7 @@ function ArticleNav({
           className="text-sm text-primary hover:underline inline-flex items-center gap-1"
         >
           <ArrowLeft size={14} />
-          {isAr ? `المادة ${current - 1}` : `Article ${current - 1}`}
+          {t.constitutionArticle_articleN.replace("{n}", String(current - 1))}
         </Link>
       ) : (
         <span />
@@ -40,7 +40,7 @@ function ArticleNav({
           href={`/constitution/article/${current + 1}`}
           className="text-sm text-primary hover:underline inline-flex items-center gap-1"
         >
-          {isAr ? `المادة ${current + 1}` : `Article ${current + 1}`}
+          {t.constitutionArticle_articleN.replace("{n}", String(current + 1))}
           <ChevronRight size={14} />
         </Link>
       )}
@@ -49,7 +49,7 @@ function ArticleNav({
 }
 
 export default function ArticlePageClient({ number }: { number: string }) {
-  const { lang, dir } = useLanguage();
+  const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
   const [showOriginal, setShowOriginal] = useState(false);
 
@@ -75,13 +75,13 @@ export default function ArticlePageClient({ number }: { number: string }) {
       <div className="page-content" dir={dir}>
         <div className="container-page text-center py-20">
           <p className="text-muted-foreground text-sm">
-            {isAr ? "المادة غير موجودة" : "Article not found"}
+            {t.constitutionArticle_notFound}
           </p>
           <Link
             href="/constitution"
             className="text-primary hover:underline text-sm mt-4 inline-block"
           >
-            {isAr ? "← العودة للدستور" : "← Back to Constitution"}
+            {t.constitutionArticle_backToConstitution}
           </Link>
         </div>
       </div>
@@ -90,19 +90,19 @@ export default function ArticlePageClient({ number }: { number: string }) {
 
   return (
     <div className="page-content" dir={dir}>
-      <div className="container-page max-w-3xl">
+      <div data-guide="article-detail" className="container-page max-w-3xl">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-xs text-muted-foreground mb-8">
           <Link href="/" className="hover:text-foreground">
-            {isAr ? "الرئيسية" : "Home"}
+            {t.common_home}
           </Link>
           <ChevronRight size={10} />
           <Link href="/constitution" className="hover:text-foreground">
-            {isAr ? "الدستور" : "Constitution"}
+            {t.navConstitution}
           </Link>
           <ChevronRight size={10} />
           <span className="text-foreground">
-            {isAr ? `المادة ${n}` : `Article ${n}`}
+            {t.constitutionArticle_articleN.replace("{n}", String(n))}
           </span>
         </nav>
 
@@ -110,9 +110,9 @@ export default function ArticlePageClient({ number }: { number: string }) {
           {/* Direct-answer paragraph for GEO */}
           {summaryText && (
             <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
-              {isAr
-                ? `المادة ${n} من الدستور المصري: ${summaryText}`
-                : `Article ${n} of the Egyptian Constitution: ${summaryText}`}
+              {t.constitutionArticle_geoSummary
+                .replace("{n}", String(n))
+                .replace("{summary}", summaryText)}
             </p>
           )}
 
@@ -123,18 +123,18 @@ export default function ArticlePageClient({ number }: { number: string }) {
             </span>
             <div className="pt-2">
               <h1 className="text-xl font-bold mb-2">
-                {isAr ? `المادة ${n}` : `Article ${n}`}
+                {t.constitutionArticle_articleN.replace("{n}", String(n))}
               </h1>
               <div className="flex items-center gap-2 flex-wrap">
                 <Badge variant="outline" className="text-xs">
-                  {isAr ? "دستور 2014" : "Constitution 2014"}
+                  {t.constitutionArticle_constitution2014}
                 </Badge>
                 {article?.wasAmended2019 && (
                   <Badge
                     variant="outline"
                     className="text-xs border-amber-400 text-amber-600 bg-amber-50 dark:bg-amber-950/30"
                   >
-                    {isAr ? "معدّلة 2019" : "Amended 2019"}
+                    {t.amended}
                   </Badge>
                 )}
               </div>
@@ -164,14 +164,14 @@ export default function ArticlePageClient({ number }: { number: string }) {
                     size={14}
                     className={`transition-transform ${showOriginal ? "rotate-180" : ""}`}
                   />
-                  {isAr ? "مقارنة نص ما قبل 2019" : "Compare pre-2019 text"}
+                  {t.constitutionArticle_comparePre2019}
                 </Button>
 
                 {showOriginal && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="p-4 rounded-lg bg-red-50/50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/40">
                       <p className="text-xs font-semibold mb-2 text-red-600 dark:text-red-400">
-                        {isAr ? "قبل التعديل (2014)" : "Before (2014)"}
+                        {t.constitutionArticle_before2014}
                       </p>
                       <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
                         {isAr
@@ -181,7 +181,7 @@ export default function ArticlePageClient({ number }: { number: string }) {
                     </div>
                     <div className="p-4 rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40">
                       <p className="text-xs font-semibold mb-2 text-emerald-600 dark:text-emerald-400">
-                        {isAr ? "بعد التعديل (2019)" : "After (2019)"}
+                        {t.constitutionArticle_after2019}
                       </p>
                       <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
                         {articleText}
@@ -196,7 +196,7 @@ export default function ArticlePageClient({ number }: { number: string }) {
           <Card className="border-border/40 bg-muted/30 mb-8">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground mb-2 font-medium uppercase tracking-wider">
-                {isAr ? "النص الآخر" : "Other language"}
+                {t.constitutionArticle_otherLanguage}
               </p>
               <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
                 {isAr ? article?.textEn : article?.textAr}
@@ -210,10 +210,10 @@ export default function ArticlePageClient({ number }: { number: string }) {
             className="text-sm text-primary hover:underline inline-flex items-center gap-1"
           >
             <ArrowLeft size={14} />
-            {isAr ? "عرض كل المواد" : "View all articles"}
+            {t.constitutionArticle_viewAllArticles}
           </Link>
 
-          {isValidNumber && <ArticleNav current={n} isAr={isAr} />}
+          {isValidNumber && <ArticleNav current={n} t={t} />}
         </Skeleton>
 
         <DataSourceFooter category="constitution" />

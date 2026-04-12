@@ -95,7 +95,7 @@ function OfficialCard({ official, size = "md" }: { official: Official; size?: "l
 // ─── Cabinet Tab ──────────────────────────────────────────────────────────────
 
 export function CabinetTab() {
-  const { lang } = useLanguage();
+  const { lang, t } = useLanguage();
   const isAr = lang === "ar";
   const [ministrySearch, setMinistrySearch] = useState("");
 
@@ -158,21 +158,21 @@ export function CabinetTab() {
   return (
     <Tabs defaultValue="leadership">
       <TabsList className="mb-8">
-        <TabsTrigger value="leadership">{isAr ? "القيادة" : "Leadership"}</TabsTrigger>
-        <TabsTrigger value="ministries">{isAr ? "الوزارات" : "Ministries"}</TabsTrigger>
+        <TabsTrigger value="leadership">{t.cabinetTab_leadership}</TabsTrigger>
+        <TabsTrigger value="ministries">{t.ministries}</TabsTrigger>
       </TabsList>
 
       {/* ═══ LEADERSHIP — Visual Org Chart ═══ */}
       <TabsContent value="leadership">
         <Skeleton name="gov-leadership" loading={isLoading}>
-          <div className="flex flex-col items-center gap-0">
+          <div data-guide="president" className="flex flex-col items-center gap-0">
             {/* President */}
             {president ? (
               <div className="w-full max-w-md">
                 <OfficialCard official={president} size="lg" />
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground py-4">{isAr ? "لا توجد بيانات" : "No data available"}</p>
+              <p className="text-sm text-muted-foreground py-4">{t.common_noData}</p>
             )}
 
             {/* Connector */}
@@ -195,9 +195,9 @@ export function CabinetTab() {
 
             {/* Ministers Grid */}
             {ministries.length > 0 && (
-              <div className="w-full mt-6">
+              <div data-guide="cabinet" className="w-full mt-6">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-4 text-center">
-                  {isAr ? `مجلس الوزراء — ${ministries.length} وزارة` : `Cabinet — ${ministries.length} Ministries`}
+                  {t.govPage_cabinet} -- {ministries.length} {t.ministries}
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {ministries.map(m => {
@@ -240,7 +240,7 @@ export function CabinetTab() {
             )}
 
             {!president && !pm && ministries.length === 0 && (
-              <p className="text-center text-muted-foreground py-20">{isAr ? "لا توجد بيانات متاحة" : "No data available"}</p>
+              <p className="text-center text-muted-foreground py-20">{t.common_noData}</p>
             )}
 
             <DataSourceFooter category="government" />
@@ -256,16 +256,16 @@ export function CabinetTab() {
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
               <div className="relative flex-1 max-w-sm">
                 <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                <Input value={ministrySearch} onChange={e => setMinistrySearch(e.target.value)} placeholder={isAr ? "بحث بالاسم أو الوزير..." : "Search by name or minister..."} className="ps-9 text-sm" />
+                <Input value={ministrySearch} onChange={e => setMinistrySearch(e.target.value)} placeholder={t.cabinetTab_searchMinistries} className="ps-9 text-sm" />
               </div>
               <span className="text-xs text-muted-foreground">
-                {isAr ? `${ministries.length} وزارة` : `${ministries.length} ministries`}
+                {ministries.length} {t.ministries}
               </span>
             </div>
 
             {/* Ministry cards */}
             {ministries.length === 0 ? (
-              <p className="text-center text-muted-foreground py-20">{isAr ? "لا توجد بيانات متاحة" : "No data available"}</p>
+              <p className="text-center text-muted-foreground py-20">{t.common_noData}</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {filteredMinistries.map(m => {
@@ -283,7 +283,7 @@ export function CabinetTab() {
                         {m.employees > 0 && (
                           <div className="text-end flex-shrink-0">
                             <p className="font-mono text-sm font-bold text-foreground">{m.employees >= 1000000 ? `${(m.employees / 1000000).toFixed(1)}M` : `${Math.round(m.employees / 1000)}K`}</p>
-                            <p className="text-[0.625rem] text-muted-foreground">{isAr ? "موظف" : "employees"}</p>
+                            <p className="text-[0.625rem] text-muted-foreground">{t.employees}</p>
                           </div>
                         )}
                       </CardContent>
@@ -293,10 +293,10 @@ export function CabinetTab() {
               </div>
             )}
             {filteredMinistries.length === 0 && ministries.length > 0 && (
-              <p className="text-sm text-muted-foreground py-12 text-center">{isAr ? "لا توجد نتائج" : "No results"}</p>
+              <p className="text-sm text-muted-foreground py-12 text-center">{t.noResults}</p>
             )}
             <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground">{filteredMinistries.length} {isAr ? "وزارة" : "ministries"}</p>
+              <p className="text-xs text-muted-foreground">{filteredMinistries.length} {t.ministries}</p>
             </div>
             <DataSourceFooter category="government" />
           </>

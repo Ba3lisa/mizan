@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { usePersistedState } from "@/lib/use-persisted-state";
 import { createPortal } from "react-dom";
 import { useQuery } from "convex/react";
 import { api } from "../../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
+import { useWebMCPTool, mcpJSON } from "@/lib/webmcp";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -22,6 +23,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { AdjustableSlider } from "@/components/adjustable-slider";
+import { Slider } from "@/components/ui/slider";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -310,7 +312,8 @@ function SensitivityBar({
   max,
   steps,
   currentValue,
-  isAr,
+  rentingBetterLabel,
+  buyingBetterLabel,
 }: {
   params: CalcParams;
   paramKey: keyof CalcParams;
@@ -318,7 +321,8 @@ function SensitivityBar({
   max: number;
   steps: number;
   currentValue: number;
-  isAr: boolean;
+  rentingBetterLabel: string;
+  buyingBetterLabel: string;
 }) {
   const segments = useMemo(() => {
     const arr: boolean[] = [];
@@ -349,8 +353,8 @@ function SensitivityBar({
         <div className="w-0.5 h-4 bg-white/80 rounded-full mx-auto" />
       </div>
       <div className="flex justify-between text-[0.55rem] text-muted-foreground/50 mt-1">
-        <span style={{ color: "#C9A84C" }}>{isAr ? "الإيجار أفضل" : "Renting better"}</span>
-        <span style={{ color: "#3FC380" }}>{isAr ? "الشراء أفضل" : "Buying better"}</span>
+        <span style={{ color: "#C9A84C" }}>{rentingBetterLabel}</span>
+        <span style={{ color: "#3FC380" }}>{buyingBetterLabel}</span>
       </div>
     </div>
   );
@@ -388,14 +392,14 @@ function SummaryRow({
           highlight ? "text-[#E5484D]" : ""
         }`}
       >
-        {fmtCompact(buy)} ج.م
+        {fmtCompact(buy)} EGP
       </span>
       <span
         className={`w-24 text-end font-mono ${
           highlight ? "text-[#C9A84C]" : ""
         }`}
       >
-        {fmtCompact(rent)} ج.م
+        {fmtCompact(rent)} EGP
       </span>
     </div>
   );
@@ -407,13 +411,14 @@ function Section({
   title,
   description,
   children,
+  ...rest
 }: {
   title: string;
   description: string;
   children: React.ReactNode;
-}) {
+} & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className="border-t border-border pt-10 mt-10 first:border-t-0 first:pt-0 first:mt-0">
+    <div className="border-t border-border pt-10 mt-10 first:border-t-0 first:pt-0 first:mt-0" {...rest}>
       <h2 className="text-xl font-bold mb-2">{title}</h2>
       <p className="text-sm text-muted-foreground mb-8">{description}</p>
       {children}
@@ -424,8 +429,9 @@ function Section({
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function BuyVsRentPage() {
-  const { lang, dir } = useLanguage();
-  const isAr = lang === "ar";
+  const { t, lang, dir } = useLanguage();
+  // Translation helper for keys not yet in translations.ts — will be added in a follow-up
+  
   const mortgageData = useQuery(api.tools.getMortgageRate);
   const investmentData = useQuery(api.tools.getInvestmentDefaults);
 
@@ -542,7 +548,100 @@ export default function BuyVsRentPage() {
     return calcMonthlyMortgage(loan, mortgageRatePct, mortgageTerm);
   }, [financingType, homePrice, downPaymentPct, mortgageRatePct, mortgageTerm]);
 
-  const t = (ar: string, en: string) => (isAr ? ar : en);
+  // ─── WebMCP: expose buy-vs-rent calculator to AI agents ──────────────────
+  const bvrSchema = useMemo(() => ({
+    type: "object" as const,
+    properties: {
+      homePrice: { type: "number", description: "Property price in EGP (e.g. 3000000)", minimum: 100_000 },
+      monthlyRent: { type: "number", description: "Current monthly rent in EGP (e.g. 10000)", minimum: 500 },
+      years: { type: "number", description: "Time horizon in years (1-30)", minimum: 1, maximum: 30 },
+      financingType: { type: "string", enum: ["mortgage", "installments", "cash"], description: "How you'd finance the purchase" },
+      downPaymentPct: { type: "number", description: "Down payment as % of home price (0-100)", minimum: 0, maximum: 100 },
+      mortgageRatePct: { type: "number", description: "Annual mortgage interest rate %", minimum: 0, maximum: 50 },
+      homePriceGrowthPct: { type: "number", description: "Expected annual home price appreciation %", minimum: 0 },
+      rentGrowthPct: { type: "number", description: "Expected annual rent increase %", minimum: 0 },
+      investmentReturnPct: { type: "number", description: "Expected return on alternative investments %", minimum: 0 },
+      inflationPct: { type: "number", description: "Expected annual inflation rate %", minimum: 0 },
+    },
+    required: ["homePrice", "monthlyRent"],
+  }), []);
+
+  useWebMCPTool({
+    name: "compare_buy_vs_rent",
+    description: "Compare the total cost of buying vs renting a home in Egypt over a given time horizon. Accounts for mortgage payments, home appreciation, inflation, EGP depreciation, opportunity cost of the down payment, maintenance, and closing costs. Returns verdict (buy or rent), total costs for each, breakeven year, and detailed cost breakdowns.",
+    title: "Buy vs Rent Calculator (Egypt)",
+    inputSchema: bvrSchema,
+    execute: useCallback((input: Record<string, unknown>) => {
+      const hp = Number(input.homePrice) || homePrice;
+      const mr = Number(input.monthlyRent) || monthlyRent;
+      const yr = Number(input.years) || years;
+      const ft = (input.financingType as FinancingType) || financingType;
+
+      // Apply inputs to UI
+      if (input.homePrice) setHomePrice(hp);
+      if (input.monthlyRent) setMonthlyRent(mr);
+      if (input.years) setYears(yr);
+      if (input.financingType) setFinancingType(ft);
+      if (input.downPaymentPct !== undefined) setDownPaymentPct(Number(input.downPaymentPct));
+      if (input.mortgageRatePct !== undefined) setMortgageRatePct(Number(input.mortgageRatePct));
+      if (input.homePriceGrowthPct !== undefined) setHomePriceGrowthPct(Number(input.homePriceGrowthPct));
+      if (input.rentGrowthPct !== undefined) setRentGrowthPct(Number(input.rentGrowthPct));
+      if (input.investmentReturnPct !== undefined) setInvestmentReturnPct(Number(input.investmentReturnPct));
+      if (input.inflationPct !== undefined) setInflationPct(Number(input.inflationPct));
+
+      // Compute with current + overridden params
+      const p: CalcParams = {
+        ...params,
+        homePrice: hp,
+        monthlyRent: mr,
+        years: yr,
+        financingType: ft,
+        ...(input.downPaymentPct !== undefined ? { downPaymentPct: Number(input.downPaymentPct) } : {}),
+        ...(input.mortgageRatePct !== undefined ? { mortgageRatePct: Number(input.mortgageRatePct) } : {}),
+        ...(input.homePriceGrowthPct !== undefined ? { homePriceGrowthPct: Number(input.homePriceGrowthPct) } : {}),
+        ...(input.rentGrowthPct !== undefined ? { rentGrowthPct: Number(input.rentGrowthPct) } : {}),
+        ...(input.investmentReturnPct !== undefined ? { investmentReturnPct: Number(input.investmentReturnPct) } : {}),
+        ...(input.inflationPct !== undefined ? { inflationPct: Number(input.inflationPct) } : {}),
+      };
+
+      const buy = calculateBuyCosts(p, yr);
+      const rent = calculateRentCosts(p, yr);
+      const be = findBreakeven(p);
+
+      return mcpJSON({
+        verdict: buy.total < rent.total ? "buy" : "rent",
+        savingsEgp: Math.round(Math.abs(buy.total - rent.total)),
+        timeHorizonYears: yr,
+        financingType: ft,
+        currency: "EGP",
+        buyCosts: {
+          totalEgp: Math.round(buy.total),
+          initialCosts: Math.round(buy.initialCosts),
+          recurringCosts: Math.round(buy.recurringCosts),
+          opportunityCosts: Math.round(buy.opportunityCosts),
+          netProceeds: Math.round(buy.netProceeds),
+        },
+        rentCosts: {
+          totalEgp: Math.round(rent.total),
+          initialCosts: Math.round(rent.initialCosts),
+          recurringCosts: Math.round(rent.recurringCosts),
+          opportunityCosts: Math.round(rent.opportunityCosts),
+        },
+        breakevenYear: be,
+        assumptions: {
+          homePrice: hp,
+          monthlyRent: mr,
+          homePriceGrowthPct: p.homePriceGrowthPct,
+          rentGrowthPct: p.rentGrowthPct,
+          inflationPct: p.inflationPct,
+          investmentReturnPct: p.investmentReturnPct,
+        },
+      });
+    }, [params, homePrice, monthlyRent, years, financingType,
+        setHomePrice, setMonthlyRent, setYears, setFinancingType,
+        setDownPaymentPct, setMortgageRatePct, setHomePriceGrowthPct,
+        setRentGrowthPct, setInvestmentReturnPct, setInflationPct]),
+  });
 
   return (
     <div className="page-content" dir={dir}>
@@ -552,17 +651,14 @@ export default function BuyVsRentPage() {
         {/* ─── Header ─────────────────────────────────────────────────────── */}
         <div className="mb-10">
           <p className="text-xs font-semibold text-primary uppercase tracking-widest mb-2">
-            {t("أدوات التحليل المالي", "Financial Tools")}
+            {t.buyVsRent_sectionLabel}
           </p>
           <h1 className="text-3xl md:text-4xl font-black mb-3 flex items-center gap-3">
             <Scale className="text-primary" size={32} />
-            {t("شراء أم إيجار؟", "Buy or Rent?")}
+            {t.buyVsRent_title}
           </h1>
           <p className="text-muted-foreground text-sm max-w-xl">
-            {t(
-              "احسب القرار الأذكى في السوق المصري — مع مراعاة التضخم وانخفاض الجنيه وعوائد الاستثمار",
-              "Calculate the smarter choice for Egypt's market — factoring in inflation, EGP depreciation, and investment returns"
-            )}
+            {t.buyVsRent_subtitle}
           </p>
         </div>
 
@@ -573,6 +669,7 @@ export default function BuyVsRentPage() {
             <Card className="border-border/60 bg-card/80 backdrop-blur-sm overflow-hidden">
               {/* Verdict banner */}
               <div
+                data-guide="verdict"
                 className={`px-5 py-4 ${
                   buyWins
                     ? "bg-[#3FC380]/10 border-b border-[#3FC380]/20"
@@ -591,106 +688,85 @@ export default function BuyVsRentPage() {
                     }`}
                   >
                     {buyWins
-                      ? t("الشراء أفضل", "Buying Wins")
-                      : t("الإيجار أفضل", "Renting Wins")}
+                      ? t.buyVsRent_buyingWins
+                      : t.buyVsRent_rentingWins}
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {t("توفر", "Save")}{" "}
+                  {t.buyVsRent_save}{" "}
                   <span className="font-mono font-bold text-foreground">
-                    {fmtCompact(savings)} ج.م
+                    {fmtCompact(savings)} EGP
                   </span>{" "}
-                  {t(`خلال ${years} سنوات`, `over ${years} years`)}
+                  {t.buyVsRent_over} {years} {t.common_yr}
                 </p>
                 <p className="text-[0.6rem] text-muted-foreground/50 font-mono" dir="ltr">
                   ≈ ${fmtCompact(toUsd(savings))} USD
                 </p>
                 {breakeven !== null && (
                   <p className="text-[0.65rem] text-muted-foreground/70 mt-1">
-                    {t(
-                      `نقطة التعادل: ${breakeven} سنة`,
-                      `Breakeven: year ${breakeven}`
-                    )}
+                    {t.buyVsRent_breakeven}: {t.invest_year} {breakeven}
                   </p>
                 )}
                 {breakeven === null && (
                   <p className="text-[0.65rem] text-muted-foreground/70 mt-1">
-                    {t(
-                      "الشراء لا يُعادل الإيجار خلال 40 سنة",
-                      "Buying never beats renting within 40 years"
-                    )}
+                    {t.buyVsRent_neverBeats}
                   </p>
                 )}
               </div>
 
-              <CardContent className="p-5">
+              <CardContent data-guide="bvr-breakdown" className="p-5">
                 {/* Column headers */}
                 <div className="flex items-center justify-between text-[0.65rem] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  <span className="flex-1">{t(`${years} سنوات`, `${years} yrs`)}</span>
-                  <span className="w-24 text-end">{t("شراء", "Buy")}</span>
-                  <span className="w-24 text-end">{t("إيجار", "Rent")}</span>
+                  <span className="flex-1">{years} {t.common_yr}</span>
+                  <span className="w-24 text-end">{t.buyVsRent_buy}</span>
+                  <span className="w-24 text-end">{t.buyVsRent_rent}</span>
                 </div>
 
                 <Separator className="mb-3" />
 
                 <SummaryRow
-                  label={t("التكاليف الأولية", "Initial Costs")}
+                  label={t.buyVsRent_initialCosts}
                   buy={buyCosts.initialCosts}
                   rent={rentCosts.initialCosts}
-                  tooltip={t(
-                    "إجمالي ما ستدفعه نقدًا في اليوم الأول: المقدم + رسوم التسجيل + المصاريف الإدارية",
-                    "Total cash paid on Day 1: Down payment + closing fees + registration"
-                  )}
+                  tooltip={t.buyVsRent_initialCostsTooltip}
                 />
                 <SummaryRow
-                  label={t("التكاليف المتكررة", "Recurring Costs")}
+                  label={t.buyVsRent_recurringCosts}
                   buy={buyCosts.recurringCosts}
                   rent={rentCosts.recurringCosts}
-                  tooltip={t(
-                    "إجمالي كل ما ستدفعه خلال المدة: الصيانة + الخدمات + الأقساط (مع مراعاة زيادة الأسعار سنوياً)",
-                    "Total of every payment made over the term: Maintenance + utilities + fees + mortgage (inflated over time)"
-                  )}
+                  tooltip={t.buyVsRent_recurringCostsTooltip}
                 />
                 <SummaryRow
-                  label={t("تكلفة الفرصة", "Opportunity Cost")}
+                  label={t.buyVsRent_opportunityCost}
                   buy={buyCosts.opportunityCosts}
                   rent={rentCosts.opportunityCosts}
-                  tooltip={t(
-                    "العائد المفقود (للمشتري) أو المكتسب (للمستأجر) من استثمار مبلغ المقدم والرسوم",
-                    "Foreground investment returns lost (Buyer) or gained (Renter) on the initial capital"
-                  )}
+                  tooltip={t.buyVsRent_opportunityCostTooltip}
                 />
                 <SummaryRow
-                  label={t("صافي العائد من البيع", "Net Sale Proceeds")}
+                  label={t.buyVsRent_netSaleProceeds}
                   buy={buyCosts.netProceeds}
                   rent={rentCosts.netProceeds}
-                  tooltip={t(
-                    "المبلغ المتوقع استرداده عند بيع العقار في نهاية المدة (بعد خصم عمولة البيع وتصفية القرض)",
-                    "The projected money returned upon selling the home at the end (minus selling costs and remaining loan)"
-                  )}
+                  tooltip={t.buyVsRent_netSaleProceedsTooltip}
                 />
 
                 <Separator className="my-3" />
 
                 <SummaryRow
-                  label={t("الإجمالي", "Total")}
+                  label={t.buyVsRent_total}
                   buy={buyCosts.total}
                   rent={rentCosts.total}
                   highlight
-                  tooltip={t(
-                    "مجموع كل التكاليف والفوائد (بالقيمة الاسمية المستقلبية). يعبر عن صافي التكلفة الحقيقية لكل اختيار.",
-                    "The sum of all costs and returns (in future nominal EGP). Represents the true net cost."
-                  )}
+                  tooltip={t.buyVsRent_totalTooltip}
                 />
 
                 {/* Monthly mortgage pill */}
                 {financingType === "mortgage" && monthlyMortgage > 0 && (
                   <div className="mt-4 p-3 rounded-lg bg-muted/40 text-center">
                     <p className="text-[0.65rem] text-muted-foreground mb-0.5">
-                      {t("القسط الشهري", "Monthly Mortgage")}
+                      {t.buyVsRent_monthlyMortgage}
                     </p>
                     <p className="font-mono font-bold text-lg text-primary">
-                      {fmtCompact(monthlyMortgage)} ج.م
+                      {fmtCompact(monthlyMortgage)} EGP
                     </p>
                   </div>
                 )}
@@ -720,27 +796,23 @@ export default function BuyVsRentPage() {
           <div className="lg:col-span-2 space-y-0">
             {/* ── Section 1: Basics ──────────────────────────────────────── */}
             <Section
-              title={t("الأساسيات", "The Basics")}
-              description={t(
-                "أدخل سعر العقار والإيجار وعدد السنوات التي تخطط للبقاء فيها",
-                "Enter the home price, rent amount, and how long you plan to stay"
-              )}
+              data-guide="bvr-basics"
+              title={t.buyVsRent_basicsTitle}
+              description={t.buyVsRent_basicsDesc}
             >
               <SliderRow
-                label={t("سعر العقار", "Home Price")}
+                label={t.buyVsRent_homePrice}
                 value={homePrice}
                 min={500_000}
                 max={30_000_000}
                 step={100_000}
-                displayValue={`${fmtCompact(homePrice)} ج.م`}
+                displayValue={`${fmtCompact(homePrice)} EGP`}
                 onChange={setHomePrice}
-                tooltip={t(
-                  "متوسط الأسعار: القاهرة 2-5 مليون، العاصمة الإدارية 1.5-4 مليون، الإسكندرية 1-3 مليون جنيه",
-                  "Average prices: Cairo 2-5M, New Capital 1.5-4M, Alexandria 1-3M EGP"
-                )}
+                tooltip={t.buyVsRent_homePriceTooltip}
               />
               <SensitivityBar
-                isAr={isAr}
+                rentingBetterLabel={t.buyVsRent_rentingBetter}
+                buyingBetterLabel={t.buyVsRent_buyingBetter}
                 params={params}
                 paramKey="homePrice"
                 min={500_000}
@@ -750,20 +822,18 @@ export default function BuyVsRentPage() {
               />
 
               <SliderRow
-                label={t("الإيجار الشهري", "Monthly Rent")}
+                label={t.buyVsRent_monthlyRent}
                 value={monthlyRent}
                 min={2_000}
                 max={80_000}
                 step={500}
-                displayValue={`${fmtCompact(monthlyRent)} ج.م`}
+                displayValue={`${fmtCompact(monthlyRent)} EGP`}
                 onChange={setMonthlyRent}
-                tooltip={t(
-                  "إيجار عقار مماثل. تحقق من أوليكس أو عقارماب للأسعار المقارنة.",
-                  "What you'd pay to rent a similar property. Check OLX or Aqarmap."
-                )}
+                tooltip={t.buyVsRent_monthlyRentTooltip}
               />
               <SensitivityBar
-                isAr={isAr}
+                rentingBetterLabel={t.buyVsRent_rentingBetter}
+                buyingBetterLabel={t.buyVsRent_buyingBetter}
                 params={params}
                 paramKey="monthlyRent"
                 min={2_000}
@@ -773,20 +843,18 @@ export default function BuyVsRentPage() {
               />
 
               <SliderRow
-                label={t("مدة البقاء (سنوات)", "How Long Do You Plan to Stay")}
+                label={t.buyVsRent_howLong}
                 value={years}
                 min={1}
                 max={40}
                 step={1}
-                displayValue={`${years} ${t("سنة", "yrs")}`}
+                displayValue={`${years} ${t.common_yr}`}
                 onChange={setYears}
-                tooltip={t(
-                  "الشراء يصبح أفضل كلما طالت المدة — التكاليف الأولية تُوزَّع على سنوات أكثر",
-                  "Buying improves the longer you stay — upfront costs spread over more years"
-                )}
+                tooltip={t.buyVsRent_howLongTooltip}
               />
               <SensitivityBar
-                isAr={isAr}
+                rentingBetterLabel={t.buyVsRent_rentingBetter}
+                buyingBetterLabel={t.buyVsRent_buyingBetter}
                 params={params}
                 paramKey="years"
                 min={1}
@@ -798,25 +866,23 @@ export default function BuyVsRentPage() {
 
             {/* ── Section 2: Financing ───────────────────────────────────── */}
             <Section
-              title={t("تفاصيل التمويل", "Financing Details")}
-              description={t(
-                "في مصر، كثير من المشترين يعتمدون على تقسيط المطور بدل القرض البنكي",
-                "In Egypt, many buyers use developer installments (تقسيط) rather than bank mortgages"
-              )}
+              data-guide="bvr-financing"
+              title={t.buyVsRent_financingTitle}
+              description={t.buyVsRent_financingDesc}
             >
               {/* Financing type selector */}
               <div className="mb-6">
                 <p className="text-sm font-medium text-foreground/80 mb-3">
-                  {t("نوع التمويل", "Financing Type")}
+                  {t.buyVsRent_financingType}
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {(
                     [
-                      { key: "mortgage", ar: "قرض بنكي", en: "Bank Mortgage" },
-                      { key: "installments", ar: "تقسيط المطور", en: "Developer Installments" },
-                      { key: "cash", ar: "كاش", en: "Cash" },
-                    ] as const
-                  ).map(({ key, ar, en }) => (
+                      { key: "mortgage", label: t.buyVsRent_bankMortgage },
+                      { key: "installments", label: t.buyVsRent_devInstallments },
+                      { key: "cash", label: t.buyVsRent_cash },
+                    ] as { key: FinancingType; label: string }[]
+                  ).map(({ key, label }) => (
                     <button
                       key={key}
                       onClick={() => setFinancingType(key)}
@@ -826,7 +892,7 @@ export default function BuyVsRentPage() {
                           : "border-border text-muted-foreground hover:border-primary/40"
                       }`}
                     >
-                      {t(ar, en)}
+                      {label}
                     </button>
                   ))}
                 </div>
@@ -835,22 +901,19 @@ export default function BuyVsRentPage() {
               {financingType === "mortgage" && (
                 <>
                   <SliderRow
-                    label={t("نسبة الدفعة المقدمة", "Down Payment")}
+                    label={t.buyVsRent_downPayment}
                     value={downPaymentPct}
                     min={0}
                     max={100}
                     step={5}
-                    displayValue={`${downPaymentPct}% — ${fmtCompact(homePrice * downPaymentPct / 100)} ج.م`}
+                    displayValue={`${downPaymentPct}% — ${fmtCompact(homePrice * downPaymentPct / 100)} EGP`}
                     onChange={setDownPaymentPct}
-                    tooltip={t(
-                      "البنوك المصرية تطلب عادة 15-30% مقدم",
-                      "Egyptian banks typically require 15-30% down payment"
-                    )}
+                    tooltip={t.buyVsRent_downPaymentTooltip}
                   />
                   <div className="mb-6">
                     <div className="flex items-center gap-1.5 mb-2">
                       <label className="text-sm font-medium text-foreground/80">
-                        {t("معدل الفائدة", "Mortgage Rate")}
+                        {t.buyVsRent_mortgageRate}
                       </label>
                       {mortgageData && (
                         <SanadBadge
@@ -862,29 +925,24 @@ export default function BuyVsRentPage() {
                         />
                       )}
                       <InputTooltip
-                        text={t(
-                          "معدل البنك المركزي الحالي. أسعار البنوك الفعلية قد تختلف.",
-                          "Current CBE benchmark rate. Actual bank rates may vary."
-                        )}
+                        text={t.buyVsRent_mortgageRateTooltip}
                       />
                       <span className="ms-auto font-mono text-sm font-bold">
                         {mortgageRatePct.toFixed(1)}%
                       </span>
                     </div>
-                    <input
-                      type="range"
+                    <Slider
                       dir="ltr"
                       min={0}
                       max={30}
                       step={0.5}
-                      value={mortgageRatePct}
-                      onChange={(e) => setMortgageRatePct(Number(e.target.value))}
-                      className="w-full h-1.5 rounded-full appearance-none bg-muted cursor-pointer accent-[#C9A84C]"
+                      value={[mortgageRatePct]}
+                      onValueChange={([v]) => setMortgageRatePct(v)}
                     />
                   </div>
                   <div className="mb-6">
                     <p className="text-sm font-medium text-foreground/80 mb-2">
-                      {t("مدة القرض", "Mortgage Term")}
+                      {t.buyVsRent_mortgageTerm}
                     </p>
                     <div className="flex gap-2" dir="ltr">
                       {[5, 10, 15, 20, 25, 30].map((yr) => (
@@ -908,107 +966,83 @@ export default function BuyVsRentPage() {
               {financingType === "installments" && (
                 <>
                   <SliderRow
-                    label={t("نسبة الدفعة المقدمة", "Down Payment")}
+                    label={t.buyVsRent_downPayment}
                     value={installDownPaymentPct}
                     min={0}
                     max={50}
                     step={5}
-                    displayValue={`${installDownPaymentPct}% — ${fmtCompact(homePrice * installDownPaymentPct / 100)} ج.م`}
+                    displayValue={`${installDownPaymentPct}% — ${fmtCompact(homePrice * installDownPaymentPct / 100)} EGP`}
                     onChange={setInstallDownPaymentPct}
-                    tooltip={t(
-                      "مطورون مصريون يقبلون مقدم 5-20%",
-                      "Egyptian developers accept 5-20% down"
-                    )}
+                    tooltip={t.buyVsRent_installDownTooltip}
                   />
                   <SliderRow
-                    label={t("فترة التقسيط (سنوات)", "Installment Period")}
+                    label={t.buyVsRent_installPeriod}
                     value={installPeriod}
                     min={1}
                     max={10}
                     step={1}
-                    displayValue={`${installPeriod} ${t("سنوات", "years")}`}
+                    displayValue={`${installPeriod} ${t.common_yr}`}
                     onChange={setInstallPeriod}
-                    tooltip={t(
-                      "معظم مطوري مصر يقدمون تقسيطاً 4-8 سنوات",
-                      "Most Egyptian developers offer 4-8 year installment plans"
-                    )}
+                    tooltip={t.buyVsRent_installPeriodTooltip}
                   />
                   <SliderRow
-                    label={t("زيادة سنوية على الأقساط", "Annual Price Increase on Installments")}
+                    label={t.buyVsRent_annualIncrease}
                     value={installAnnualIncreasePct}
                     min={0}
                     max={15}
                     step={1}
                     displayValue={`${installAnnualIncreasePct}%`}
                     onChange={setInstallAnnualIncreasePct}
-                    tooltip={t(
-                      "بعض المطورين يطبقون زيادة سنوية على الأقساط",
-                      "Some developers apply annual escalation on installments"
-                    )}
+                    tooltip={t.buyVsRent_annualIncreaseTooltip}
                   />
                 </>
               )}
 
               {financingType === "cash" && (
                 <div className="p-4 rounded-lg bg-muted/30 border border-border/50 text-sm text-muted-foreground">
-                  {t(
-                    "الشراء بالكاش — لا توجد أقساط. الدفعة المقدمة = كامل سعر العقار.",
-                    "Cash purchase — no mortgage payments. Down payment = full price."
-                  )}
+                  {t.buyVsRent_cashNote}
                 </div>
               )}
             </Section>
 
             {/* ── Section 3: Future ─────────────────────────────────────── */}
             <Section
-              title={t("ماذا يحمل المستقبل؟", "What Does the Future Hold?")}
-              description={t(
-                "السوق المصري يتميز بتضخم مرتفع وانخفاض الجنيه — هذه العوامل تؤثر كثيراً على الحساب",
-                "Egypt's market has high inflation and EGP depreciation — these heavily influence the result"
-              )}
+              title={t.buyVsRent_futureTitle}
+              description={t.buyVsRent_futureDesc}
             >
               <SliderRow
-                label={t("نمو أسعار العقارات سنوياً", "Home Price Growth Rate")}
+                label={t.buyVsRent_homePriceGrowth}
                 value={homePriceGrowthPct}
                 min={-5}
                 max={25}
                 step={1}
                 displayValue={`${homePriceGrowthPct}%`}
                 onChange={setHomePriceGrowthPct}
-                tooltip={t(
-                  "العقارات المصرية ارتفعت 12-20% سنوياً مؤخراً (اسمياً قبل التضخم)",
-                  "Egyptian real estate appreciated 12-20% annually recently (nominal, pre-inflation)"
-                )}
+                tooltip={t.buyVsRent_homePriceGrowthTooltip}
               />
               <SliderRow
-                label={t("نمو الإيجار سنوياً", "Rent Growth Rate")}
+                label={t.buyVsRent_rentGrowth}
                 value={rentGrowthPct}
                 min={0}
                 max={20}
                 step={1}
                 displayValue={`${rentGrowthPct}%`}
                 onChange={setRentGrowthPct}
-                tooltip={t(
-                  "الإيجارات المصرية ترتفع 8-15% سنوياً",
-                  "Egyptian rents increase 8-15% annually"
-                )}
+                tooltip={t.buyVsRent_rentGrowthTooltip}
               />
               <SliderRow
-                label={t("عائد الاستثمار البديل", "Investment Return Rate")}
+                label={t.buyVsRent_investReturn}
                 value={investmentReturnPct}
                 min={0}
                 max={30}
                 step={1}
                 displayValue={`${investmentReturnPct}%`}
                 onChange={setInvestmentReturnPct}
-                tooltip={t(
-                  "لو استأجرت، مدخراتك تُستثمر. أذون الخزانة ~22%، الشهادات ~19%",
-                  "If renting, your savings are invested. T-bills yield ~22%, CDs ~19%"
-                )}
+                tooltip={t.buyVsRent_investReturnTooltip}
               />
               {investmentData?.["egypt_tbill_rate"] && (
                 <p className="text-[0.625rem] text-muted-foreground -mt-4 mb-5">
-                  {t("أذون الخزانة: ", "T-bill rate: ")}
+                  {t.buyVsRent_tbillRate}{" "}
                   <span className="text-primary font-mono">
                     {investmentData["egypt_tbill_rate"].value.toFixed(1)}%
                   </span>
@@ -1022,7 +1056,7 @@ export default function BuyVsRentPage() {
                 </p>
               )}
               <SliderRow
-                label={t("معدل التضخم", "Inflation Rate")}
+                label={t.buyVsRent_inflationRate}
                 value={inflationPct}
                 min={0}
                 max={40}
@@ -1039,179 +1073,134 @@ export default function BuyVsRentPage() {
                     />
                   ) : undefined
                 }
-                tooltip={t(
-                  "التضخم في مصر وصل ~33% عام 2023. يؤثر على القيمة الحقيقية للأصول.",
-                  "Egypt's inflation hit ~33% in 2023. Affects the real value of assets."
-                )}
+                tooltip={t.buyVsRent_inflationTooltip}
               />
               <SliderRow
-                label={t("انخفاض الجنيه سنوياً", "EGP Depreciation")}
+                label={t.buyVsRent_egpDepreciation}
                 value={egpDepreciationPct}
                 min={0}
                 max={30}
                 step={1}
                 displayValue={`${egpDepreciationPct}%`}
                 onChange={setEgpDepreciationPct}
-                tooltip={t(
-                  "انخفض الجنيه ~50% مقابل الدولار منذ 2022. يؤثر على القيمة الدولارية.",
-                  "The EGP depreciated ~50% vs USD since 2022. Affects USD-value calculations."
-                )}
+                tooltip={t.buyVsRent_egpDepreciationTooltip}
               />
             </Section>
 
             {/* ── Section 4: Buy Costs ──────────────────────────────────── */}
             <Section
-              title={t("التكاليف والرسوم", "Costs & Fees")}
-              description={t(
-                "رسوم التسجيل والصيانة والتأمين والخدمات المشتركة — مصاريف يغفلها كثيرون",
-                "Registration fees, maintenance, insurance, and common charges — costs many overlook"
-              )}
+              title={t.buyVsRent_costsTitle}
+              description={t.buyVsRent_costsDesc}
             >
               <SliderRow
-                label={t("تكاليف الإغلاق (شراء)", "Closing Costs (Buying)")}
+                label={t.buyVsRent_closingCosts}
                 value={closingCostsPct}
                 min={0}
                 max={10}
                 step={0.5}
                 displayValue={`${closingCostsPct}%`}
                 onChange={setClosingCostsPct}
-                tooltip={t(
-                  "رسوم التسجيل والمحامي والتوثيق — عادة 2-5% في مصر",
-                  "Registration, lawyer, notary fees — typically 2-5% in Egypt"
-                )}
+                tooltip={t.buyVsRent_closingCostsTooltip}
               />
               <SliderRow
-                label={t("تكاليف البيع", "Selling Costs")}
+                label={t.buyVsRent_sellingCosts}
                 value={sellingCostsPct}
                 min={0}
                 max={10}
                 step={0.5}
                 displayValue={`${sellingCostsPct}%`}
                 onChange={setSellingCostsPct}
-                tooltip={t(
-                  "عمولة السمسار + رسوم النقل — عادة 2-3%",
-                  "Broker commission + transfer fees — typically 2-3%"
-                )}
+                tooltip={t.buyVsRent_sellingCostsTooltip}
               />
               <SliderRow
-                label={t("الصيانة والتجديد السنوية", "Annual Maintenance & Renovation")}
+                label={t.buyVsRent_maintenance}
                 value={maintenancePct}
                 min={0}
                 max={5}
                 step={0.25}
                 displayValue={`${maintenancePct}%`}
                 onChange={setMaintenancePct}
-                tooltip={t(
-                  "عادة 0.5-2% من قيمة العقار سنوياً",
-                  "Typically 0.5-2% of property value annually"
-                )}
+                tooltip={t.buyVsRent_maintenanceTooltip}
               />
               <SliderRow
-                label={t("تأمين المنزل السنوي", "Homeowner's Insurance")}
+                label={t.buyVsRent_insurance}
                 value={insurancePct}
                 min={0}
                 max={3}
                 step={0.05}
                 displayValue={`${insurancePct}%`}
                 onChange={setInsurancePct}
-                tooltip={t(
-                  "التأمين على المنزل — نادر الشيوع في مصر لكن مستحسن",
-                  "Home insurance — less common in Egypt but advisable"
-                )}
+                tooltip={t.buyVsRent_insuranceTooltip}
               />
               <SliderRow
-                label={t("ضريبة الأملاك السنوية", "Annual Property Tax Rate")}
+                label={t.buyVsRent_propertyTax}
                 value={propertyTaxPct}
                 min={0}
                 max={5}
                 step={0.1}
                 displayValue={`${propertyTaxPct}%`}
                 onChange={setPropertyTaxPct}
-                tooltip={t(
-                  "مصر: الوحدات السكنية أقل من 2 مليون جنيه معفاة. فوق ذلك: 10% من القيمة الإيجارية الزائدة عن 24 ألف جنيه سنوياً",
-                  "Egypt: residential units under 2M EGP are exempt. Above that: 10% of rental value exceeding 24K EGP/yr"
-                )}
+                tooltip={t.buyVsRent_propertyTaxTooltip}
               />
               <SliderRow
-                label={t("رسوم الخدمات الشهرية", "Monthly Common Fees")}
+                label={t.buyVsRent_commonFees}
                 value={monthlyFees}
                 min={0}
                 max={10_000}
                 step={100}
-                displayValue={`${fmtCompact(monthlyFees)} ج.م`}
+                displayValue={`${fmtCompact(monthlyFees)} EGP`}
                 onChange={setMonthlyFees}
-                tooltip={t(
-                  "رسوم الحراسة والنظافة والصيانة المشتركة — تتفاوت بحسب المجمع السكني",
-                  "Security, cleaning, shared maintenance — varies widely by compound"
-                )}
+                tooltip={t.buyVsRent_commonFeesTooltip}
               />
               <SliderRow
-                label={t("المصاريف الشهرية", "Monthly Utilities")}
+                label={t.buyVsRent_utilities}
                 value={monthlyUtilities}
                 min={0}
                 max={10_000}
                 step={100}
-                displayValue={`${fmtCompact(monthlyUtilities)} ج.م`}
+                displayValue={`${fmtCompact(monthlyUtilities)} EGP`}
                 onChange={setMonthlyUtilities}
-                tooltip={t(
-                  "الكهرباء والمياه والغاز والإنترنت — تُضاف لكلا السيناريوهين (شراء وإيجار)",
-                  "Electricity, water, gas, internet — applies to both buy and rent scenarios"
-                )}
+                tooltip={t.buyVsRent_utilitiesTooltip}
               />
               <p className="text-[0.65rem] text-muted-foreground/60 -mt-3 mb-6">
-                {t(
-                  "تُحتسب لكلا السيناريوهين — تُظهر التكلفة الحقيقية للسكن",
-                  "Counted in both scenarios — shows the true total cost of living"
-                )}
+                {t.buyVsRent_utilitiesNote}
               </p>
             </Section>
 
             {/* ── Section 5: Rent Costs ─────────────────────────────────── */}
             <Section
-              title={t("تكاليف الإيجار الإضافية", "Additional Renting Costs")}
-              description={t(
-                "مصاريف الإيجار التي تُضاف فوق القسط الشهري",
-                "Renting costs beyond the monthly rent payment"
-              )}
+              title={t.buyVsRent_rentCostsTitle}
+              description={t.buyVsRent_rentCostsDesc}
             >
               <SliderRow
-                label={t("مبلغ التأمين (أشهر)", "Security Deposit (months)")}
+                label={t.buyVsRent_securityDeposit}
                 value={securityDepositMonths}
                 min={0}
                 max={12}
                 step={1}
-                displayValue={`${securityDepositMonths} ${t("أشهر", "months")}`}
+                displayValue={`${securityDepositMonths} ${t.buyVsRent_months}`}
                 onChange={setSecurityDepositMonths}
-                tooltip={t(
-                  "عادة شهر إلى 3 أشهر في مصر — يُسترد عند الإخلاء",
-                  "Typically 1-3 months in Egypt — returned at end of lease"
-                )}
+                tooltip={t.buyVsRent_securityDepositTooltip}
               />
               <SliderRow
-                label={t("عمولة السمسار", "Broker's Fee")}
+                label={t.buyVsRent_brokerFee}
                 value={brokerFeePct}
                 min={0}
                 max={100}
                 step={10}
-                displayValue={`${brokerFeePct}% ${t("من الإيجار الشهري", "of monthly rent")}`}
+                displayValue={`${brokerFeePct}% ${t.buyVsRent_ofMonthlyRent}`}
                 onChange={setBrokerFeePct}
-                tooltip={t(
-                  "عادة نصف شهر إلى شهر كامل في مصر",
-                  "Typically 0.5-1 month's rent in Egypt"
-                )}
+                tooltip={t.buyVsRent_brokerFeeTooltip}
               />
               <SliderRow
-                label={t("تأمين المستأجر السنوي", "Renter's Insurance")}
+                label={t.buyVsRent_rentersInsurance}
                 value={rentersInsurancePct}
                 min={0}
                 max={3}
                 step={0.1}
                 displayValue={`${rentersInsurancePct}%`}
                 onChange={setRentersInsurancePct}
-                tooltip={t(
-                  "نادر في مصر لكن ينصح به. يغطي المحتويات والمسؤولية القانونية.",
-                  "Rare in Egypt but advisable. Covers contents and liability."
-                )}
+                tooltip={t.buyVsRent_rentersInsuranceTooltip}
               />
             </Section>
 
@@ -1222,7 +1211,7 @@ export default function BuyVsRentPage() {
                 className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors w-full"
               >
                 <BookOpen size={14} />
-                <span>{t("منهجية الحساب", "Calculation Methodology")}</span>
+                <span>{t.buyVsRent_methodology}</span>
                 <ChevronDown
                   size={14}
                   className={`ms-auto transition-transform ${showMethodology ? "rotate-180" : ""}`}
@@ -1236,30 +1225,21 @@ export default function BuyVsRentPage() {
                   className="mt-4 text-xs text-muted-foreground leading-relaxed space-y-3"
                 >
                   <p>
-                    <strong className="text-foreground">{t("منهجية الحساب:", "Methodology:")}</strong>{" "}
-                    {t(
-                      "يُحسب الفارق الحقيقي بين الشراء والإيجار عبر أربعة مكونات: التكاليف الأولية (المقدم + رسوم التسجيل)، التكاليف المتكررة (الأقساط + الصيانة + التأمين)، تكلفة الفرصة (ما كان يمكن تحقيقه بالاستثمار)، وصافي عائد البيع في نهاية المدة.",
-                      "The true buy vs rent gap is calculated across four components: initial costs (down payment + closing), recurring costs (mortgage + maintenance + insurance), opportunity cost (investment return foregone), and net sale proceeds at the end of the holding period."
-                    )}
+                    <strong className="text-foreground">{t.buyVsRent_methodology}:</strong>{" "}
+                    {t.buyVsRent_methodologyP1}
                   </p>
                   <p>
-                    {t(
-                      "للمستأجر: يُحسب عائد الاستثمار على المبلغ الذي كان سيدفعه كمقدم وتكاليف شراء. هذا هو جوهر المقارنة — الشراء يربطك بأصل، الإيجار يحرر رأس المال للاستثمار.",
-                      "For the renter: we calculate the investment return on the amount they would have paid as a down payment and closing costs. This is the heart of the comparison — buying ties up capital in an asset, renting frees it for investment."
-                    )}
+                    {t.buyVsRent_methodologyP2}
                   </p>
                   <p>
-                    {t(
-                      "ملاحظة: النتائج تقريبية وتعتمد كثيراً على الافتراضات المستقبلية. الأرقام الفعلية قد تختلف.",
-                      "Note: Results are estimates and highly sensitive to future assumptions. Actual outcomes may vary significantly."
-                    )}
+                    {t.buyVsRent_methodologyP3}
                   </p>
                   <div className="flex gap-3 flex-wrap">
                     <Badge variant="outline" className="text-[0.6rem]">
-                      {t("لا ضمانات استثمارية", "No investment guarantees")}
+                      {t.buyVsRent_noGuarantees}
                     </Badge>
                     <Badge variant="outline" className="text-[0.6rem]">
-                      {t("ليس استشارة مالية", "Not financial advice")}
+                      {t.buyVsRent_notAdvice}
                     </Badge>
                   </div>
                 </motion.div>
