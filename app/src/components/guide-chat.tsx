@@ -110,8 +110,8 @@ function NavigateCard({ href, reason, isAr, onGo }: {
   );
 }
 
-function HighlightCard({ selector, title, description, isAr, isMobile, onMinimize }: {
-  selector: string; title: string; description: string; isAr: boolean; isMobile: boolean; onMinimize: () => void;
+function HighlightCard({ selector, title, description, _isAr, isMobile, onMinimize }: {
+  selector: string; title: string; description: string; _isAr?: boolean; isMobile: boolean; onMinimize: () => void;
 }) {
   const { t } = useLanguage();
   const driverRef = useRef<{ destroy: () => void } | null>(null);
@@ -143,8 +143,8 @@ function HighlightCard({ selector, title, description, isAr, isMobile, onMinimiz
   );
 }
 
-function ControlCard({ tool, inputs, href, isAr, currentPage }: {
-  tool: string; inputs: Record<string, unknown>; href: string; isAr: boolean; currentPage: string;
+function ControlCard({ tool, inputs, href, currentPage }: {
+  tool: string; inputs: Record<string, unknown>; href: string; currentPage: string;
 }) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -207,8 +207,8 @@ function MessageBubble({ msg, isAr, currentPage, isMobile, onMinimize }: {
       {actions.map((a, i) => (
         <div key={i} className="w-full max-w-[90%]">
           {a.action === "navigate" && <NavigateCard href={a.href} reason={a.reason} isAr={isAr} onGo={() => router.push(a.href)} />}
-          {a.action === "highlight" && <HighlightCard selector={a.selector} title={a.title} description={a.description} isAr={isAr} isMobile={isMobile} onMinimize={onMinimize} />}
-          {a.action === "control" && <ControlCard tool={a.tool} inputs={a.inputs} href={a.href} isAr={isAr} currentPage={currentPage} />}
+          {a.action === "highlight" && <HighlightCard selector={a.selector} title={a.title} description={a.description} isMobile={isMobile} onMinimize={onMinimize} />}
+          {a.action === "control" && <ControlCard tool={a.tool} inputs={a.inputs} href={a.href} currentPage={currentPage} />}
           {a.action === "ask" && <AskCard question={a.question} />}
         </div>
       ))}
