@@ -10,23 +10,11 @@ const categoryValidator = v.union(
 export const listFiscalYears = query({
   args: {},
   handler: async (ctx) => {
-    const all = await ctx.db
+    return await ctx.db
       .query("fiscalYears")
       .withIndex("by_year")
       .order("asc")
       .collect();
-
-    // Deduplicate by normalized year ("2024/2025" and "2024-2025" are the same).
-    // Keep the record with more budget data (higher revenue + expenditure totals).
-    const byNormalized = new Map<string, (typeof all)[number]>();
-    for (const fy of all) {
-      const key = fy.year.replace("/", "-");
-      const prev = byNormalized.get(key);
-      if (!prev || (fy.totalRevenue ?? 0) + (fy.totalExpenditure ?? 0) > (prev.totalRevenue ?? 0) + (prev.totalExpenditure ?? 0)) {
-        byNormalized.set(key, fy);
-      }
-    }
-    return Array.from(byNormalized.values());
   },
 });
 
@@ -170,34 +158,37 @@ export const getTaxBrackets = query({
 export const getExpenditureBreakdown = query({
   args: {},
   handler: async (ctx) => {
-    // Get the latest fiscal year
+    // Get recent fiscal years, try latest first, fall back if no items
     const fiscalYears = await ctx.db
       .query("fiscalYears")
       .withIndex("by_year")
       .order("desc")
-      .take(1);
+      .take(5);
 
     if (fiscalYears.length === 0) return { fiscalYear: null, items: [] };
 
-    const fy = fiscalYears[0];
-    const items = await ctx.db
-      .query("budgetItems")
-      .withIndex("by_fiscalYearId_and_category", (q) =>
-        q.eq("fiscalYearId", fy._id).eq("category", "expenditure")
-      )
-      .collect();
+    for (const fy of fiscalYears) {
+      const items = await ctx.db
+        .query("budgetItems")
+        .withIndex("by_fiscalYearId_and_category", (q) =>
+          q.eq("fiscalYearId", fy._id).eq("category", "expenditure")
+        )
+        .collect();
 
-    // Only top-level items (no parent)
-    const topLevel = items.filter((i) => !i.parentItemId);
+      const topLevel = items.filter((i) => !i.parentItemId);
+      if (topLevel.length > 0) {
+        return {
+          fiscalYear: fy,
+          items: topLevel.map((i) => ({
+            sectorAr: i.sectorAr,
+            sectorEn: i.sectorEn,
+            amount: i.amount,
+            percentageOfTotal: i.percentageOfTotal ?? 0,
+          })),
+        };
+      }
+    }
 
-    return {
-      fiscalYear: fy,
-      items: topLevel.map((i) => ({
-        sectorAr: i.sectorAr,
-        sectorEn: i.sectorEn,
-        amount: i.amount,
-        percentageOfTotal: i.percentageOfTotal ?? 0,
-      })),
-    };
+    return { fiscalYear: fiscalYears[0], items: [] };
   },
 });
