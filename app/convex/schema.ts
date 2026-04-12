@@ -855,4 +855,20 @@ export default defineSchema({
   })
     .index("by_publishedAt", ["publishedAt"])
     .index("by_url", ["url"]),
+
+  // GUIDE CHAT USAGE (analytics + $20/month cost cap)
+  chatUsage: defineTable({
+    userId: v.optional(v.string()),
+    threadId: v.string(),
+    model: v.string(),
+    provider: v.string(),
+    promptTokens: v.number(),
+    completionTokens: v.number(),
+    totalTokens: v.number(),
+    costUsd: v.number(),
+    timestamp: v.number(),
+  })
+    .index("by_timestamp", ["timestamp"])
+    .index("by_threadId", ["threadId"])
+    .index("by_userId", ["userId"]),
 });

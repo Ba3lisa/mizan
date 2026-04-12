@@ -11,7 +11,10 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.52",
+    "@convex-dev/agent": "^0.6.1",
     "@convex-dev/auth": "^0.0.90",
+    "@convex-dev/rate-limiter": "^0.3.2",
     "@nivo/core": "^0.99.0",
     "@nivo/sankey": "^0.99.0",
     "@tailwindcss/postcss": "^4.2.2",
@@ -23,11 +26,14 @@
     "@visx/scale": "^3.12.0",
     "@visx/shape": "^3.12.0",
     "@visx/tooltip": "^3.12.0",
+    "ai": "^6.0.156",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.0",
     "cmdk": "^1.1.1",
     "convex": "^1.19.0",
+    "convex-helpers": "^0.1.114",
     "date-fns": "^4.1.0",
+    "driver.js": "^1.4.0",
     "framer-motion": "^12.38.0",
     "fuse.js": "^7.3.0",
     "lucide-react": "^0.460.0",
@@ -41,6 +47,8 @@
     "recharts": "^3.8.0",
     "sonner": "^2.0.0",
     "tailwind-merge": "^3.0.0",
+    "unicode-animations": "^1.0.3",
+    "vaul": "^1.1.2",
     "zod": "^3.23.0"
   },
   "lint-staged": {
