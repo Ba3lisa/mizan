@@ -8,7 +8,7 @@ Architecture diagram: https://app.excalidraw.com/s/8B4UFPTVlkA/2QtqeIRt0rX
 
 ## How Code Gets Written
 
-Code is authored by Claude Code agents, triggered by developers running local sessions. The developer describes what needs to be built or fixed, and the agent writes the implementation in TypeScript, following project rules defined in `CLAUDE.md` and `convex_rules.txt`.
+Code can be authored in local agent sessions using Codex or Claude-based tools. The developer describes what needs to be built or fixed, and the agent writes the implementation in TypeScript while following the project rules defined in `AGENTS.md`, `CLAUDE.md`, and `convex_rules.txt`.
 
 Key constraints enforced on every agent session:
 - TypeScript only, no JavaScript
@@ -17,25 +17,19 @@ Key constraints enforced on every agent session:
 - All Convex functions must use validators (`v` from `convex/values`)
 - All data must have a `sourceUrl` field
 
+Codex is the repo's first-class local setup because it can load instructions automatically from the repository root `AGENTS.md`, merge in nested guidance such as `app/AGENTS.md`, and apply project-scoped behavior from `.codex/config.toml`.
+
 Future: GitHub Actions will trigger agent sessions automatically for certain issue types, removing the requirement for a local developer to initiate work.
 
 ## How Code Gets Reviewed
 
-Pull requests are automatically reviewed by the OpenAI Codex agent via `.github/workflows/codex-review.yml`. When a PR is opened or updated, the workflow:
-
-1. Triggers the Codex review agent
-2. The agent reads the diff and project context
-3. Posts inline review comments on the PR identifying issues, suggesting improvements, and flagging violations of project rules
-4. The review is non-blocking -- it informs but does not gate merging
-
-This creates a two-agent pipeline: Claude Code writes, Codex reviews. Neither agent has merge authority.
+Reviews are maintainer-driven. Agents can still be used locally to inspect diffs, run checks, or suggest fixes before a pull request is opened, but there is no repository-managed automated review agent.
 
 ## How Code Gets Merged
 
 All merges require human approval. The single maintainer (essamgouda97) reviews every PR before merging to the main branch. This is a hard gate -- no automated merge path exists.
 
 Merge criteria:
-- Codex review comments are addressed or explicitly dismissed
 - TypeScript compiles without errors
 - No new `any` types or lint suppressions
 - Schema changes require explicit maintainer approval (destructive operations are never auto-approved)
@@ -88,25 +82,26 @@ Provider interface:
 
 ## Agent Onboarding Guide
 
-If you are a Claude Code agent (or any AI agent) working on this repo for the first time, read these files in order to understand the codebase:
+If you are a Codex session, Claude session, or any other AI agent working on this repo for the first time, read these files in order to understand the codebase:
 
 ### Required Reading (before any code change)
-1. `CLAUDE.md` -- Project rules, data philosophy, critical constraints
-2. `convex_rules.txt` -- Convex-specific patterns (function syntax, validators, indexes, scheduling)
-3. `convex/schema.ts` -- All 26+ tables, their fields, and indexes
+1. `AGENTS.md` -- Repo-level agent guidance, commands, and verification expectations
+2. `CLAUDE.md` -- Project rules, data philosophy, critical constraints
+3. `convex_rules.txt` -- Convex-specific patterns (function syntax, validators, indexes, scheduling)
+4. `convex/schema.ts` -- All 26+ tables, their fields, and indexes
 
 ### Architecture Understanding
-4. `docs/architecture.md` -- Three-layer system overview (visual, data, agentic)
-5. `convex/agents/dataAgent.ts` -- Main 6h orchestrator (how data flows in)
-6. `convex/agents/council.ts` -- LLM Council orchestrator (how data gets verified)
-7. `convex/agents/githubAgent.ts` -- GitHub issue processing (how community contributes)
-8. `convex/agents/providers/anthropic.ts` -- Shared Claude caller (reuse this, don't inline API calls)
+5. `docs/architecture.md` -- Three-layer system overview (visual, data, agentic)
+6. `convex/agents/dataAgent.ts` -- Main 6h orchestrator (how data flows in)
+7. `convex/agents/council.ts` -- LLM Council orchestrator (how data gets verified)
+8. `convex/agents/githubAgent.ts` -- GitHub issue processing (how community contributes)
+9. `convex/agents/providers/anthropic.ts` -- Shared Claude caller (reuse this, don't inline API calls)
 
 ### Data Layer
-9. `convex/dataRefresh.ts` -- All mutations for writing data (upsert patterns, audit logging)
-10. `convex/referenceData.ts` -- Reference data loader (static data that rarely changes)
-11. `convex/agents/constitutionAgent.ts` -- PDF extraction tool (how constitution is loaded)
-12. `convex/agents/validators.ts` -- Deterministic validators (budget sums, debt bounds, etc.)
+10. `convex/dataRefresh.ts` -- All mutations for writing data (upsert patterns, audit logging)
+11. `convex/referenceData.ts` -- Reference data loader (static data that rarely changes)
+12. `convex/agents/constitutionAgent.ts` -- PDF extraction tool (how constitution is loaded)
+13. `convex/agents/validators.ts` -- Deterministic validators (budget sums, debt bounds, etc.)
 
 ### What You Need From Your Human
 - **ANTHROPIC_API_KEY** and **GITHUB_TOKEN** must be set as Convex environment variables

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Work"
+  short_description: "Turn a rough coding task into a subagent-backed execution workflow."
+  default_prompt: "Use $work for this task. Make a short plan, use subagents only where they materially help, and then implement with relevant verification."
+policy:
+  allow_implicit_invocation: false

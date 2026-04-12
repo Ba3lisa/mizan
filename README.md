@@ -2,7 +2,6 @@
 
 [![Deploy](https://github.com/Ba3lisa/mizan/actions/workflows/deploy.yml/badge.svg?event=release)](https://github.com/Ba3lisa/mizan/actions/workflows/deploy.yml)
 [![Lint](https://github.com/Ba3lisa/mizan/actions/workflows/lint.yml/badge.svg)](https://github.com/Ba3lisa/mizan/actions/workflows/lint.yml)
-[![Codex Review](https://github.com/Ba3lisa/mizan/actions/workflows/codex-review.yml/badge.svg)](https://github.com/Ba3lisa/mizan/actions/workflows/codex-review.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Egypt's government, made visible.**
@@ -131,7 +130,7 @@ Priority sources:
 
 ## Development Model
 
-Code is written by Claude Code agents and reviewed by OpenAI Codex. Human maintainers approve all merges. See [docs/agent-development.md](docs/agent-development.md) for details.
+Mizan supports agent-driven development with both Codex and Claude-based workflows. Codex is supported for day-to-day repository work through the root `AGENTS.md` and the nested `app/AGENTS.md`. Human maintainers approve all merges. See [docs/agent-development.md](docs/agent-development.md) for details.
 
 ## License
 

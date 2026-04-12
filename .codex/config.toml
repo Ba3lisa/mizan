@@ -1,0 +1,9 @@
+project_doc_max_bytes = 65536
+project_doc_fallback_filenames = ["CLAUDE.md"]
+
+[agents]
+max_threads = 6
+max_depth = 1
+
+[features]
+multi_agent = true

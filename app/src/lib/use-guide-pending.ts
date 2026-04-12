@@ -34,7 +34,6 @@ export function useGuidePending() {
           if (!el) return;
           try {
             const { driver } = await import("driver.js");
-            // @ts-expect-error CSS import handled by webpack
             await import("driver.js/dist/driver.css");
             const d = driver({
               stagePadding: 8,
