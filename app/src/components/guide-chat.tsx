@@ -339,12 +339,11 @@ function GuideChatContent({
 export function GuideChat() {
   const { t, lang, dir } = useLanguage();
   const isAr = lang === "ar";
-  const isRtl = dir === "rtl";
+  const _isRtl = dir === "rtl"; // kept for future mobile support
   const pathname = usePathname();
   const isMobile = useIsMobile();
 
   const [isOpen, setIsOpen] = useState(false);
-  const [isMinimized, setIsMinimized] = useState(false);
   const [threadId, setThreadId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
 
