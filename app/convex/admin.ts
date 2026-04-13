@@ -1,4 +1,5 @@
-import { mutation } from "./_generated/server";
+import { mutation, MutationCtx } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 import { v } from "convex/values";
 
 const officialRoleValidator = v.union(
@@ -12,6 +13,61 @@ const officialRoleValidator = v.union(
   v.literal("speaker"),
   v.literal("other")
 );
+
+function roundBudgetPct(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+async function reconcileFiscalYearBudgetState(
+  ctx: MutationCtx,
+  fiscalYearId: Id<"fiscalYears">
+) {
+  const fiscalYear = await ctx.db.get(fiscalYearId);
+  if (!fiscalYear) return;
+
+  const items = await ctx.db
+    .query("budgetItems")
+    .withIndex("by_fiscalYearId_and_category", (q) => q.eq("fiscalYearId", fiscalYearId))
+    .collect();
+
+  if (items.length === 0) return;
+
+  const topLevel = items.filter((item) => !item.parentItemId);
+  const totalRevenue = topLevel
+    .filter((item) => item.category === "revenue")
+    .reduce((sum, item) => sum + item.amount, 0);
+  const totalExpenditure = topLevel
+    .filter((item) => item.category === "expenditure")
+    .reduce((sum, item) => sum + item.amount, 0);
+  const deficit = totalRevenue - totalExpenditure;
+  const gdp = fiscalYear.gdp ?? 0;
+
+  const fiscalPatch: Partial<typeof fiscalYear> = {};
+  if (fiscalYear.totalRevenue !== totalRevenue) fiscalPatch.totalRevenue = totalRevenue;
+  if (fiscalYear.totalExpenditure !== totalExpenditure) fiscalPatch.totalExpenditure = totalExpenditure;
+  if (fiscalYear.deficit !== deficit) fiscalPatch.deficit = deficit;
+  if (Object.keys(fiscalPatch).length > 0) {
+    await ctx.db.patch(fiscalYearId, fiscalPatch);
+  }
+
+  for (const item of items) {
+    const categoryTotal = item.category === "revenue" ? totalRevenue : totalExpenditure;
+    const nextPctOfTotal = categoryTotal > 0
+      ? roundBudgetPct((item.amount / categoryTotal) * 100)
+      : undefined;
+    const nextPctOfGdp = gdp > 0
+      ? roundBudgetPct((item.amount / gdp) * 100)
+      : undefined;
+
+    const patch: Partial<typeof item> = {};
+    if (item.percentageOfTotal !== nextPctOfTotal) patch.percentageOfTotal = nextPctOfTotal;
+    if (item.percentageOfGdp !== nextPctOfGdp) patch.percentageOfGdp = nextPctOfGdp;
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(item._id, patch);
+    }
+  }
+}
 
 export const upsertOfficial = mutation({
   args: {
@@ -144,7 +200,9 @@ export const addBudgetItem = mutation({
     sanadLevel: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    return await ctx.db.insert("budgetItems", { ...args, sanadLevel: args.sanadLevel ?? 1 });
+    const budgetItemId = await ctx.db.insert("budgetItems", { ...args, sanadLevel: args.sanadLevel ?? 1 });
+    await reconcileFiscalYearBudgetState(ctx, args.fiscalYearId);
+    return budgetItemId;
   },
 });
 

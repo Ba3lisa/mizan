@@ -6,7 +6,7 @@ import { DataSourceFooter } from "@/components/data-source";
 import { useQuery } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useLanguage } from "@/components/providers";
-import { fmtEGP } from "@/lib/format";
+import { fmt, fmtEGP } from "@/lib/format";
 import {
   Select,
   SelectContent,
@@ -58,6 +58,21 @@ const REVENUE_COLOR = "#1A6B5C";
 const SPENDING_COLOR = "#8B3535";
 const DEBT_SERVICE_COLOR = "#C94040";
 const DEFICIT_COLOR = "#C9A84C";
+
+function formatBudgetBillions(value: number, isAr: boolean): string {
+  const abs = Math.abs(value);
+
+  if (abs >= 1000) {
+    const trillions = abs / 1000;
+    const decimals = trillions >= 10 ? 1 : 2;
+    const formatted = fmt(trillions, { decimals });
+    return isAr ? `${formatted} تريليون جنيه` : `EGP ${formatted} trillion`;
+  }
+
+  const decimals = abs >= 100 ? 0 : 1;
+  const formatted = fmt(abs, { decimals });
+  return isAr ? `${formatted} مليار جنيه` : `EGP ${formatted} billion`;
+}
 
 // ─── Mobile Flow Diagram (interactive) ──────────────────────────────────────
 
@@ -351,7 +366,7 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
   const validLinks = links.filter(l => l.source !== l.target && l.value > 0);
 
   const totalBudget = spendingData.reduce((s, r) => s + r.amount, 0);
-  const fmtAmount = (v: number) => fmtEGP(v * 1e9, { compact: true });
+  const fmtAmount = (v: number) => formatBudgetBillions(v, isAr);
   const _fmtPct = (v: number) => totalBudget > 0 ? `${((v / totalBudget) * 100).toFixed(1)}%` : "";
 
   const [isMobile, setIsMobile] = useState(false);
@@ -454,16 +469,24 @@ function BudgetSankey({ revenueData, spendingData }: { revenueData: BudgetCatego
 // ─── Year Comparison Chart ────────────────────────────────────────────────────
 
 function YearComparisonChart() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const isAr = lang === "ar";
 
-  // Use Convex fiscal years for year comparison -- no hardcoded data
+  // Derive comparison totals from the same item-level data used elsewhere on the page.
   const convexFYs = useQuery(api.budget.listFiscalYears);
-  const chartData = convexFYs
-    ? convexFYs.map((fy) => ({
-        year: fy.year.slice(0, 4),
-        revenue: fy.totalRevenue ?? 0,
-        spending: fy.totalExpenditure ?? 0,
-      }))
+  const comparison = useQuery(
+    api.budget.compareBudgetYears,
+    convexFYs ? { yearIds: convexFYs.map((fy) => fy._id) } : "skip"
+  );
+  const chartData = comparison
+    ? [...comparison]
+        .sort((a, b) => (a.fiscalYear?.year ?? "").localeCompare(b.fiscalYear?.year ?? ""))
+        .map(({ fiscalYear, revenue, expenditure }) => ({
+          year: fiscalYear?.year.slice(0, 4) ?? "",
+          revenue: revenue.filter((item) => !item.parentItemId).reduce((sum, item) => sum + item.amount, 0),
+          spending: expenditure.filter((item) => !item.parentItemId).reduce((sum, item) => sum + item.amount, 0),
+        }))
+        .filter((row) => row.year && (row.revenue > 0 || row.spending > 0))
     : [];
 
   const svgW = 600;
@@ -512,7 +535,7 @@ function YearComparisonChart() {
           {[0, 0.25, 0.5, 0.75, 1].map((frac) => {
             const y = padT + innerH * (1 - frac);
             const val = Math.round(maxVal * frac);
-            const labelVal = fmtEGP(val * 1e9, { compact: true, decimals: 0 });
+            const labelVal = formatBudgetBillions(val, isAr);
             return (
               <g key={frac}>
                 <line x1={padL} y1={y} x2={svgW - padR} y2={y} stroke="#252A36" strokeWidth={0.5} />
@@ -530,8 +553,8 @@ function YearComparisonChart() {
             const expH = (yr.spending / maxVal) * innerH;
             const revX = cx - barW - gap / 2;
             const expX = cx + gap / 2;
-            const revLabel = fmtEGP(yr.revenue * 1e9, { compact: true, decimals: 0 });
-            const expLabel = fmtEGP(yr.spending * 1e9, { compact: true, decimals: 0 });
+            const revLabel = formatBudgetBillions(yr.revenue, isAr);
+            const expLabel = formatBudgetBillions(yr.spending, isAr);
 
             return (
               <g key={yr.year}>
@@ -662,7 +685,7 @@ function BreakdownTable({
             const gdpPct = ((item.amount / gdp) * 100).toFixed(1);
             const isDebt = item.nameEn === "Debt Service";
             const isTop = sorted[0].nameEn === item.nameEn;
-            const displayAmount = fmtEGP(item.amount * 1e9, { compact: true });
+            const displayAmount = formatBudgetBillions(item.amount, isAr);
             const hasSubItems = (item.subItems?.length ?? 0) > 0;
             const isExpanded = expanded === item.nameEn;
 
@@ -717,7 +740,7 @@ function BreakdownTable({
               // Sub-item rows
               ...(isExpanded && item.subItems
                 ? item.subItems.map((sub) => {
-                    const subDisplay = fmtEGP(sub.amount * 1e9, { compact: true });
+                    const subDisplay = formatBudgetBillions(sub.amount, isAr);
                     const subPct = ((sub.amount / total) * 100).toFixed(1);
                     const subGdpPct = ((sub.amount / gdp) * 100).toFixed(1);
                     return (
@@ -752,7 +775,7 @@ function BreakdownTable({
             </TableCell>
             <TableCell className="text-end">
               <span className="font-mono font-semibold tabular-nums text-sm text-foreground">
-                {fmtEGP(total * 1e9, { compact: true })}
+                {formatBudgetBillions(total, isAr)}
               </span>
             </TableCell>
             <TableCell className="text-end">
@@ -773,13 +796,18 @@ function BreakdownTable({
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function BudgetPage() {
-  const { t, dir } = useLanguage();
+  const { t, dir, lang } = useLanguage();
+  const isAr = lang === "ar";
 
   const [selectedYearStr, setSelectedYearStr] = useState<string>("");
 
   // ─── Convex queries ───────────────────────────────────────────────────────
   const convexFiscalYears = useQuery(api.budget.listFiscalYears);
   const populationTimeline = useQuery(api.economy.getIndicatorTimeline, { indicator: "population" });
+  const allBudgetYears = useQuery(
+    api.budget.compareBudgetYears,
+    convexFiscalYears ? { yearIds: convexFiscalYears.map((fy) => fy._id) } : "skip"
+  );
   const _isLoading = convexFiscalYears === undefined;
 
   // Sort newest first for dropdown
@@ -787,13 +815,32 @@ export default function BudgetPage() {
     ? [...convexFiscalYears].sort((a, b) => b.year.localeCompare(a.year))
     : [];
 
-  // Default to latest fiscal year
-  const effectiveYear = selectedYearStr || sortedFYs[0]?.year || "";
+  const yearsWithBreakdown = allBudgetYears
+    ? new Set(
+        allBudgetYears
+          .filter(({ revenue, expenditure }) =>
+            revenue.some((item) => !item.parentItemId && item.amount > 0) ||
+            expenditure.some((item) => !item.parentItemId && item.amount > 0)
+          )
+          .map(({ fiscalYear }) => fiscalYear?.year)
+          .filter((year): year is string => Boolean(year))
+      )
+    : null;
+
+  const selectableFYs = yearsWithBreakdown && yearsWithBreakdown.size > 0
+    ? sortedFYs.filter((fy) => yearsWithBreakdown.has(fy.year))
+    : sortedFYs;
+
+  // Default to the latest fiscal year that actually has budget rows.
+  const effectiveYear =
+    (selectedYearStr && selectableFYs.some((fy) => fy.year === selectedYearStr) ? selectedYearStr : "") ||
+    selectableFYs[0]?.year ||
+    "";
 
   // Find the selected fiscal year from Convex
-  const selectedFY = sortedFYs.find((fy) => fy.year === effectiveYear);
+  const selectedFY = selectableFYs.find((fy) => fy.year === effectiveYear);
 
-  const yearOptions = sortedFYs.map((fy) => fy.year);
+  const yearOptions = selectableFYs.map((fy) => fy.year);
 
   // Get budget breakdown for selected fiscal year
   const convexBreakdown = useQuery(
@@ -806,9 +853,6 @@ export default function BudgetPage() {
   );
 
   // All data from Convex -- no hardcoded fallbacks
-  const totalRevenue = selectedFY?.totalRevenue ?? 0;
-  const totalSpending = selectedFY?.totalExpenditure ?? 0;
-  const deficit = selectedFY?.deficit ?? (totalSpending - totalRevenue);
   const gdp = selectedFY?.gdp ?? 0;
   // Population from Convex (World Bank, stored in millions) — match fiscal year
   const fiscalStartYear = effectiveYear.split(/[-/]/)[0]; // "2024-2025" → "2024"
@@ -843,11 +887,17 @@ export default function BudgetPage() {
         }))
     : [];
 
-  const debtServicePct = ((activeSpending.find((s) => s.nameEn === "Debt Service" || s.nameEn.includes("Debt"))?.amount ?? 0) / totalSpending * 100).toFixed(1);
+  const derivedRevenueTotal = activeRevenue.reduce((sum, item) => sum + item.amount, 0);
+  const derivedSpendingTotal = activeSpending.reduce((sum, item) => sum + item.amount, 0);
+  const totalRevenue = activeRevenue.length > 0 ? derivedRevenueTotal : (selectedFY?.totalRevenue ?? 0);
+  const totalSpending = activeSpending.length > 0 ? derivedSpendingTotal : (selectedFY?.totalExpenditure ?? 0);
+  const deficit = totalSpending - totalRevenue;
+  const debtServiceAmount = activeSpending.find((s) => s.nameEn === "Debt Service" || s.nameEn.includes("Debt"))?.amount ?? 0;
+  const debtServicePct = totalSpending > 0 ? ((debtServiceAmount / totalSpending) * 100).toFixed(1) : "0.0";
 
-  const revenueDisplay = fmtEGP(totalRevenue * 1e9, { compact: true });
-  const spendingDisplay = fmtEGP(totalSpending * 1e9, { compact: true });
-  const deficitDisplay = fmtEGP(Math.abs(deficit) * 1e9, { compact: true });
+  const revenueDisplay = formatBudgetBillions(totalRevenue, isAr);
+  const spendingDisplay = formatBudgetBillions(totalSpending, isAr);
+  const deficitDisplay = formatBudgetBillions(Math.abs(deficit), isAr);
 
   return (
     <div className="page-content" dir={dir}>
@@ -891,12 +941,12 @@ export default function BudgetPage() {
                 <TrendingUp size={13} style={{ color: "#4DCCB3" }} />
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">{t.totalRevenue}</p>
               </div>
-              <p className="font-mono text-3xl font-bold tabular-nums flex items-center gap-1.5" style={{ color: "#4DCCB3" }}>
+              <p className="font-mono text-3xl font-bold tabular-nums flex items-center gap-1.5" dir={isAr ? "rtl" : "ltr"} style={{ color: "#4DCCB3" }}>
                 {revenueDisplay}
                 {selectedFY?.sanadLevel && <SanadBadge sanadLevel={selectedFY.sanadLevel} sourceUrl={selectedFY?.sourceUrl} />}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {((totalRevenue / gdp) * 100).toFixed(1)}% {t.budget_ofGDP}
+                {gdp > 0 ? ((totalRevenue / gdp) * 100).toFixed(1) : "0.0"}% {t.budget_ofGDP}
               </p>
             </CardContent>
           </Card>
@@ -908,12 +958,12 @@ export default function BudgetPage() {
                 <TrendingUp size={13} style={{ color: "#E07070" }} />
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">{t.totalExpenditure}</p>
               </div>
-              <p className="font-mono text-3xl font-bold tabular-nums flex items-center gap-1.5" style={{ color: "#E07070" }}>
+              <p className="font-mono text-3xl font-bold tabular-nums flex items-center gap-1.5" dir={isAr ? "rtl" : "ltr"} style={{ color: "#E07070" }}>
                 {spendingDisplay}
                 {selectedFY?.sanadLevel && <SanadBadge sanadLevel={selectedFY.sanadLevel} sourceUrl={selectedFY?.sourceUrl} />}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {((totalSpending / gdp) * 100).toFixed(1)}% {t.budget_ofGDP}
+                {gdp > 0 ? ((totalSpending / gdp) * 100).toFixed(1) : "0.0"}% {t.budget_ofGDP}
               </p>
             </CardContent>
           </Card>
@@ -925,12 +975,12 @@ export default function BudgetPage() {
                 <TrendingDown size={13} style={{ color: DEFICIT_COLOR }} />
                 <p className="text-xs text-muted-foreground uppercase tracking-wider">{t.deficit}</p>
               </div>
-              <p className="font-mono text-3xl font-bold tabular-nums flex items-center gap-1.5" style={{ color: DEFICIT_COLOR }}>
-                -{deficitDisplay}
+              <p className="font-mono text-3xl font-bold tabular-nums flex items-center gap-1.5" dir={isAr ? "rtl" : "ltr"} style={{ color: DEFICIT_COLOR }}>
+                {deficitDisplay}
                 {selectedFY?.sanadLevel && <SanadBadge sanadLevel={selectedFY.sanadLevel} sourceUrl={selectedFY?.sourceUrl} />}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {((deficit / gdp) * 100).toFixed(1)}% {t.budget_ofGDP}
+                {gdp > 0 ? ((Math.abs(deficit) / gdp) * 100).toFixed(1) : "0.0"}% {t.budget_ofGDP}
               </p>
             </CardContent>
           </Card>

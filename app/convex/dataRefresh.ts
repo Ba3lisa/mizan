@@ -1,6 +1,7 @@
 import {
   query,
   mutation,
+  MutationCtx,
   internalQuery,
   internalMutation,
   internalAction,
@@ -20,6 +21,68 @@ const categoryValidator = v.union(
   v.literal("industry"),
   v.literal("all")
 );
+
+function roundBudgetPct(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+async function reconcileFiscalYearBudgetState(
+  ctx: MutationCtx,
+  fiscalYearId: Id<"fiscalYears">
+): Promise<number> {
+  const fiscalYear = await ctx.db.get(fiscalYearId);
+  if (!fiscalYear) return 0;
+
+  const items = await ctx.db
+    .query("budgetItems")
+    .withIndex("by_fiscalYearId_and_category", (q) => q.eq("fiscalYearId", fiscalYearId))
+    .collect();
+
+  if (items.length === 0) return 0;
+
+  const topLevel = items.filter((item) => !item.parentItemId);
+  const totalRevenue = topLevel
+    .filter((item) => item.category === "revenue")
+    .reduce((sum, item) => sum + item.amount, 0);
+  const totalExpenditure = topLevel
+    .filter((item) => item.category === "expenditure")
+    .reduce((sum, item) => sum + item.amount, 0);
+  const deficit = totalRevenue - totalExpenditure;
+  const gdp = fiscalYear.gdp ?? 0;
+
+  let writes = 0;
+
+  const fiscalPatch: Partial<typeof fiscalYear> = {};
+  if (fiscalYear.totalRevenue !== totalRevenue) fiscalPatch.totalRevenue = totalRevenue;
+  if (fiscalYear.totalExpenditure !== totalExpenditure) fiscalPatch.totalExpenditure = totalExpenditure;
+  if (fiscalYear.deficit !== deficit) fiscalPatch.deficit = deficit;
+
+  if (Object.keys(fiscalPatch).length > 0) {
+    await ctx.db.patch(fiscalYearId, fiscalPatch);
+    writes++;
+  }
+
+  for (const item of items) {
+    const categoryTotal = item.category === "revenue" ? totalRevenue : totalExpenditure;
+    const nextPctOfTotal = categoryTotal > 0
+      ? roundBudgetPct((item.amount / categoryTotal) * 100)
+      : undefined;
+    const nextPctOfGdp = gdp > 0
+      ? roundBudgetPct((item.amount / gdp) * 100)
+      : undefined;
+
+    const patch: Partial<typeof item> = {};
+    if (item.percentageOfTotal !== nextPctOfTotal) patch.percentageOfTotal = nextPctOfTotal;
+    if (item.percentageOfGdp !== nextPctOfGdp) patch.percentageOfGdp = nextPctOfGdp;
+
+    if (Object.keys(patch).length > 0) {
+      await ctx.db.patch(item._id, patch);
+      writes++;
+    }
+  }
+
+  return writes;
+}
 
 // ─── PUBLIC QUERIES ─────────────────────────────────────────────────────────
 
@@ -303,6 +366,27 @@ export const upsertFiscalYear = internalMutation({
       return 1;
     }
 
+    const existingItems = await ctx.db
+      .query("budgetItems")
+      .withIndex("by_fiscalYearId_and_category", (q) => q.eq("fiscalYearId", existing._id))
+      .take(1);
+
+    if (existingItems.length > 0) {
+      const patch: Partial<typeof existing> = {};
+      if (args.gdp !== existing.gdp) patch.gdp = args.gdp;
+      if (args.sourceUrl !== undefined && args.sourceUrl !== existing.sourceUrl) patch.sourceUrl = args.sourceUrl;
+      if (args.sanadLevel !== existing.sanadLevel) patch.sanadLevel = args.sanadLevel;
+
+      let writes = 0;
+      if (Object.keys(patch).length > 0) {
+        await ctx.db.patch(existing._id, patch);
+        writes++;
+      }
+
+      writes += await reconcileFiscalYearBudgetState(ctx, existing._id);
+      return writes > 0 ? 1 : 0;
+    }
+
     const hasChange =
       args.totalRevenue !== existing.totalRevenue ||
       args.totalExpenditure !== existing.totalExpenditure ||
@@ -322,6 +406,24 @@ export const upsertFiscalYear = internalMutation({
     }
 
     return 0;
+  },
+});
+
+export const reconcileBudgetTotals = mutation({
+  args: { fiscalYearId: v.optional(v.id("fiscalYears")) },
+  handler: async (ctx, args) => {
+    if (args.fiscalYearId) {
+      const writes = await reconcileFiscalYearBudgetState(ctx, args.fiscalYearId);
+      return { fiscalYearsProcessed: 1, writes };
+    }
+
+    const fiscalYears = await ctx.db.query("fiscalYears").collect();
+    let writes = 0;
+    for (const fiscalYear of fiscalYears) {
+      writes += await reconcileFiscalYearBudgetState(ctx, fiscalYear._id);
+    }
+
+    return { fiscalYearsProcessed: fiscalYears.length, writes };
   },
 });
 
