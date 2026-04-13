@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -160,11 +161,51 @@ def list() -> None:
 
 
 @app.command()
-def status() -> None:
+def status(
+    watch: bool = typer.Option(False, "--watch", "-w", help="Poll until the latest deploy run reaches a final state"),
+    interval: int = typer.Option(10, "--interval", min=1, help="Polling interval in seconds when using --watch"),
+) -> None:
     """Show the deploy status of the latest release."""
-    result = subprocess.run(
-        ["gh", "run", "list", "--workflow", "deploy.yml", "--limit", "3", "--repo", "Ba3lisa/mizan"],
-        cwd=str(ROOT),
-    )
-    if result.returncode != 0:
-        console.print("[red]Failed to get deploy status.[/red]")
+
+    def fetch_status() -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["gh", "run", "list", "--workflow", "deploy.yml", "--limit", "3", "--repo", "Ba3lisa/mizan"],
+            cwd=str(ROOT),
+            capture_output=True,
+            text=True,
+        )
+
+    while True:
+        result = fetch_status()
+        if result.returncode != 0:
+            console.print("[red]Failed to get deploy status.[/red]")
+            if result.stderr:
+                console.print(result.stderr.strip())
+            raise typer.Exit(1)
+
+        output = result.stdout.strip()
+        if output:
+            if watch:
+                console.clear()
+                console.print(f"[bold]Watching latest deploy[/bold] [dim](every {interval}s)[/dim]\n")
+            console.print(output)
+        else:
+            console.print("[yellow]No deploy runs found.[/yellow]")
+            raise typer.Exit(0)
+
+        if not watch:
+            raise typer.Exit(0)
+
+        latest_line = output.splitlines()[0]
+        fields = latest_line.split("\t")
+        latest_status = fields[0].strip() if fields else ""
+        latest_conclusion = fields[1].strip() if len(fields) > 1 else ""
+
+        if latest_status == "completed":
+            if latest_conclusion == "success":
+                console.print("\n[green]Latest deploy completed successfully.[/green]")
+                raise typer.Exit(0)
+            console.print(f"\n[red]Latest deploy completed with conclusion: {latest_conclusion or 'unknown'}[/red]")
+            raise typer.Exit(1)
+
+        time.sleep(interval)
