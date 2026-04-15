@@ -46,8 +46,8 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 │       GitHub Issues → Claude Code Action             │
 │      .github/workflows/claude-fix.yml                │
 │                                                       │
-│  Triggered by: `claude-fix` or `claude-feature`      │
-│  label on an issue, or @claude mention in comments   │
+│  Triggered by: `bug`, `enhancement`, or              │
+│  `data-correction` label, or @claude mention         │
 │                                                       │
 │  Claude Code Action runs on GitHub-hosted runner,    │
 │  implements the fix, and opens a PR with             │
@@ -288,7 +288,7 @@ For all source types, if a council member votes `reject` with a reasoning that c
 
 ### Integration with GitHub Issues
 
-> **Note (v1.9.3+):** GitHub issue processing has moved from the Convex `processGitHubIssues` cron to the GitHub Actions Claude Code Action (`.github/workflows/claude-fix.yml`). Issues labeled `claude-fix` or `claude-feature` are now handled directly by Claude Code running on GitHub-hosted runners, which creates fix PRs automatically. The LLM Council below still applies to community *data corrections* submitted via the separate `data-correction` label flow.
+> **Note (v1.9.3+):** GitHub issue processing has moved from the Convex `processGitHubIssues` cron to the GitHub Actions Claude Code Action (`.github/workflows/claude-fix.yml`). Issues labeled `bug`, `enhancement`, or `data-correction` are now handled directly by Claude Code running on GitHub-hosted runners, which creates fix PRs automatically. The LLM Council below still applies to community *data corrections* submitted via the separate `data-correction` label flow.
 
 The council is the middle step in the community data-correction pipeline:
 

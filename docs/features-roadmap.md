@@ -111,5 +111,5 @@ The `/governorate/[slug]` pages are live, showing the governor, House MPs, and S
 | Guide Chat | (sidebar, disabled in prod) | 🚧 Dev only | Driver.js-powered page tours + Convex Agent chat |
 | WebMCP Integration | `.well-known/webmcp` | ✅ Done | Exposes tool pages to external AI agents (Chrome Gemini, etc.) |
 | PR Preview Deploys | `.github/workflows/preview.yml` | ✅ Done | DigitalOcean preview deploy on every PR with URL comment |
-| Claude Code Action | `.github/workflows/claude-fix.yml` | ✅ Done | Auto-fixes GitHub issues labeled `claude-fix` / `claude-feature` |
+| Claude Code Action | `.github/workflows/claude-fix.yml` | ✅ Done | Auto-fixes GitHub issues labeled `bug`, `enhancement`, `data-correction` or @claude mention |
 | xAI Grok LLM Council | `convex/agents/providers/xai.ts` | ✅ Done | Grok added as primary council provider (`grok-4-1-fast-reasoning`) |
