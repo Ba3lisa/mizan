@@ -59,5 +59,3 @@ jobs:
             - Do NOT modify production deploy configs or environment variables
             - Do NOT run `./dev release` or push to production
             - If you cannot fix it or are unsure, comment on the issue explaining why and tag @essamgouda97 for guidance
-          allowed_tools: "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch"
-          timeout_minutes: 30
