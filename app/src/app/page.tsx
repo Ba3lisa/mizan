@@ -18,6 +18,10 @@ import { Button } from "@/components/ui/button";
 import { AiPipelineStatus } from "@/components/ai-pipeline-status";
 import { SanadBadge } from "@/components/sanad-badge";
 
+function fmtBudgetBillions(value: number): string {
+  return fmtEGP(value * 1_000_000_000, { decimals: 1, compact: true });
+}
+
 /* ─── Nile-wave section divider with centered icon ─── */
 function SectionDivider({ icon: Icon }: { icon?: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }> }) {
   return (
@@ -359,20 +363,20 @@ export default function HomePage() {
                     <div className="text-center flex-1">
                       <p className="text-[0.6rem] text-muted-foreground mb-0.5">{t.home_revenue}</p>
                       <p className="font-mono text-base font-bold tabular-nums text-chart-3" dir="ltr">
-                        {fmtEGP(homeStats.budget.totalRevenue, { decimals: 0, compact: true })}
+                        {fmtBudgetBillions(homeStats.budget.totalRevenue)}
                       </p>
                     </div>
                     <div className="text-center flex-1">
                       <p className="text-[0.6rem] text-muted-foreground mb-0.5">{t.home_spending}</p>
                       <p className="font-mono text-base font-bold tabular-nums text-chart-4" dir="ltr">
-                        {fmtEGP(homeStats.budget.totalExpenditure, { decimals: 0, compact: true })}
+                        {fmtBudgetBillions(homeStats.budget.totalExpenditure)}
                       </p>
                     </div>
                     {homeStats.budget.deficit !== 0 && (
                       <div className="text-center flex-1">
                         <p className="text-[0.6rem] text-muted-foreground mb-0.5">{t.home_deficit}</p>
                         <p className="font-mono text-base font-bold tabular-nums text-destructive" dir="ltr">
-                          {fmtEGP(Math.abs(homeStats.budget.deficit), { decimals: 0, compact: true })}
+                          {fmtBudgetBillions(Math.abs(homeStats.budget.deficit))}
                         </p>
                       </div>
                     )}
@@ -649,16 +653,16 @@ export default function HomePage() {
                   <div className="flex justify-between gap-3 mb-4">
                     <div className="text-center flex-1">
                       <p className="text-[0.65rem] text-muted-foreground uppercase tracking-wider mb-0.5">{t.home_revenue}</p>
-                      <p className="font-mono text-lg font-bold tabular-nums text-chart-3" dir="ltr">{fmtEGP(homeStats.budget.totalRevenue, { decimals: 0, compact: true })}</p>
+                      <p className="font-mono text-lg font-bold tabular-nums text-chart-3" dir="ltr">{fmtBudgetBillions(homeStats.budget.totalRevenue)}</p>
                     </div>
                     <div className="text-center flex-1">
                       <p className="text-[0.65rem] text-muted-foreground uppercase tracking-wider mb-0.5">{t.home_spending}</p>
-                      <p className="font-mono text-lg font-bold tabular-nums text-chart-4" dir="ltr">{fmtEGP(homeStats.budget.totalExpenditure, { decimals: 0, compact: true })}</p>
+                      <p className="font-mono text-lg font-bold tabular-nums text-chart-4" dir="ltr">{fmtBudgetBillions(homeStats.budget.totalExpenditure)}</p>
                     </div>
                     {homeStats.budget.deficit !== 0 && (
                       <div className="text-center flex-1">
                         <p className="text-[0.65rem] text-muted-foreground uppercase tracking-wider mb-0.5">{t.home_theDeficit}</p>
-                        <p className="font-mono text-lg font-bold tabular-nums text-destructive" dir="ltr">{fmtEGP(Math.abs(homeStats.budget.deficit), { decimals: 0, compact: true })}</p>
+                        <p className="font-mono text-lg font-bold tabular-nums text-destructive" dir="ltr">{fmtBudgetBillions(Math.abs(homeStats.budget.deficit))}</p>
                       </div>
                     )}
                   </div>
