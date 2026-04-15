@@ -1,0 +1,52 @@
+name: Claude Auto-Fix
+
+on:
+  issues:
+    types: [labeled, opened, assigned]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude-fix:
+    # Run when claude-fix or claude-feature label is present
+    if: >
+      (github.event.label.name == 'claude-fix' || github.event.label.name == 'claude-feature') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          label_trigger: "claude-fix,claude-feature"
+          branch_prefix: "claude/"
+          prompt: |
+            You are fixing a GitHub issue for the Mizan project (Egypt government transparency platform).
+
+            IMPORTANT: Read CLAUDE.md first for project rules.
+
+            Steps:
+            1. Understand the issue fully
+            2. Investigate the relevant code
+            3. Implement the fix/feature
+            4. Run `cd app && npx tsc --noEmit` to verify no type errors
+            5. Create a PR with "Closes #<issue-number>" in the body
+            6. Keep changes minimal and focused on the issue
+
+            Rules:
+            - TypeScript only, no `any`
+            - Use Convex validators on all functions
+            - Do NOT merge — leave for human review
+            - Do NOT modify production deploy configs
+            - If you cannot fix it, explain why in a comment
+          allowed_tools: "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch"
+          timeout_minutes: 30

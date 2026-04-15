@@ -11,13 +11,8 @@ crons.interval(
   {}
 );
 
-// Process GitHub Issues every 12 hours (runs after data refresh).
-crons.interval(
-  "process-github-issues",
-  { hours: 12 },
-  internal.agents.githubAgent.processGitHubIssues,
-  {}
-);
+// GitHub Issues are now handled by Claude routines (see .github/workflows/claude-fix.yml)
+// The old processGitHubIssues cron has been removed.
 
 // Generate a new weekly poll using AI.
 crons.interval(
