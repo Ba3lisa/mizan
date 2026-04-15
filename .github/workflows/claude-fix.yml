@@ -8,9 +8,13 @@ on:
 
 jobs:
   claude-fix:
-    # Run when claude-fix or claude-feature label is present
+    # Trigger on: bug/enhancement/data-correction labels, or @claude mention in comments
     if: >
-      (github.event.label.name == 'claude-fix' || github.event.label.name == 'claude-feature') ||
+      (github.event.action == 'labeled' && (
+        github.event.label.name == 'bug' ||
+        github.event.label.name == 'enhancement' ||
+        github.event.label.name == 'data-correction'
+      )) ||
       (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
     runs-on: ubuntu-latest
     permissions:
@@ -27,26 +31,33 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          label_trigger: "claude-fix,claude-feature"
+          trigger_phrase: "@claude"
+          label_trigger: "bug,enhancement,data-correction"
           branch_prefix: "claude/"
           prompt: |
-            You are fixing a GitHub issue for the Mizan project (Egypt government transparency platform).
+            You are fixing a GitHub issue for the Mizan project — Egypt's government transparency platform.
 
-            IMPORTANT: Read CLAUDE.md first for project rules.
+            IMPORTANT: Read CLAUDE.md first for project rules and constraints.
+
+            Context based on label:
+            - "bug": Something is broken. Find the root cause, fix it, verify with tsc.
+            - "enhancement": A new feature request. Implement it following existing patterns.
+            - "data-correction": A data accuracy issue. Fix the data source, pipeline, or display logic.
 
             Steps:
-            1. Understand the issue fully
-            2. Investigate the relevant code
-            3. Implement the fix/feature
+            1. Read the issue carefully — understand what's expected vs actual behavior
+            2. Investigate the relevant source code
+            3. Implement the fix or feature (minimal, focused changes)
             4. Run `cd app && npx tsc --noEmit` to verify no type errors
             5. Create a PR with "Closes #<issue-number>" in the body
-            6. Keep changes minimal and focused on the issue
+            6. Summarize what you changed and why in the PR description
 
             Rules:
-            - TypeScript only, no `any`
+            - TypeScript only, no `any` types
             - Use Convex validators on all functions
-            - Do NOT merge — leave for human review
-            - Do NOT modify production deploy configs
-            - If you cannot fix it, explain why in a comment
+            - Do NOT merge the PR — leave for human review
+            - Do NOT modify production deploy configs or environment variables
+            - Do NOT run `./dev release` or push to production
+            - If you cannot fix it or are unsure, comment on the issue explaining why and tag @essamgouda97 for guidance
           allowed_tools: "Bash,Edit,Write,Read,Glob,Grep,WebSearch,WebFetch"
           timeout_minutes: 30
