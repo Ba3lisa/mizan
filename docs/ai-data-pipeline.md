@@ -10,10 +10,12 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 ┌─────────────────────────────────────────────────────┐
 │                    Convex Cron Jobs                   │
 │                                                       │
-│  Every 12 hours:                                       │
+│  Every 12 hours:                                      │
 │    crons.ts → internal.agents.dataAgent.orchestrateRefresh │
 │  Daily:                                               │
 │    crons.ts → log compaction (delete logs >30 days)   │
+│  Weekly:                                              │
+│    crons.ts → generate weekly poll (pollAgent)        │
 └──────────────────────┬──────────────────────────────┘
                        │
                        ▼
@@ -28,18 +30,31 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 │  4. Government refresh (Ahram Online + Claude parsing)│
 │  5. Parliament refresh (Wikipedia + parliament.gov.eg)│
 │  6. Constitution refresh (PDF extraction if needed)   │
-│  7. GitHub issue processing (LLM Council)             │
-│  8. Log compaction (daily, deletes logs >30 days)     │
+│  7. Log compaction (daily, deletes logs >30 days)     │
 └──────────────────────┬──────────────────────────────┘
                        │
         ┌──────────┬───┼───────┬──────────┐
         ▼          ▼   ▼       ▼          ▼
-┌────────────┐ ┌────────┐ ┌────────┐ ┌──────────┐ ┌──────────┐
-│  Debt Data │ │ Budget │ │ Govt   │ │ Constit. │ │ GitHub   │
-│            │ │ Data   │ │ Data   │ │ Data     │ │ Issues   │
-│ World Bank │ │ MOF +  │ │ Ahram  │ │ FAO PDF  │ │ API +    │
-│ API (free) │ │ Claude │ │+Claude │ │ + Claude │ │ Council  │
-└────────────┘ └────────┘ └────────┘ └──────────┘ └──────────┘
+┌────────────┐ ┌────────┐ ┌────────┐ ┌──────────┐
+│  Debt Data │ │ Budget │ │ Govt   │ │ Constit. │
+│            │ │ Data   │ │ Data   │ │ Data     │
+│ World Bank │ │ MOF +  │ │ Ahram  │ │ FAO PDF  │
+│ API (free) │ │ Claude │ │+Claude │ │ + Claude │
+└────────────┘ └────────┘ └────────┘ └──────────┘
+
+┌─────────────────────────────────────────────────────┐
+│       GitHub Issues → Claude Code Action             │
+│      .github/workflows/claude-fix.yml                │
+│                                                       │
+│  Triggered by: `claude-fix` or `claude-feature`      │
+│  label on an issue, or @claude mention in comments   │
+│                                                       │
+│  Claude Code Action runs on GitHub-hosted runner,    │
+│  implements the fix, and opens a PR with             │
+│  "Closes #N". Human reviews before merge.            │
+│                                                       │
+│  (Replaces the old processGitHubIssues Convex cron)  │
+└─────────────────────────────────────────────────────┘
 ```
 
 ## What the AI Searches
@@ -51,7 +66,7 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 | Ahram Online | english.ahram.org.eg/News/562168.aspx | Minister names and titles | Fetch HTML, Claude extracts minister list |
 | FAO/FAOLEX | faolex.fao.org/docs/pdf/egy127542e.pdf | Constitution full text (247 articles) | pdf-parse extracts text, Claude structures articles |
 | Constitute Project | constituteproject.org/constitution/Egypt_2019 | Constitution reference/verification | Referenced as data source |
-| GitHub Issues | github.com/Ba3lisa/mizan/issues | Community data corrections | GitHub API + Claude parsing + LLM Council vote |
+| ~~GitHub Issues~~ | ~~github.com/Ba3lisa/mizan/issues~~ | ~~Community data corrections~~ | Moved to GitHub Actions (`claude-fix.yml`) — no longer a Convex pipeline step |
 
 ## Data Sources by Category
 
@@ -167,7 +182,8 @@ This is particularly valuable for the budget page, which may only change once pe
 2. The model used is `claude-haiku-4-5-20251001` (Claude Haiku 4.5) for all data extraction tasks
 3. Without the key, World Bank API data still refreshes (no auth needed), but Claude-powered parsing is skipped
 4. Cron job runs automatically every 12 hours
-5. Manual trigger: `npx convex run agents/dataAgent:orchestrateRefresh`
+5. Manual trigger (public action): `npx convex run agents/dataAgent:triggerRefresh`
+   (also available as internal: `npx convex run agents/dataAgent:orchestrateRefresh`)
 
 ## Graceful Degradation
 
@@ -246,7 +262,7 @@ The LLM Council is a multi-model voting system that verifies community-submitted
 
 ### Current Configuration
 
-The council currently runs on Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) as a single provider. Additional providers (OpenAI, Google models) are planned for v1.2 to enable true multi-model consensus.
+The council now runs on multiple providers in priority order: xAI Grok (`grok-4-1-fast-reasoning`), OpenAI, Anthropic Claude, Google, and OpenRouter. The priority chain falls back automatically if a provider's API key is not set. This enables true multi-model consensus voting across independent model families.
 
 ### Source Classification
 
@@ -272,7 +288,9 @@ For all source types, if a council member votes `reject` with a reasoning that c
 
 ### Integration with GitHub Issues
 
-The council is the middle step in the community correction pipeline:
+> **Note (v1.9.3+):** GitHub issue processing has moved from the Convex `processGitHubIssues` cron to the GitHub Actions Claude Code Action (`.github/workflows/claude-fix.yml`). Issues labeled `claude-fix` or `claude-feature` are now handled directly by Claude Code running on GitHub-hosted runners, which creates fix PRs automatically. The LLM Council below still applies to community *data corrections* submitted via the separate `data-correction` label flow.
+
+The council is the middle step in the community data-correction pipeline:
 
 1. A community member opens a GitHub Issue with label `data-correction`, including the incorrect value, the proposed correct value, and a source URL
 2. The GitHub Agent ingests the issue, runs spam detection (rate limiting, duplicate checking, source URL validation), and classifies it

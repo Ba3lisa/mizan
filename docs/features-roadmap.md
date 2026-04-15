@@ -5,9 +5,17 @@
 ### Already Built (Phase 1-5)
 | BuildCanada | Mizan Equivalent | Status |
 |---|---|---|
-| Canada Spends | `/budget` — Budget breakdown with CanadaSpends-style visualization | ✅ Building |
+| Canada Spends | `/budget` — Budget breakdown with CanadaSpends-style visualization | ✅ Done |
 | Election Tracker | `/elections` — Presidential + parliamentary results with Egypt map | ✅ Done |
 | Builder MP (bill analysis) | `/parliament` — Member profiles, party composition, committees | ✅ Done |
+| Economic Tracker | `/economy` — GDP, inflation, debt, reserves, EGX30, Suez Canal revenue | ✅ Done |
+| Your Governorate | `/governorate/[slug]` — Governor, MPs, senators, stats per governorate | ✅ Done |
+| Tax Calculator | `/tools/tax-calculator` — Income tax, social insurance, net salary | ✅ Done |
+| Mashrou'ak | `/tools/mashroaak` — Entrepreneur investment simulator (مشروعك) | ✅ Done |
+| Investment Simulator | `/tools/invest` — Investment growth calculator | ✅ Done |
+| Buy vs Rent | `/tools/buy-vs-rent` — Homeownership vs renting calculator | ✅ Done |
+| Funding Sources | `/funding` — Where Egypt's budget funding comes from | ✅ Done |
+| Polls | `/polls` — Weekly AI-generated polls on government topics | ✅ Done |
 
 ### To Build Next
 
@@ -29,19 +37,8 @@
 - Visualization: progress bars, timeline, completion percentage
 - **Data needed**: Official government plans, Vision 2030 reports (available from planning ministry)
 
-#### 3. "Trade/Economic Tracker" → `/economy`
-**What**: Track key economic indicators in real-time
-- GDP growth rate (quarterly)
-- Inflation rate (monthly CPI from CAPMAS)
-- Unemployment rate
-- EGP exchange rate (vs USD, EUR, SAR)
-- Foreign reserves (CBE monthly)
-- Suez Canal revenue (monthly)
-- Tourism revenue (quarterly)
-- Remittances from diaspora
-- Visualization: sparklines, trend charts, year-over-year comparison
-- **Data needed**: CAPMAS statistical yearbook, CBE reports, World Bank API
-- **Auto-refreshable**: Most of this data has APIs (World Bank, CBE)
+#### 3. ~~"Trade/Economic Tracker" → `/economy`~~ ✅ Done
+The `/economy` page is live with GDP, inflation, debt, forex reserves, EGX30 index, and Suez Canal revenue. Auto-refreshed via World Bank API and other sources.
 
 #### 4. "Great Egyptian Builders" → `/figures`
 **What**: Biographical profiles of significant Egyptian political/civic figures
@@ -50,12 +47,8 @@
 - Each profile: photo, bio, role, key achievements, controversies, sources
 - **Data needed**: Curated from SIS, Wikipedia, academic sources
 
-#### 5. "Tax Calculator" → `/tools/tax-calculator`
-**What**: Calculate your Egyptian taxes
-- Input: salary, employment type (public/private), marital status
-- Output: income tax, social insurance, net salary
-- Show comparison with regional peers (how does Egypt's tax burden compare to Saudi, UAE, Jordan?)
-- **Data needed**: Egyptian Tax Authority brackets (publicly available)
+#### 5. ~~"Tax Calculator" → `/tools/tax-calculator`~~ ✅ Done
+The `/tools/tax-calculator` page is live with Egyptian income tax brackets and social insurance calculation.
 
 #### 6. "Legislation Tracker" → `/legislation`
 **What**: Track laws passed by parliament
@@ -72,13 +65,8 @@
 - Freedom of press index
 - **Data needed**: TI reports, World Bank governance indicators (all public APIs)
 
-#### 8. "Your Governorate" → `/governorate/[name]`
-**What**: Personalized dashboard for your governorate
-- Select your governorate → see YOUR governor, YOUR MPs, YOUR senators
-- Budget allocation to your governorate
-- Local economic indicators (unemployment, poverty rate)
-- Schools/hospitals per capita
-- **Data needed**: CAPMAS governorate-level data, local government reports
+#### 8. ~~"Your Governorate" → `/governorate/[name]`~~ ✅ Done
+The `/governorate/[slug]` pages are live, showing the governor, House MPs, and Senate members for each of Egypt's 27 governorates.
 
 #### 9. "Automated Sanad Scoring" → LLM Council
 **What**: LLM Council automatically determines Sanad confidence levels for data sources
@@ -110,3 +98,18 @@
 | Legislation | Official Gazette | No (PDF extraction) | AI-assisted |
 | Corruption index | Transparency International | Yes (public data) | Yearly |
 | Automated Sanad | LLM Council + source metadata | Yes (internal) | Real-time |
+
+## Recently Added (Not in Original Roadmap)
+
+| Feature | Path | Status | Notes |
+|---|---|---|---|
+| Mashrou'ak (مشروعك) | `/tools/mashroaak` | ✅ Done | Entrepreneur investment tool |
+| Investment Simulator | `/tools/invest` | ✅ Done | Investment growth with inflation calculator |
+| Buy vs Rent | `/tools/buy-vs-rent` | ✅ Done | Homeownership cost comparison |
+| Funding Sources | `/funding` | ✅ Done | Where Egypt's budget revenue comes from |
+| Weekly Polls | `/polls` | ✅ Done | AI-generated polls on government policy topics |
+| Guide Chat | (sidebar, disabled in prod) | 🚧 Dev only | Driver.js-powered page tours + Convex Agent chat |
+| WebMCP Integration | `.well-known/webmcp` | ✅ Done | Exposes tool pages to external AI agents (Chrome Gemini, etc.) |
+| PR Preview Deploys | `.github/workflows/preview.yml` | ✅ Done | DigitalOcean preview deploy on every PR with URL comment |
+| Claude Code Action | `.github/workflows/claude-fix.yml` | ✅ Done | Auto-fixes GitHub issues labeled `claude-fix` / `claude-feature` |
+| xAI Grok LLM Council | `convex/agents/providers/xai.ts` | ✅ Done | Grok added as primary council provider (`grok-4-1-fast-reasoning`) |

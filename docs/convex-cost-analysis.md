@@ -1,6 +1,6 @@
 # Convex Cost Analysis — Mizan
 
-> Last updated: 2026-04-07
+> Last updated: 2026-04-15
 > Status: Development mode (numbers may be inflated by frequent deploys/hot reloads)
 
 ## Current Plan: Free & Starter
