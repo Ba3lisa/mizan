@@ -6,6 +6,7 @@ import { extractClaudeText } from "../validators";
 import type { LLMProvider, LLMCallResult, ToolSchema, ServerToolDef, CouncilEvaluationContext, CouncilVoteResult } from "./types";
 import { COUNCIL_SYSTEM_PROMPT, buildCouncilPrompt } from "./councilPrompt";
 import { CouncilVoteSchema, zodToToolSchema } from "../schemas";
+import { WEB_RESEARCH_PROVIDER_TIMEOUT_MS, withProviderTimeout } from "./http";
 
 const COUNCIL_VOTE_TOOL = zodToToolSchema(
   "submit_council_vote",
@@ -48,6 +49,7 @@ export async function callClaudeWithUsage(
   const startMs = Date.now();
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -55,6 +57,7 @@ export async function callClaudeWithUsage(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
+    }),
   });
 
   const durationMs = Date.now() - startMs;
@@ -120,6 +123,7 @@ export async function callClaudeStructuredWithUsage<T>(
   const startMs = Date.now();
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -127,6 +131,7 @@ export async function callClaudeStructuredWithUsage<T>(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
+    }),
   });
 
   const durationMs = Date.now() - startMs;
@@ -198,6 +203,7 @@ export async function callClaudeWithServerTools(
   const startMs = Date.now();
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -205,6 +211,7 @@ export async function callClaudeWithServerTools(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
+    }, WEB_RESEARCH_PROVIDER_TIMEOUT_MS),
   });
 
   const durationMs = Date.now() - startMs;

@@ -71,6 +71,29 @@ function activeProviderName(): string {
 type RefreshCategory = "government" | "parliament" | "budget" | "debt" | "economy" | "governorate_stats" | "industry";
 
 const STALE_THRESHOLD_MS = 12 * 60 * 60 * 1000; // 12 hours (matches cron interval)
+const INDUSTRY_REFRESH_TIMEOUT_MS = 20 * 60 * 1000;
+
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  label: string,
+): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutHandle = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 60000)} minute(s)`));
+    }, timeoutMs);
+  });
+
+  try {
+    return await Promise.race([promise, timeoutPromise]);
+  } finally {
+    if (timeoutHandle !== null) {
+      clearTimeout(timeoutHandle);
+    }
+  }
+}
 
 // ─── SOURCE REGISTRY ─────────────────────────────────────────────────────────
 // Every URL the pipeline fetches, grouped by category.
@@ -2468,7 +2491,11 @@ async function refreshCategory(
         result = await refreshGovernorateStatsData(ctx);
         break;
       case "industry":
-        result = await refreshIndustryData(ctx);
+        result = await withTimeout(
+          refreshIndustryData(ctx),
+          INDUSTRY_REFRESH_TIMEOUT_MS,
+          "Industry refresh",
+        );
         break;
     }
 
@@ -2549,6 +2576,7 @@ async function refreshCategory(
       logId,
       errorMessage: message,
     });
+    throw err;
   }
 }
 

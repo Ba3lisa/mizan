@@ -21,6 +21,7 @@ import type * as agents_pollAgent from "../agents/pollAgent.js";
 import type * as agents_providers_anthropic from "../agents/providers/anthropic.js";
 import type * as agents_providers_councilPrompt from "../agents/providers/councilPrompt.js";
 import type * as agents_providers_google from "../agents/providers/google.js";
+import type * as agents_providers_http from "../agents/providers/http.js";
 import type * as agents_providers_openai from "../agents/providers/openai.js";
 import type * as agents_providers_openrouter from "../agents/providers/openrouter.js";
 import type * as agents_providers_registry from "../agents/providers/registry.js";
@@ -96,6 +97,7 @@ declare const fullApi: ApiFromModules<{
   "agents/providers/anthropic": typeof agents_providers_anthropic;
   "agents/providers/councilPrompt": typeof agents_providers_councilPrompt;
   "agents/providers/google": typeof agents_providers_google;
+  "agents/providers/http": typeof agents_providers_http;
   "agents/providers/openai": typeof agents_providers_openai;
   "agents/providers/openrouter": typeof agents_providers_openrouter;
   "agents/providers/registry": typeof agents_providers_registry;

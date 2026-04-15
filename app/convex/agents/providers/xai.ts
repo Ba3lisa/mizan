@@ -5,6 +5,7 @@
 import type { LLMProvider, LLMCallResult, ToolSchema, ServerToolDef, CouncilEvaluationContext, CouncilVoteResult } from "./types";
 import { COUNCIL_SYSTEM_PROMPT, buildCouncilPrompt } from "./councilPrompt";
 import { CouncilVoteSchema, zodToToolSchema } from "../schemas";
+import { WEB_RESEARCH_PROVIDER_TIMEOUT_MS, withProviderTimeout } from "./http";
 
 const COUNCIL_VOTE_TOOL = zodToToolSchema(
   "submit_council_vote",
@@ -46,6 +47,7 @@ async function callGrokWithUsage(
   const startMs = Date.now();
 
   const response = await fetch(CHAT_API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -55,6 +57,7 @@ async function callGrokWithUsage(
       model: GROK_MODEL,
       max_tokens: 4096,
       messages,
+    }),
     }),
   });
 
@@ -116,6 +119,7 @@ async function callGrokStructuredWithUsage<T>(
   const startMs = Date.now();
 
   const response = await fetch(CHAT_API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -127,6 +131,7 @@ async function callGrokStructuredWithUsage<T>(
       messages,
       tools,
       tool_choice: "required",
+    }),
     }),
   });
 
@@ -222,6 +227,7 @@ async function callGrokWithServerTools(
   const startMs = Date.now();
 
   const response = await fetch(RESPONSES_API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -233,6 +239,7 @@ async function callGrokWithServerTools(
       tools: toXaiServerTools(serverTools),
       store: false,
     }),
+    }, WEB_RESEARCH_PROVIDER_TIMEOUT_MS),
   });
 
   const durationMs = Date.now() - startMs;

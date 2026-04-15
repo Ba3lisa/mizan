@@ -2,6 +2,8 @@ import { internalMutation, query } from "./_generated/server";
 import { v } from "convex/values";
 import { internal as _internal } from "./_generated/api";
 
+const RUNNING_STEP_TIMEOUT_MS = 90 * 60 * 1000;
+
 // All steps in pipeline order
 const PIPELINE_STEPS = [
   "reference_data",
@@ -144,8 +146,26 @@ export const getProgress = query({
     runIds.sort((a, b) => b.localeCompare(a));
     const currentRunId = runIds[0];
 
+    const now = Date.now();
     const steps = allDocs
       .filter((d) => d.runId === currentRunId)
+      .map((doc) => {
+        if (
+          doc.status === "running" &&
+          doc.startedAt !== undefined &&
+          now - doc.startedAt > RUNNING_STEP_TIMEOUT_MS
+        ) {
+          return {
+            ...doc,
+            status: "failed" as const,
+            completedAt: now,
+            error: doc.error ?? "Step timed out while waiting for upstream AI provider",
+            message: "Timed out.",
+            messageAr: "انتهت المهلة.",
+          };
+        }
+        return doc;
+      })
       .sort((a, b) => {
         const ai = PIPELINE_STEPS.indexOf(a.step as PipelineStep);
         const bi = PIPELINE_STEPS.indexOf(b.step as PipelineStep);

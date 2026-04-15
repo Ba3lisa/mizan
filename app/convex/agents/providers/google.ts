@@ -5,6 +5,7 @@
 import type { LLMProvider, LLMCallResult, ToolSchema, CouncilEvaluationContext, CouncilVoteResult } from "./types";
 import { COUNCIL_SYSTEM_PROMPT, buildCouncilPrompt } from "./councilPrompt";
 import { CouncilVoteSchema, zodToToolSchema } from "../schemas";
+import { withProviderTimeout } from "./http";
 
 const COUNCIL_VOTE_TOOL = zodToToolSchema(
   "submit_council_vote",
@@ -42,9 +43,11 @@ async function callGemini(
   }
 
   const response = await fetch(apiUrl(GEMINI_MODEL, "generateContent", apiKey), {
+    ...withProviderTimeout({
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    }),
   });
 
   if (!response.ok) {
@@ -90,9 +93,11 @@ async function callGeminiStructured<T>(
   }
 
   const response = await fetch(apiUrl(GEMINI_MODEL, "generateContent", apiKey), {
+    ...withProviderTimeout({
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    }),
   });
 
   if (!response.ok) {
@@ -139,9 +144,11 @@ async function callGeminiWithUsage(
   const startMs = Date.now();
 
   const response = await fetch(apiUrl(GEMINI_MODEL, "generateContent", apiKey), {
+    ...withProviderTimeout({
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    }),
   });
 
   const durationMs = Date.now() - startMs;
@@ -198,9 +205,11 @@ async function callGeminiStructuredWithUsage<T>(
   const startMs = Date.now();
 
   const response = await fetch(apiUrl(GEMINI_MODEL, "generateContent", apiKey), {
+    ...withProviderTimeout({
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
+    }),
   });
 
   const durationMs = Date.now() - startMs;

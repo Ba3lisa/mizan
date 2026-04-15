@@ -6,6 +6,7 @@
 import type { LLMProvider, LLMCallResult, ToolSchema, CouncilEvaluationContext, CouncilVoteResult } from "./types";
 import { COUNCIL_SYSTEM_PROMPT, buildCouncilPrompt } from "./councilPrompt";
 import { CouncilVoteSchema, zodToToolSchema } from "../schemas";
+import { withProviderTimeout } from "./http";
 
 const COUNCIL_VOTE_TOOL = zodToToolSchema(
   "submit_council_vote",
@@ -41,6 +42,7 @@ async function callOpenRouter(
   messages.push({ role: "user", content: prompt });
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -52,6 +54,7 @@ async function callOpenRouter(
       model: getModel(),
       max_tokens: 4096,
       messages,
+    }),
     }),
   });
 
@@ -86,6 +89,7 @@ async function callOpenRouterStructured<T>(
   });
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -97,6 +101,7 @@ async function callOpenRouterStructured<T>(
       model: getModel(),
       max_tokens: 4096,
       messages,
+    }),
     }),
   });
 
@@ -139,6 +144,7 @@ async function callOpenRouterWithUsage(
   const startMs = Date.now();
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -150,6 +156,7 @@ async function callOpenRouterWithUsage(
       model,
       max_tokens: 4096,
       messages,
+    }),
     }),
   });
 
@@ -195,6 +202,7 @@ async function callOpenRouterStructuredWithUsage<T>(
   const startMs = Date.now();
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -206,6 +214,7 @@ async function callOpenRouterStructuredWithUsage<T>(
       model,
       max_tokens: 4096,
       messages,
+    }),
     }),
   });
 

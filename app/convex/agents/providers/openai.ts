@@ -5,6 +5,7 @@
 import type { LLMProvider, LLMCallResult, ToolSchema, ServerToolDef as _ServerToolDef, CouncilEvaluationContext, CouncilVoteResult } from "./types";
 import { COUNCIL_SYSTEM_PROMPT, buildCouncilPrompt } from "./councilPrompt";
 import { CouncilVoteSchema, zodToToolSchema } from "../schemas";
+import { withProviderTimeout } from "./http";
 
 const COUNCIL_VOTE_TOOL = zodToToolSchema(
   "submit_council_vote",
@@ -35,6 +36,7 @@ async function callOpenAI(
   messages.push({ role: "user", content: prompt });
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -44,6 +46,7 @@ async function callOpenAI(
       model: OPENAI_MODEL,
       max_tokens: 4096,
       messages,
+    }),
     }),
   });
 
@@ -84,6 +87,7 @@ async function callOpenAIStructured<T>(
   }];
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -95,6 +99,7 @@ async function callOpenAIStructured<T>(
       messages,
       tools,
       tool_choice: { type: "function", function: { name: schema.name } },
+    }),
     }),
   });
 
@@ -142,6 +147,7 @@ async function callOpenAIWithUsage(
   const startMs = Date.now();
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -151,6 +157,7 @@ async function callOpenAIWithUsage(
       model: OPENAI_MODEL,
       max_tokens: 4096,
       messages,
+    }),
     }),
   });
 
@@ -201,6 +208,7 @@ async function callOpenAIStructuredWithUsage<T>(
   const startMs = Date.now();
 
   const response = await fetch(API_URL, {
+    ...withProviderTimeout({
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -212,6 +220,7 @@ async function callOpenAIStructuredWithUsage<T>(
       messages,
       tools,
       tool_choice: { type: "function", function: { name: schema.name } },
+    }),
     }),
   });
 
