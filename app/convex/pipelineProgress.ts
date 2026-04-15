@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { internal as _internal } from "./_generated/api";
 
 const RUNNING_STEP_TIMEOUT_MS = 90 * 60 * 1000;
+const STALE_STEP_ERROR = "AI provider timeout";
 
 // All steps in pipeline order
 const PIPELINE_STEPS = [
@@ -159,7 +160,7 @@ export const getProgress = query({
             ...doc,
             status: "failed" as const,
             completedAt: now,
-            error: doc.error ?? "Step timed out while waiting for upstream AI provider",
+            error: doc.error ?? STALE_STEP_ERROR,
             message: "Timed out.",
             messageAr: "انتهت المهلة.",
           };

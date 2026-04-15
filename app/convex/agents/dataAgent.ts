@@ -72,17 +72,17 @@ type RefreshCategory = "government" | "parliament" | "budget" | "debt" | "econom
 
 const STALE_THRESHOLD_MS = 12 * 60 * 60 * 1000; // 12 hours (matches cron interval)
 const INDUSTRY_REFRESH_TIMEOUT_MS = 20 * 60 * 1000;
+const PIPELINE_TIMEOUT_ERROR = "AI provider timeout";
 
 async function withTimeout<T>(
   promise: Promise<T>,
   timeoutMs: number,
-  label: string,
 ): Promise<T> {
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
   const timeoutPromise = new Promise<never>((_, reject) => {
     timeoutHandle = setTimeout(() => {
-      reject(new Error(`${label} timed out after ${Math.round(timeoutMs / 60000)} minute(s)`));
+      reject(new Error(PIPELINE_TIMEOUT_ERROR));
     }, timeoutMs);
   });
 
@@ -2494,7 +2494,6 @@ async function refreshCategory(
         result = await withTimeout(
           refreshIndustryData(ctx),
           INDUSTRY_REFRESH_TIMEOUT_MS,
-          "Industry refresh",
         );
         break;
     }
