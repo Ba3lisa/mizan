@@ -108,6 +108,7 @@ The `/governorate/[slug]` pages are live, showing the governor, House MPs, and S
 | Buy vs Rent | `/tools/buy-vs-rent` | ✅ Done | Homeownership cost comparison |
 | Funding Sources | `/funding` | ✅ Done | Where Egypt's budget revenue comes from |
 | Weekly Polls | `/polls` | ✅ Done | AI-generated polls on government policy topics |
+| News Ticker | `/` (homepage) | ✅ Done | Live Egyptian news headlines from 7 RSS feeds (Google News, BBC, NYT, Daily News Egypt, Egypt Independent, Al-Monitor); also refreshed by pipeline via LLM web search |
 | Guide Chat | (sidebar, disabled in prod) | 🚧 Dev only | Driver.js-powered page tours + Convex Agent chat |
 | WebMCP Integration | `.well-known/webmcp` | ✅ Done | Exposes tool pages to external AI agents (Chrome Gemini, etc.) |
 | PR Preview Deploys | `.github/workflows/preview.yml` | ✅ Done | DigitalOcean preview deploy on every PR with URL comment |

@@ -23,24 +23,29 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 │              AI Orchestrator Action                    │
 │           convex/agents/dataAgent.ts                  │
 │                                                       │
-│  1. ensureAllReferenceData (18 tables, zero-cost if   │
-│     populated, loads from backup if empty)             │
-│  2. Debt refresh (World Bank API)                     │
-│  3. Budget refresh (MOF + Claude parsing)             │
-│  4. Government refresh (Ahram Online + Claude parsing)│
-│  5. Parliament refresh (Wikipedia + parliament.gov.eg)│
-│  6. Constitution refresh (PDF extraction if needed)   │
-│  7. Log compaction (daily, deletes logs >30 days)     │
-└──────────────────────┬──────────────────────────────┘
+│  1.  reference_data     — ensureAllReferenceData (18 tables)  │
+│  2.  government         — Cabinet (Wikipedia/Ahram + Claude)  │
+│  3.  parliament         — Members (parliament.gov.eg + Wiki)  │
+│  4.  budget             — MOF open data + Claude parsing      │
+│  5.  debt               — World Bank API (debt stock + GDP)   │
+│  6.  economy            — World Bank indicators, IMF, FX rate │
+│  7.  governorate_stats  — Claude web research per governorate │
+│  8.  industry           — IDA + GAFI investment opportunities │
+│  9.  constitution       — FAO PDF extraction if < 247 arts.   │
+│  10. github_issues      — Community data corrections (LLM)    │
+│  11. narrative          — AI bilingual economic narrative     │
+│  12. news               — RSS feeds + LLM web search          │
+│  13. llm_export         — ISR revalidation of /llms-full.txt  │
+│  14. cleanup            — Log compaction                      │
+└──────────────────────┬──────────────────────────────────────┘
                        │
-        ┌──────────┬───┼───────┬──────────┐
-        ▼          ▼   ▼       ▼          ▼
-┌────────────┐ ┌────────┐ ┌────────┐ ┌──────────┐
-│  Debt Data │ │ Budget │ │ Govt   │ │ Constit. │
-│            │ │ Data   │ │ Data   │ │ Data     │
-│ World Bank │ │ MOF +  │ │ Ahram  │ │ FAO PDF  │
-│ API (free) │ │ Claude │ │+Claude │ │ + Claude │
-└────────────┘ └────────┘ └────────┘ └──────────┘
+     ┌────────┬────────┼────────┬────────┬────────┐
+     ▼        ▼        ▼        ▼        ▼        ▼
+┌────────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+│  Debt  │ │Budget│ │ Govt │ │Econom│ │Indust│ │ News │
+│ World  │ │ MOF+ │ │Ahram/│ │ WB + │ │IDA + │ │ RSS+ │
+│ Bank   │ │Claude│ │ Wiki │ │ IMF  │ │ GAFI │ │ LLM  │
+└────────┘ └──────┘ └──────┘ └──────┘ └──────┘ └──────┘
 
 ┌─────────────────────────────────────────────────────┐
 │       GitHub Issues → Claude Code Action             │
@@ -61,12 +66,20 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 
 | Source | URL | What It Fetches | How |
 |---|---|---|---|
-| World Bank API | api.worldbank.org/v2/country/EGY/indicator/DT.DOD.DECT.CD | External debt time series (raw USD) | Direct API call, parse JSON, convert to billions |
+| World Bank API | api.worldbank.org/v2/country/EGY/indicator/... | External debt, GDP, inflation, unemployment, reserves | Direct API call, parse JSON |
+| IMF DataMapper | imf.org/external/datamapper/api/v1 | GDP, inflation, debt forecasts through 2030 | Direct API call, seeded once |
+| Frankfurter API | api.frankfurter.app | Live USD/EGP exchange rate (daily) | Direct API call |
 | Ministry of Finance | mof.gov.eg/en/open-data | Budget totals (revenue, expenditure, deficit) | Fetch HTML, Claude extracts JSON |
-| Ahram Online | english.ahram.org.eg/News/562168.aspx | Minister names and titles | Fetch HTML, Claude extracts minister list |
+| Wikipedia (Cabinet) | en.wikipedia.org/wiki/Madbouly_Cabinet | Cabinet minister names and portfolios | Fetch HTML, Claude extracts list |
+| Ahram Online | english.ahram.org.eg/News/562168.aspx | Minister names (fallback) | Fetch HTML, Claude extracts list |
+| parliament.gov.eg | parliament.gov.eg/MembersDetails.aspx?id=N | Individual MP names and details | Batch scrape, regex + Claude |
+| Wikipedia (Parliament) | en.wikipedia.org/wiki/2025_Egyptian_parliamentary_election | Party seat counts | Fetch HTML, Claude extracts |
+| IDA (Egypt) | ida.gov.eg | Industrial investment opportunities | Fetch HTML/JSON, Claude verifies with Zod schema |
+| GAFI | gafi.gov.eg | Free zones and investment areas | Fetch HTML/JSON, Claude verifies with Zod schema |
 | FAO/FAOLEX | faolex.fao.org/docs/pdf/egy127542e.pdf | Constitution full text (247 articles) | pdf-parse extracts text, Claude structures articles |
 | Constitute Project | constituteproject.org/constitution/Egypt_2019 | Constitution reference/verification | Referenced as data source |
-| ~~GitHub Issues~~ | ~~github.com/Ba3lisa/mizan/issues~~ | ~~Community data corrections~~ | Moved to GitHub Actions (`claude-fix.yml`) — no longer a Convex pipeline step |
+| RSS / Google News | /api/news proxy (Next.js route) | Egyptian news headlines, bilingual | 7 RSS feeds; LLM web search supplements |
+| GitHub Issues | github.com/Ba3lisa/mizan/issues | Community data corrections | LLM Council verifies; Claude Code Action handles bug/feature labels |
 
 ## Data Sources by Category
 
@@ -119,6 +132,35 @@ Mizan uses an AI-powered data agent built on Convex to keep all government data 
 - **Secondary reference**: Constitute Project (`constituteproject.org/constitution/Egypt_2019`)
 - **Validation**: Article count must equal 247
 - **Refresh**: Only triggered when article count is below 247 (effectively a one-time load)
+
+### Economy Data
+- **Primary**: World Bank API — multiple indicators for Egypt:
+  - GDP growth (`NY.GDP.MKTP.KD.ZG`), Inflation (`FP.CPI.TOTL.ZG`), Unemployment (`SL.UEM.TOTL.ZS`), Reserves (`FI.RES.TOTL.CD`), and others
+- **Forecasts**: IMF DataMapper API — GDP, inflation, debt/GDP forecasts through 2030
+- **Exchange rate**: Frankfurter API (`api.frankfurter.app/latest?from=USD&to=EGP`) — live daily rate
+- **Stock index**: CountryEconomy (`countryeconomy.com/stock-exchange/egypt`) — EGX 30 index
+- **Refresh**: Fully automated. Indicators skipped if still fresh (< staleness threshold). IMF forecasts seeded once.
+
+### Governorate Stats
+- **Source**: Claude web research — LLM searches for economic stats per governorate
+- **Data**: Population, GDP contribution, key industries, employment indicators
+- **Refresh**: Each 12h run; uses `callLLMWebResearchStructured` with a Zod-verified schema
+
+### Industry Data
+- **IDA** (Egyptian Industrial Development Authority): Investment opportunity listings, industrial complexes
+- **GAFI** (General Authority for Investment): Free zones, investment incentive areas
+- **Benchmarks**: AI-generated industrial cost benchmarks (research + structured extraction)
+- **Cost estimates**: Unpriced opportunities get AI cost estimates based on benchmarks
+- **Refresh**: Automated. Deep scrape pipeline: Pass 1 (structure discovery) → Pass 2 (enrichment + cost estimation)
+
+### News Headlines
+- **RSS feeds**: 7 feeds via Next.js API proxy at `/api/news`:
+  - Google News (English + Arabic, Egypt-filtered)
+  - Daily News Egypt, Egypt Independent (Egypt-only outlets)
+  - Al-Monitor, BBC Middle East, NYT Middle East (filtered for Egypt keywords)
+- **LLM supplement**: Pipeline `news` step uses `callLLMWebResearchStructured` to find headlines beyond RSS
+- **Storage**: `newsHeadlines` table; entries older than 7 days are purged automatically
+- **Frontend**: `NewsTicker` component on homepage fetches `/api/news` directly (client-side, 15-min cache)
 
 ### Election Data
 - **Primary**: National Elections Authority (elections.eg)
@@ -288,7 +330,7 @@ For all source types, if a council member votes `reject` with a reasoning that c
 
 ### Integration with GitHub Issues
 
-> **Note (v1.9.3+):** GitHub issue processing has moved from the Convex `processGitHubIssues` cron to the GitHub Actions Claude Code Action (`.github/workflows/claude-fix.yml`). Issues labeled `bug`, `enhancement`, or `data-correction` are now handled directly by Claude Code running on GitHub-hosted runners, which creates fix PRs automatically. The LLM Council below still applies to community *data corrections* submitted via the separate `data-correction` label flow.
+> **Note (v1.9.3+):** The standalone `processGitHubIssues` Convex cron has been removed. `bug` and `enhancement` issues are now handled by the GitHub Actions Claude Code Action (`.github/workflows/claude-fix.yml`) which creates fix PRs automatically. However, `data-correction` issues are still processed by the `github_issues` step inside `orchestrateRefresh` (step 10 of the 12h pipeline), which runs the LLM Council verification flow described below.
 
 The council is the middle step in the community data-correction pipeline:
 
