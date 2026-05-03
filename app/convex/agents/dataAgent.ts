@@ -72,7 +72,26 @@ type RefreshCategory = "government" | "parliament" | "budget" | "debt" | "econom
 
 const STALE_THRESHOLD_MS = 12 * 60 * 60 * 1000; // 12 hours (matches cron interval)
 const INDUSTRY_REFRESH_TIMEOUT_MS = 20 * 60 * 1000;
+const NEWS_REFRESH_TIMEOUT_MS = 8 * 60 * 1000;
 const PIPELINE_TIMEOUT_ERROR = "AI provider timeout";
+const CORE_REFRESH_CATEGORIES: Array<RefreshCategory> = [
+  "government",
+  "parliament",
+  "budget",
+  "debt",
+  "economy",
+  "governorate_stats",
+  "industry",
+];
+
+type PipelineChainArgs = {
+  runId: string;
+  force?: boolean;
+};
+
+type CoreCategoryStepArgs = PipelineChainArgs & {
+  categoryIndex: number;
+};
 
 async function withTimeout<T>(
   promise: Promise<T>,
@@ -2579,6 +2598,121 @@ async function refreshCategory(
   }
 }
 
+async function scheduleReferenceDataStep(
+  ctx: ActionCtx,
+  args: PipelineChainArgs,
+): Promise<void> {
+  const scheduleArgs: PipelineChainArgs = { runId: args.runId };
+  if (args.force !== undefined) scheduleArgs.force = args.force;
+
+  await ctx.scheduler.runAfter(
+    0,
+    internal.agents.dataAgent.runReferenceDataStep,
+    scheduleArgs,
+  );
+}
+
+async function scheduleCoreCategoryStep(
+  ctx: ActionCtx,
+  args: CoreCategoryStepArgs,
+): Promise<void> {
+  const scheduleArgs: CoreCategoryStepArgs = {
+    runId: args.runId,
+    categoryIndex: args.categoryIndex,
+  };
+  if (args.force !== undefined) scheduleArgs.force = args.force;
+
+  await ctx.scheduler.runAfter(
+    0,
+    internal.agents.dataAgent.runCoreCategoryStep,
+    scheduleArgs,
+  );
+}
+
+async function scheduleConstitutionStep(
+  ctx: ActionCtx,
+  args: PipelineChainArgs,
+): Promise<void> {
+  const scheduleArgs: PipelineChainArgs = { runId: args.runId };
+  if (args.force !== undefined) scheduleArgs.force = args.force;
+
+  await ctx.scheduler.runAfter(
+    0,
+    internal.agents.dataAgent.runConstitutionStep,
+    scheduleArgs,
+  );
+}
+
+async function scheduleGitHubIssuesStep(
+  ctx: ActionCtx,
+  args: PipelineChainArgs,
+): Promise<void> {
+  const scheduleArgs: PipelineChainArgs = { runId: args.runId };
+  if (args.force !== undefined) scheduleArgs.force = args.force;
+
+  await ctx.scheduler.runAfter(
+    0,
+    internal.agents.dataAgent.runGitHubIssuesStep,
+    scheduleArgs,
+  );
+}
+
+async function scheduleNarrativeStep(
+  ctx: ActionCtx,
+  args: PipelineChainArgs,
+): Promise<void> {
+  const scheduleArgs: PipelineChainArgs = { runId: args.runId };
+  if (args.force !== undefined) scheduleArgs.force = args.force;
+
+  await ctx.scheduler.runAfter(
+    0,
+    internal.agents.dataAgent.runNarrativeStep,
+    scheduleArgs,
+  );
+}
+
+async function scheduleNewsStep(
+  ctx: ActionCtx,
+  args: PipelineChainArgs,
+): Promise<void> {
+  const scheduleArgs: PipelineChainArgs = { runId: args.runId };
+  if (args.force !== undefined) scheduleArgs.force = args.force;
+
+  await ctx.scheduler.runAfter(
+    0,
+    internal.agents.dataAgent.runNewsStep,
+    scheduleArgs,
+  );
+}
+
+async function scheduleLlmExportStep(
+  ctx: ActionCtx,
+  args: PipelineChainArgs,
+): Promise<void> {
+  const scheduleArgs: PipelineChainArgs = { runId: args.runId };
+  if (args.force !== undefined) scheduleArgs.force = args.force;
+
+  await ctx.scheduler.runAfter(
+    0,
+    internal.agents.dataAgent.runLlmExportStep,
+    scheduleArgs,
+  );
+}
+
+async function scheduleCleanupStep(
+  ctx: ActionCtx,
+  args: PipelineChainArgs,
+): Promise<void> {
+  const scheduleArgs: PipelineChainArgs = { runId: args.runId };
+  if (args.force !== undefined) scheduleArgs.force = args.force;
+
+  await ctx.scheduler.runAfter(
+    0,
+    internal.agents.dataAgent.runCleanupStep,
+    scheduleArgs,
+  );
+}
+
 // ─── BACKFILL ACTION (ONE-TIME) ───────────────────────────────────────────────
 
 /**
@@ -2598,19 +2732,20 @@ export const runBackfillInvestmentHistory = internalAction({
 // ─── ORCHESTRATOR ACTION ──────────────────────────────────────────────────────
 
 /**
- * Main AI orchestrator. Checks which data categories are stale (>24 h since
- * last successful refresh) and refreshes them using public APIs and Claude.
+ * Main AI orchestrator. Starts a durable step chain instead of doing the whole
+ * pipeline in one Convex action. Each scheduled action gets its own execution
+ * budget, which keeps expensive LLM/web-search steps from starving later steps.
  *
  * Called by the cron job every 12 hours and can also be triggered manually.
  */
 export const orchestrateRefresh = internalAction({
   args: { force: v.optional(v.boolean()) },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<null> => {
     if (process.env.DISABLE_CRONS === "true") {
       console.log("[dataAgent] Crons disabled (DISABLE_CRONS=true), skipping.");
       return null;
     }
-    console.log("[dataAgent] orchestrateRefresh started.");
+    console.log("[dataAgent] orchestrateRefresh scheduling started.");
 
     // Deduplicate fiscal years before any refresh (e.g. "2024/2025" vs "2024-2025")
     const dedupResult = await ctx.runMutation(internal.dataRefresh.deduplicateFiscalYears, {});
@@ -2624,9 +2759,22 @@ export const orchestrateRefresh = internalAction({
     // pending rows for every step so the frontend can subscribe immediately.
     await ctx.runMutation(internal.pipelineProgress.startRun, { runId });
 
-    // ── Step: reference_data ─────────────────────────────────────────────────
+    await scheduleReferenceDataStep(ctx, { runId, force: args.force });
+
+    console.log(`[dataAgent] orchestrateRefresh scheduled run ${runId}.`);
+
+    return null;
+  },
+});
+
+export const runReferenceDataStep = internalAction({
+  args: {
+    runId: v.string(),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<null> => {
     await ctx.runMutation(internal.pipelineProgress.updateStep, {
-      runId,
+      runId: args.runId,
       step: "reference_data",
       status: "running",
       message: "Checking reference tables...",
@@ -2635,7 +2783,7 @@ export const orchestrateRefresh = internalAction({
     try {
       await ctx.runMutation(internal.referenceData.ensureAllReferenceData, {});
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "reference_data",
         status: "success",
         message: "Reference data verified.",
@@ -2643,36 +2791,60 @@ export const orchestrateRefresh = internalAction({
       });
     } catch (err) {
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "reference_data",
         status: "failed",
         error: err instanceof Error ? err.message : String(err),
       });
     }
 
-    // Fetch last-updated timestamps for all categories
-    const lastUpdated = await ctx.runQuery(api.dataRefresh.getAllLastUpdated, {});
+    await scheduleCoreCategoryStep(ctx, {
+      runId: args.runId,
+      categoryIndex: 0,
+      force: args.force,
+    });
 
-    const now = Date.now();
-    const categories: Array<RefreshCategory> = [
-      "government",
-      "parliament",
-      "budget",
-      "debt",
-      "economy",
-      "governorate_stats",
-      "industry",
-    ];
+    return null;
+  },
+});
 
-    // Check which tables are actually empty (force refresh even if "fresh")
-    const tableEmpty: Record<string, boolean> = await ctx.runQuery(
-      internal.dataRefresh.checkEmptyTables,
-      {}
-    );
+export const runCoreCategoryStep = internalAction({
+  args: {
+    runId: v.string(),
+    categoryIndex: v.number(),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<null> => {
+    const category = CORE_REFRESH_CATEGORIES[args.categoryIndex];
 
-    for (const category of categories) {
-      const lastTime = lastUpdated[category];
+    if (category === undefined) {
+      await scheduleConstitutionStep(ctx, {
+        runId: args.runId,
+        force: args.force,
+      });
+      return null;
+    }
+
+    await ctx.runMutation(internal.pipelineProgress.updateStep, {
+      runId: args.runId,
+      step: category,
+      status: "running",
+      message: "Fetching...",
+      messageAr: "جارٍ الجلب...",
+    });
+
+    try {
+      const lastUpdated: Record<string, number | null> = await ctx.runQuery(
+        api.dataRefresh.getAllLastUpdated,
+        {},
+      );
+      const tableEmpty: Record<string, boolean> = await ctx.runQuery(
+        internal.dataRefresh.checkEmptyTables,
+        {},
+      );
+      const lastTime = lastUpdated[category] ?? null;
       const isEmpty = tableEmpty[category] ?? false;
+      const now = Date.now();
 
       // Skip if fresh AND not empty (unless force=true). Always refresh if table is empty.
       if (!args.force && !isEmpty && lastTime !== null && now - lastTime < STALE_THRESHOLD_MS) {
@@ -2680,52 +2852,53 @@ export const orchestrateRefresh = internalAction({
           `[dataAgent] Category "${category}" is fresh — skipping.`
         );
         await ctx.runMutation(internal.pipelineProgress.updateStep, {
-          runId,
+          runId: args.runId,
           step: category,
           status: "skipped",
           message: "Data is fresh — no refresh needed.",
           messageAr: "البيانات حديثة — لا حاجة للتحديث.",
         });
-        continue;
-      }
+      } else {
+        if (isEmpty) {
+          console.log(`[dataAgent] Category "${category}" table is EMPTY — forcing refresh.`);
+        }
 
-      if (isEmpty) {
-        console.log(`[dataAgent] Category "${category}" table is EMPTY — forcing refresh.`);
-      }
-
-      await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
-        step: category,
-        status: "running",
-        message: "Fetching...",
-        messageAr: "جارٍ الجلب...",
-      });
-
-      try {
         await refreshCategory(ctx, category);
         await ctx.runMutation(internal.pipelineProgress.updateStep, {
-          runId,
+          runId: args.runId,
           step: category,
           status: "success",
           message: "Done.",
           messageAr: "اكتمل.",
         });
-      } catch (err) {
-        await ctx.runMutation(internal.pipelineProgress.updateStep, {
-          runId,
-          step: category,
-          status: "failed",
-          error: err instanceof Error ? err.message : String(err),
-        });
       }
+    } catch (err) {
+      await ctx.runMutation(internal.pipelineProgress.updateStep, {
+        runId: args.runId,
+        step: category,
+        status: "failed",
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
 
-    // Ensure reference data exists (zero cost if tables already populated)
-    await ctx.runMutation(internal.referenceData.ensureAllReferenceData, {});
+    await scheduleCoreCategoryStep(ctx, {
+      runId: args.runId,
+      categoryIndex: args.categoryIndex + 1,
+      force: args.force,
+    });
 
-    // ── Step: constitution ───────────────────────────────────────────────────
+    return null;
+  },
+});
+
+export const runConstitutionStep = internalAction({
+  args: {
+    runId: v.string(),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<null> => {
     await ctx.runMutation(internal.pipelineProgress.updateStep, {
-      runId,
+      runId: args.runId,
       step: "constitution",
       status: "running",
       message: "Verifying articles...",
@@ -2751,7 +2924,7 @@ export const orchestrateRefresh = internalAction({
         }
       }
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "constitution",
         status: "success",
         message: "Articles verified.",
@@ -2762,16 +2935,30 @@ export const orchestrateRefresh = internalAction({
         `[dataAgent] Constitution refresh failed: ${err instanceof Error ? err.message : String(err)}`
       );
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "constitution",
         status: "failed",
         error: err instanceof Error ? err.message : String(err),
       });
     }
 
-    // ── Step: github_issues ──────────────────────────────────────────────────
+    await scheduleGitHubIssuesStep(ctx, {
+      runId: args.runId,
+      force: args.force,
+    });
+
+    return null;
+  },
+});
+
+export const runGitHubIssuesStep = internalAction({
+  args: {
+    runId: v.string(),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<null> => {
     await ctx.runMutation(internal.pipelineProgress.updateStep, {
-      runId,
+      runId: args.runId,
       step: "github_issues",
       status: "running",
       message: "Processing community corrections...",
@@ -2780,7 +2967,7 @@ export const orchestrateRefresh = internalAction({
     try {
       await ctx.runAction(internal.agents.githubAgent.processGitHubIssues, {});
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "github_issues",
         status: "success",
         message: "Community corrections processed.",
@@ -2788,16 +2975,30 @@ export const orchestrateRefresh = internalAction({
       });
     } catch (err) {
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "github_issues",
         status: "failed",
         error: err instanceof Error ? err.message : String(err),
       });
     }
 
-    // ── Step: narrative ──────────────────────────────────────────────────────
+    await scheduleNarrativeStep(ctx, {
+      runId: args.runId,
+      force: args.force,
+    });
+
+    return null;
+  },
+});
+
+export const runNarrativeStep = internalAction({
+  args: {
+    runId: v.string(),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<null> => {
     await ctx.runMutation(internal.pipelineProgress.updateStep, {
-      runId,
+      runId: args.runId,
       step: "narrative",
       status: "running",
       message: "Generating AI economic narrative...",
@@ -2806,7 +3007,7 @@ export const orchestrateRefresh = internalAction({
     try {
       await generateEconomicNarrative(ctx);
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "narrative",
         status: "success",
         message: "Narrative generated.",
@@ -2817,16 +3018,30 @@ export const orchestrateRefresh = internalAction({
         `[dataAgent] Economic narrative generation failed: ${err instanceof Error ? err.message : String(err)}`
       );
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "narrative",
         status: "failed",
         error: err instanceof Error ? err.message : String(err),
       });
     }
 
-    // ── Step: news ────────────────────────────────────────────────────────────
+    await scheduleNewsStep(ctx, {
+      runId: args.runId,
+      force: args.force,
+    });
+
+    return null;
+  },
+});
+
+export const runNewsStep = internalAction({
+  args: {
+    runId: v.string(),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<null> => {
     await ctx.runMutation(internal.pipelineProgress.updateStep, {
-      runId,
+      runId: args.runId,
       step: "news",
       status: "running",
       message: "Refreshing Egyptian news headlines...",
@@ -2839,20 +3054,23 @@ export const orchestrateRefresh = internalAction({
         "Extract Egyptian news headlines from the research results.",
         RawNewsListSchema,
       );
-      const newsResult = await callLLMWebResearchStructured<z.infer<typeof RawNewsListSchema>>(
-        `Search for the latest important Egyptian news from the past 24 hours. Include economic, political, and social news.
+      const newsResult = await withTimeout(
+        callLLMWebResearchStructured<z.infer<typeof RawNewsListSchema>>(
+          `Search for the latest important Egyptian news from the past 24 hours. Include economic, political, and social news.
 Include 10-15 headlines. Prefer authoritative sources (Reuters, Bloomberg, Ahram, BBC, Al Jazeera).
 For each headline, extract the title, URL, and source outlet name.`,
-        [
-          {
-            type: "web_search_20250305",
-            name: "web_search",
-            max_uses: 3,
-          },
-        ],
-        newsToolSchema,
-        "Parse the researched news into structured headline items with title, url, and source fields.",
-        "You are a news extraction assistant for Egyptian current affairs.",
+          [
+            {
+              type: "web_search_20250305",
+              name: "web_search",
+              max_uses: 3,
+            },
+          ],
+          newsToolSchema,
+          "Parse the researched news into structured headline items with title, url, and source fields.",
+          "You are a news extraction assistant for Egyptian current affairs.",
+        ),
+        NEWS_REFRESH_TIMEOUT_MS,
       );
 
       let headlinesInserted = 0;
@@ -2890,7 +3108,7 @@ For each headline, extract the title, URL, and source outlet name.`,
       }
 
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "news",
         status: "success",
         message: `${headlinesInserted} new headlines added.`,
@@ -2900,16 +3118,30 @@ For each headline, extract the title, URL, and source outlet name.`,
     } catch (err) {
       console.warn(`[dataAgent/news] News step failed: ${err instanceof Error ? err.message : String(err)}`);
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "news",
         status: "failed",
         error: err instanceof Error ? err.message : String(err),
       });
     }
 
-    // ── Step: llm_export ──────────────────────────────────────────────────────
+    await scheduleLlmExportStep(ctx, {
+      runId: args.runId,
+      force: args.force,
+    });
+
+    return null;
+  },
+});
+
+export const runLlmExportStep = internalAction({
+  args: {
+    runId: v.string(),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<null> => {
     await ctx.runMutation(internal.pipelineProgress.updateStep, {
-      runId,
+      runId: args.runId,
       step: "llm_export",
       status: "running",
       message: "Triggering LLM data export revalidation...",
@@ -2928,7 +3160,7 @@ For each headline, extract the title, URL, and source outlet name.`,
       });
       const revalidated = revalRes.ok;
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "llm_export",
         status: "success",
         message: revalidated
@@ -2944,7 +3176,7 @@ For each headline, extract the title, URL, and source outlet name.`,
         `[dataAgent] LLM export revalidation failed: ${err instanceof Error ? err.message : String(err)}`
       );
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "llm_export",
         status: "success",
         message: "LLM export: ISR will auto-refresh within 6h.",
@@ -2952,9 +3184,23 @@ For each headline, extract the title, URL, and source outlet name.`,
       });
     }
 
-    // ── Step: cleanup ────────────────────────────────────────────────────────
+    await scheduleCleanupStep(ctx, {
+      runId: args.runId,
+      force: args.force,
+    });
+
+    return null;
+  },
+});
+
+export const runCleanupStep = internalAction({
+  args: {
+    runId: v.string(),
+    force: v.optional(v.boolean()),
+  },
+  handler: async (ctx, args): Promise<null> => {
     await ctx.runMutation(internal.pipelineProgress.updateStep, {
-      runId,
+      runId: args.runId,
       step: "cleanup",
       status: "running",
       message: "Compacting logs...",
@@ -2962,7 +3208,7 @@ For each headline, extract the title, URL, and source outlet name.`,
     });
     try {
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "cleanup",
         status: "success",
         message: "Done.",
@@ -2970,14 +3216,14 @@ For each headline, extract the title, URL, and source outlet name.`,
       });
     } catch (err) {
       await ctx.runMutation(internal.pipelineProgress.updateStep, {
-        runId,
+        runId: args.runId,
         step: "cleanup",
         status: "failed",
         error: err instanceof Error ? err.message : String(err),
       });
     }
 
-    console.log("[dataAgent] orchestrateRefresh completed.");
+    console.log(`[dataAgent] Pipeline run ${args.runId} completed.`);
 
     return null;
   },
