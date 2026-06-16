@@ -2,10 +2,9 @@ name: mizan
 region: fra
 services:
   - name: web
-    github:
-      repo: bokralabs/mizan
+    git:
+      repo_clone_url: https://github.com/bokralabs/mizan.git
       branch: main
-      deploy_on_push: true
     source_dir: app
     build_command: npm ci --legacy-peer-deps && npm run build
     run_command: npm start

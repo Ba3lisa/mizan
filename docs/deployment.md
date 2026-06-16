@@ -25,7 +25,7 @@
 
 ## DigitalOcean Setup
 
-1. Create App from GitHub repo: bokralabs/mizan
+1. Create App from Git source: `https://github.com/bokralabs/mizan.git`
 2. Source directory: /app
 3. Build command: `npm ci --legacy-peer-deps && npm run build`
 4. Run command: `npm start`
@@ -114,6 +114,8 @@ Jobs (sequential):
 1. **lint-and-typecheck** -- `npm run lint` + `npm run type-check` (`tsc --noEmit`)
 2. **deploy-convex** -- `npx convex deploy --cmd 'npm run build'` (uses `CONVEX_DEPLOY_KEY` and `NEXT_PUBLIC_CONVEX_URL` secrets; sets `NEXT_PUBLIC_APP_VERSION` from the release tag or commit SHA)
 3. **deploy-app** -- triggers DigitalOcean App Platform deploy via `digitalocean/app_action/deploy@v2`
+
+The app spec uses the generic `git.repo_clone_url` source instead of the `github.repo` source. This lets the release workflow deploy from the public repository without depending on the DigitalOcean GitHub App installation having access to the `bokralabs/mizan` organization repository.
 
 ### lint.yml -- CI
 
