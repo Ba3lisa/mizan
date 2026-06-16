@@ -184,6 +184,16 @@ function fallbackSuggestionPrompts(elements: MizanJsonSpec["elements"], lang: La
   ));
   const hasSources = Object.values(elements).some((item) => item.type === "SourceList");
   const hasGovernment = Object.values(elements).some((item) => item.type === "EntityGrid");
+  const hasInvestment = Object.values(elements).some((item) => (
+    item.type === "IndicatorStrip"
+    || (item.type === "SourceList" && item.props.sources.includes("investmentIndicators"))
+  ));
+
+  if (hasInvestment) {
+    return ar
+      ? ["قارن العائد بالتضخم", "ما مخاطر العملة؟", "اعرض مصادر المؤشرات"]
+      : ["Compare returns with inflation", "What is the currency risk?", "Show the indicator sources"];
+  }
 
   if (hasDebt) {
     return ar
@@ -303,6 +313,12 @@ export const mizanJsonCatalog = defineCatalog(jsonRenderReactSchema, {
 export const MIZAN_GENERATIVE_CATALOG_PROMPT = `
 You are generating a @json-render/react flat spec for Mizan.
 
+Planner loop:
+1. Read the user's prompt and chat history.
+2. Read the capability/data scan, especially promptMatch, availability, dataDomains, and appCapabilities.
+3. Select the smallest useful set of data domains and components.
+4. Return one coherent UI spec. Never describe this planning loop to the user.
+
 Allowed components:
 - MizanBoard({ lang, eyebrow, title, summary }) root container.
 - MizanGrid({ columns }) layout container.
@@ -320,11 +336,16 @@ Allowed components:
 Rules:
 - Return a flat spec: { "root": "root", "elements": { ... }, "state": {... optional ...} }.
 - The root element must be MizanBoard.
+- First scan the provided capability/data inventory, then compose a view from the relevant Mizan data domains and components.
 - Do not emit empty props. Every element must include the meaningful props listed for its component.
 - Do not emit JSX, CSS, markdown, arbitrary URLs, or component names outside the catalog.
 - Do not invent numbers. Use MetricCard/InsightList metric keys and the renderer will read values from Mizan data.
 - Use SourceList when the user asks about trust, source quality, or wants citations.
+- For investment prompts, render scenario/risk/indicator context with IndicatorStrip, InsightList, SourceList, and Callout. Do not recommend a specific investment or allocation.
+- Use ActionLinks only when a first-party Mizan tool or page is a useful next action. Do not make routes, paths, or selectors the answer.
 - For follow-ups, preserve useful existing intent and add/update only what the user asked for unless they request reset.
+- Suggestions must feel like natural follow-up questions specific to the rendered view, not generic workflow steps.
+- Avoid generic titles like "Mizan overview" unless the user asks for a broad overview.
 - Keep text concise and user-facing. No hidden reasoning or step-by-step chain of thought.
 `.trim();
 
@@ -440,6 +461,10 @@ function repairHierarchy(elements: MizanJsonSpec["elements"], root: string, lang
 function enhanceGenericElements(elements: MizanJsonSpec["elements"], lang: Lang): void {
   const hasDebt = Object.values(elements).some((item) => item.type === "DebtSplit");
   const hasBudget = Object.values(elements).some((item) => item.type === "BudgetBars");
+  const hasInvestment = Object.values(elements).some((item) => (
+    item.type === "IndicatorStrip"
+    || (item.type === "SourceList" && item.props.sources.includes("investmentIndicators"))
+  ));
   const ar = lang === "ar";
 
   const rootEntry = Object.entries(elements).find(([, item]) => item.type === "MizanBoard");
@@ -462,14 +487,105 @@ function enhanceGenericElements(elements: MizanJsonSpec["elements"], lang: Lang)
             ? (ar ? "وضع الدين العام" : "Debt status")
             : hasBudget
               ? (ar ? "فجوة الموازنة" : "Budget gap")
-              : item.props.title,
+              : hasInvestment
+                ? (ar ? "سياق الاستثمار" : "Investment context")
+                : item.props.title,
           summary: hasDebt
             ? (ar ? "قراءة سريعة لإجمالي الدين ونسبته وتركيبه حسب بيانات ميزان." : "A quick view of debt level, ratio, and composition from Mizan data.")
             : hasBudget
               ? (ar ? "قراءة للإيرادات والمصروفات والعجز حسب بيانات ميزان." : "A view of revenue, spending, and deficit from Mizan data.")
-              : item.props.summary,
+              : hasInvestment
+                ? (ar ? "قراءة للمخاطر والمؤشرات المتاحة في ميزان بدون توصية بشراء أصل محدد." : "A sourced risk and indicator view from Mizan data, without recommending a specific asset.")
+                : item.props.summary,
         },
       };
+    }
+  }
+
+  if (hasInvestment) {
+    for (const [id, item] of Object.entries(elements)) {
+      if (item.type === "Suggestions") {
+        const joinedPrompts = item.props.prompts.join(" ").toLowerCase();
+        const alreadySpecific = /\b(invest|investment|return|inflation|currency|risk|scenario|source)\b/.test(joinedPrompts)
+          || /استثمار|عائد|تضخم|عملة|مخاطر|سيناريو|مصدر/.test(joinedPrompts);
+        if (alreadySpecific) continue;
+        elements[id] = {
+          ...item,
+          props: {
+            prompts: ar
+              ? ["قارن العائد بالتضخم", "اختبر 100 ألف جنيه لمدة 5 سنوات", "ما مخاطر العملة؟"]
+              : ["Compare returns with inflation", "Test EGP 100k over 5 years", "What is the currency risk?"],
+          },
+        };
+      }
+
+      if (
+        item.type === "SourceList"
+        && !item.props.sources.includes("investmentIndicators")
+      ) {
+        elements[id] = {
+          ...item,
+          props: {
+            title: ar ? "مصادر المؤشرات" : "Indicator sources",
+            description: ar ? "روابط المصدر ومستوى سند للبيانات الاستثمارية." : "Source links and Sanad levels for investment indicators.",
+            sources: ["investmentIndicators"],
+          },
+        };
+      }
+
+      if (
+        item.type === "InsightList"
+        && item.props.items.some((entry) => entry.label === "Context" || entry.label === "سياق")
+      ) {
+        elements[id] = {
+          ...item,
+          props: {
+            title: ar ? "كيف تقرأ السؤال؟" : "How to frame it",
+            items: [
+              {
+                label: ar ? "ابدأ بالقيود" : "Start with constraints",
+                metric: null,
+                note: ar
+                  ? "رأس المال والمدة والسيولة وتحمل مخاطر العملة تغير الإجابة."
+                  : "Capital, time horizon, liquidity needs, and currency exposure change the answer.",
+              },
+              {
+                label: ar ? "قارن بالعائد الحقيقي" : "Compare real return",
+                metric: null,
+                note: ar
+                  ? "التضخم وسعر الصرف هما حاجز القراءة؛ العائد الاسمي وحده مضلل."
+                  : "Inflation and exchange-rate movement are the hurdle; nominal yield alone can mislead.",
+              },
+              {
+                label: ar ? "افصل السياق عن النصيحة" : "Separate context from advice",
+                metric: null,
+                note: ar
+                  ? "ميزان يعرض بيانات ومقارنات، وليس توصية شخصية بشراء أصل معين."
+                  : "Mizan can show data and comparisons, not a personal recommendation to buy a specific asset.",
+              },
+            ],
+          },
+        };
+      }
+
+      if (
+        item.type === "Callout"
+        && (
+          item.props.body === "Figures are shown as sourced by Mizan."
+          || item.props.body === "الأرقام معروضة كما وردت في مصادر ميزان."
+        )
+      ) {
+        elements[id] = {
+          ...item,
+          props: {
+            title: ar ? "ليس توصية مالية" : "Not financial advice",
+            body: ar
+              ? "لإجابة عملية، حدد المبلغ والمدة والقدرة على تحمل الخسارة وحاجتك للسيولة."
+              : "For a useful scenario, provide amount, horizon, loss tolerance, and liquidity needs.",
+            tone: "primary",
+          },
+        };
+      }
     }
   }
 
@@ -827,6 +943,9 @@ export function makePromptFallbackSpec(lang: Lang, prompt: string): MizanJsonSpe
   if (/\bsource|trust|sanad|citation|reliable\b/.test(normalized) || /مصدر|مصادر|ثقة|سند|موثوق/.test(prompt)) {
     return makeSourcesFallbackSpec(lang);
   }
+  if (/\b(invest|investment|portfolio|return|yield|treasury|t-?bill|certificate|cd|gold|egx|stock|stocks|real estate|mortgage|asset|assets|where should i put|where should i invest)\b/.test(normalized) || /استثمار|استثمر|محفظة|عائد|عوائد|ذهب|بورصة|أسهم|عقار|شهادات|أذون|خزانة|تمويل عقاري/.test(prompt)) {
+    return makeInvestmentFallbackSpec(lang);
+  }
   if (/\bgovernment|parliament|minister|constitution|governorate\b/.test(normalized) || /حكومة|برلمان|وزارة|دستور|محافظة/.test(prompt)) {
     return makeGovernmentFallbackSpec(lang);
   }
@@ -1118,6 +1237,98 @@ function makeSourcesFallbackSpec(lang: Lang): MizanJsonSpec {
       },
     },
     state: { lang, fallback: true, intent: "sources" },
+  };
+}
+
+function makeInvestmentFallbackSpec(lang: Lang): MizanJsonSpec {
+  const ar = lang === "ar";
+  return {
+    root: "root",
+    elements: {
+      root: {
+        type: "MizanBoard",
+        props: {
+          lang,
+          eyebrow: ar ? "سياق استثماري" : "Investment context",
+          title: ar ? "مؤشرات قبل القرار" : "Investment context",
+          summary: ar
+            ? "قراءة للمخاطر والمؤشرات المتاحة في ميزان بدون توصية بشراء أصل محدد."
+            : "A sourced risk and indicator view from Mizan data, without recommending a specific asset.",
+        },
+        children: ["grid", "suggestions"],
+      },
+      grid: {
+        type: "MizanGrid",
+        props: { columns: 3 },
+        children: ["indicators", "read", "sources", "guardrail"],
+      },
+      indicators: {
+        type: "IndicatorStrip",
+        props: {
+          title: ar ? "مؤشرات السوق المتاحة" : "Available market indicators",
+          description: ar
+            ? "عوائد ومعدلات وسعر صرف وتضخم من بيانات ميزان."
+            : "Returns, rates, exchange rate, and inflation from Mizan data.",
+          indicators: ["cbe_cd_rate", "egypt_tbill_rate", "inflation", "exchange_rate", "egx30_annual_return", "gold_annual_return"],
+        },
+      },
+      read: {
+        type: "InsightList",
+        props: {
+          title: ar ? "كيف تقرأ السؤال؟" : "How to frame it",
+          items: [
+            {
+              label: ar ? "ابدأ بالقيود" : "Start with constraints",
+              metric: null,
+              note: ar
+                ? "رأس المال والمدة والسيولة وتحمل مخاطر العملة تغير الإجابة."
+                : "Capital, time horizon, liquidity needs, and currency exposure change the answer.",
+            },
+            {
+              label: ar ? "قارن بالعائد الحقيقي" : "Compare real return",
+              metric: null,
+              note: ar
+                ? "التضخم وسعر الصرف هما حاجز القراءة؛ العائد الاسمي وحده مضلل."
+                : "Inflation and exchange-rate movement are the hurdle; nominal yield alone can mislead.",
+            },
+            {
+              label: ar ? "افصل السياق عن النصيحة" : "Separate context from advice",
+              metric: null,
+              note: ar
+                ? "ميزان يعرض بيانات ومقارنات، وليس توصية شخصية بشراء أصل معين."
+                : "Mizan can show data and comparisons, not a personal recommendation to buy a specific asset.",
+            },
+          ],
+        },
+      },
+      sources: {
+        type: "SourceList",
+        props: {
+          title: ar ? "مصادر المؤشرات" : "Indicator sources",
+          description: ar ? "روابط المصدر ومستوى سند للبيانات الاستثمارية." : "Source links and Sanad levels for investment indicators.",
+          sources: ["investmentIndicators"],
+        },
+      },
+      guardrail: {
+        type: "Callout",
+        props: {
+          title: ar ? "ليس توصية مالية" : "Not financial advice",
+          body: ar
+            ? "لإجابة عملية، حدد المبلغ والمدة والقدرة على تحمل الخسارة وحاجتك للسيولة."
+            : "For a useful scenario, provide amount, horizon, loss tolerance, and liquidity needs.",
+          tone: "primary",
+        },
+      },
+      suggestions: {
+        type: "Suggestions",
+        props: {
+          prompts: ar
+            ? ["قارن العائد بالتضخم", "اختبر 100 ألف جنيه لمدة 5 سنوات", "ما مخاطر العملة؟"]
+            : ["Compare returns with inflation", "Test EGP 100k over 5 years", "What is the currency risk?"],
+        },
+      },
+    },
+    state: { lang, fallback: true, intent: "investment" },
   };
 }
 

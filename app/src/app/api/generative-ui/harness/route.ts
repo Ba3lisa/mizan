@@ -2,6 +2,7 @@ import { createOpenAI, openai } from "@ai-sdk/openai";
 import { generateObject } from "ai";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { buildMizanCapabilityContext } from "@/lib/mizan-capability-catalog";
 import {
   MIZAN_GENERATIVE_CATALOG_PROMPT,
   langSchema,
@@ -142,8 +143,11 @@ function modelConfig() {
 }
 
 function buildPrompt(body: z.infer<typeof requestSchema>): string {
+  const capabilityContext = buildMizanCapabilityContext(body.dataContext, body.prompt);
   return [
     `User language: ${body.lang === "ar" ? "Arabic" : "English"}.`,
+    "Available Mizan capabilities and data scan:",
+    JSON.stringify(capabilityContext),
     "Recent chat:",
     JSON.stringify(body.history ?? []),
     "Current json-render spec:",
@@ -205,6 +209,12 @@ function hasDebtComparisonIntent(prompt: string): boolean {
   );
 }
 
+function hasInvestmentIntent(prompt: string): boolean {
+  const normalized = prompt.toLowerCase();
+  return /\b(invest|investment|portfolio|return|yield|treasury|t-?bill|certificate|cd|gold|egx|stock|stocks|real estate|mortgage|asset|assets|where should i put|where should i invest)\b/.test(normalized)
+    || /استثمار|استثمر|استثمرت|محفظة|عائد|عوائد|ذهب|بورصة|أسهم|عقار|شهادات|أذون|خزانة|تمويل عقاري/.test(prompt);
+}
+
 function isSourceTrustSpec(spec: ReturnType<typeof normalizeMizanSpec>): boolean {
   if (spec.state?.intent === "sources") return true;
   const root = spec.elements[spec.root];
@@ -233,6 +243,23 @@ function isDebtComparisonSpec(spec: ReturnType<typeof normalizeMizanSpec>): bool
   const hasExternal = values.some((item) => item.type === "MetricCard" && item.props.metric === "externalDebt");
   const hasDomestic = values.some((item) => item.type === "MetricCard" && item.props.metric === "domesticDebt");
   return hasComparisonFrame && hasSplit && hasExternal && hasDomestic;
+}
+
+function isInvestmentSpec(spec: ReturnType<typeof normalizeMizanSpec>): boolean {
+  if (spec.state?.intent === "investment") return true;
+  const root = spec.elements[spec.root];
+  const rootText = root?.type === "MizanBoard"
+    ? `${root.props.title} ${root.props.summary}`.toLowerCase()
+    : "";
+  const hasInvestmentFrame = /\b(invest|investment|portfolio|returns?|yield|risk|indicator|scenario|asset)\b/.test(rootText)
+    || /استثمار|محفظة|عائد|مخاطر|مؤشر|سيناريو|أصل/.test(rootText);
+  const values = Object.values(spec.elements);
+  const hasInvestmentPrimitive = values.some((item) => (
+    item.type === "IndicatorStrip"
+    || (item.type === "SourceList" && item.props.sources.includes("investmentIndicators"))
+    || (item.type === "ActionLinks" && item.props.links.some((link) => link.href === "/tools/invest" || link.href === "/tools/mashroaak"))
+  ));
+  return hasInvestmentFrame && hasInvestmentPrimitive;
 }
 
 function responsePayloadForSpec(
@@ -289,6 +316,9 @@ export async function POST(request: Request) {
       responseSpec = makePromptFallbackSpec(body.lang, body.prompt);
     }
     if (hasDebtComparisonIntent(body.prompt) && !isDebtComparisonSpec(responseSpec)) {
+      responseSpec = makePromptFallbackSpec(body.lang, body.prompt);
+    }
+    if (hasInvestmentIntent(body.prompt) && !isInvestmentSpec(responseSpec)) {
       responseSpec = makePromptFallbackSpec(body.lang, body.prompt);
     }
 

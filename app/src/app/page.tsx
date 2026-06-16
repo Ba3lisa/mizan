@@ -1077,7 +1077,7 @@ export default function HomePage() {
   const pageDir = lang === "ar" ? "rtl" : "ltr";
   const activeTurn = turns.at(-1) ?? null;
   const isInteractionLocked = turns.some((turn) => turn.status === "running");
-  const investmentDefaults = useQuery(api.tools.getInvestmentDefaults, activeSpec ? {} : "skip") as InvestmentDefaults | undefined;
+  const investmentDefaults = useQuery(api.tools.getInvestmentDefaults, {}) as InvestmentDefaults | undefined;
 
   useEffect(() => {
     const storedTurns = loadTurns();
