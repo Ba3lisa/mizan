@@ -60,3 +60,4 @@ jobs:
         with:
           token: ${{ secrets.DIGITALOCEAN_ACCESS_TOKEN }}
           app_name: mizan
+          app_spec_location: .do/app.yaml
