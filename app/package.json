@@ -15,11 +15,8 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.0-canary.66",
     "@ai-sdk/google": "^4.0.0-canary.81",
-    "@ai-sdk/harness": "^1.0.0-canary.13",
-    "@ai-sdk/harness-codex": "^1.0.0-canary.9",
     "@ai-sdk/openai": "^4.0.0-canary.73",
     "@ai-sdk/react": "^4.0.0-canary.180",
-    "@ai-sdk/sandbox-vercel": "^1.0.0-canary.13",
     "@ai-sdk/xai": "^4.0.0-canary.74",
     "@convex-dev/auth": "^0.0.90",
     "@convex-dev/rate-limiter": "^0.3.2",
