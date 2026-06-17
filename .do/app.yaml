@@ -1,5 +1,10 @@
 name: mizan
 region: fra
+domains:
+  - domain: mizanmasr.com
+    type: PRIMARY
+  - domain: www.mizanmasr.com
+    type: ALIAS
 services:
   - name: web
     git:

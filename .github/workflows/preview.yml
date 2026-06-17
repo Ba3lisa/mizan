@@ -38,6 +38,7 @@ jobs:
           PREVIEW_BRANCH: ${{ github.head_ref }}
         run: |
           cp .do/app.yaml .do/preview-app.yaml
+          perl -0pi -e 's/\ndomains:\n(?:  - domain: .+\n    type: .+\n)+//' .do/preview-app.yaml
           perl -0pi -e 's/branch: main/branch: $ENV{PREVIEW_BRANCH}/' .do/preview-app.yaml
       - name: Deploy PR Preview to DigitalOcean
         id: deploy
