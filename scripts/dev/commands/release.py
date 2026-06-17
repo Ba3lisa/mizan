@@ -17,6 +17,7 @@ app = typer.Typer(help="Release management — create releases that deploy to pr
 console = Console()
 
 ROOT = Path(__file__).resolve().parents[3]
+GITHUB_REPO = "bokralabs/mizan"
 
 
 def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess[str]:
@@ -134,6 +135,7 @@ def create(
             "--title", f"Release {version}",
             "--notes", f"## {version} ({date})\n\n{changelog}",
             "--target", "main",
+            "--repo", GITHUB_REPO,
         ],
         cwd=str(ROOT),
         capture_output=True,
@@ -146,14 +148,14 @@ def create(
 
     console.print(f"[green]Release {version} created![/green]")
     console.print("[dim]Deploy workflow will start automatically.[/dim]")
-    console.print(f"\n[cyan]https://github.com/Ba3lisa/mizan/releases/tag/{version}[/cyan]")
+    console.print(f"\n[cyan]https://github.com/{GITHUB_REPO}/releases/tag/{version}[/cyan]")
 
 
 @app.command()
 def list() -> None:
     """List recent releases."""
     result = subprocess.run(
-        ["gh", "release", "list", "--limit", "10", "--repo", "Ba3lisa/mizan"],
+        ["gh", "release", "list", "--limit", "10", "--repo", GITHUB_REPO],
         cwd=str(ROOT),
     )
     if result.returncode != 0:
@@ -169,7 +171,7 @@ def status(
 
     def fetch_status() -> subprocess.CompletedProcess[str]:
         return subprocess.run(
-            ["gh", "run", "list", "--workflow", "deploy.yml", "--limit", "3", "--repo", "Ba3lisa/mizan"],
+            ["gh", "run", "list", "--workflow", "deploy.yml", "--limit", "3", "--repo", GITHUB_REPO],
             cwd=str(ROOT),
             capture_output=True,
             text=True,

@@ -73,18 +73,17 @@ export function NewsTicker() {
       })
       .slice(0, 18)
   ), [headlines, lang]);
-  const marqueeHeadlines = visibleHeadlines.length > 0 ? visibleHeadlines : [];
 
   function renderTickerItem(headline: Headline, index: number, interactive: boolean) {
     const meta = `${headline.sourceDomain} · ${relativeTime(headline.publishedAt, lang)}`;
     const content = (
       <>
-        <span className="mx-3 size-1.5 shrink-0 rounded-full bg-primary/70" />
-        <span className="max-w-28 shrink-0 truncate font-mono text-[0.62rem] uppercase text-primary/75">
+        <span className="mx-3 size-1.5 shrink-0 rounded-full bg-primary/70" aria-hidden="true" />
+        <span className="max-w-32 shrink-0 truncate font-mono text-[0.62rem] uppercase text-primary/75">
           {meta}
         </span>
         <span className="mx-2 text-muted-foreground/45">/</span>
-        <span className="max-w-[30rem] truncate text-xs font-semibold text-foreground">
+        <span className="max-w-[34rem] truncate text-xs font-semibold text-foreground">
           {headline.title}
         </span>
       </>
@@ -92,7 +91,7 @@ export function NewsTicker() {
 
     if (!interactive) {
       return (
-        <span key={`dup-${headline.url}-${index}`} className="inline-flex h-9 items-center whitespace-nowrap">
+        <span key={`dup-${headline.url}-${index}`} className="inline-flex h-full shrink-0 items-center whitespace-nowrap" aria-hidden="true">
           {content}
           <span className="ms-1 inline-flex size-6 shrink-0" />
         </span>
@@ -100,7 +99,7 @@ export function NewsTicker() {
     }
 
     return (
-      <span key={`${headline.url}-${index}`} className="group/news-item inline-flex h-9 items-center whitespace-nowrap">
+      <span key={`${headline.url}-${index}`} className="group/news-item inline-flex h-full shrink-0 items-center whitespace-nowrap">
         <a
           href={headline.url}
           target="_blank"
@@ -135,7 +134,7 @@ export function NewsTicker() {
 
   return (
     <section className="rounded-[8px] border border-border/70 bg-card/75">
-      <div className="flex h-11 items-center gap-3 overflow-hidden px-3">
+      <div className="flex h-10 items-center gap-3 overflow-hidden px-3">
         <div className="inline-flex shrink-0 items-center gap-2 text-primary">
           <Newspaper size={14} />
           <span className="workbench-label">{t.newsTicker_title ?? copy.channel}</span>
@@ -146,12 +145,8 @@ export function NewsTicker() {
             <div className="h-3 w-full animate-pulse rounded-full bg-muted" />
           ) : (
             <div className={lang === "ar" ? "news-marquee-track news-marquee-track-rtl" : "news-marquee-track"}>
-              <div className="inline-flex min-w-max items-center">
-                {marqueeHeadlines.map((headline, index) => renderTickerItem(headline, index, true))}
-              </div>
-              <div className="inline-flex min-w-max items-center" aria-hidden="true">
-                {marqueeHeadlines.map((headline, index) => renderTickerItem(headline, index, false))}
-              </div>
+              {visibleHeadlines.map((headline, index) => renderTickerItem(headline, index, true))}
+              {visibleHeadlines.map((headline, index) => renderTickerItem(headline, index, false))}
             </div>
           )}
         </div>
