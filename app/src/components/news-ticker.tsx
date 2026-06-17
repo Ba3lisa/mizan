@@ -1,174 +1,200 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ExternalLink, Newspaper, X } from "lucide-react";
 import { useLanguage } from "@/components/providers";
-import { Newspaper, ExternalLink } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-interface Headline {
+type Headline = {
   title: string;
   url: string;
   sourceDomain: string;
   language: string;
   publishedAt: number;
-}
+};
 
-function relativeTime(epochMs: number): string {
-  const diff = Date.now() - epochMs;
+const COPY = {
+  en: {
+    channel: "News channel",
+    stories: "stories",
+    loading: "Loading headlines",
+    empty: "No news available",
+    preview: "Preview",
+    open: "Open",
+    close: "Close preview",
+    frameNote: "Some publishers block embedded previews. Open the article if the preview stays blank.",
+  },
+  ar: {
+    channel: "قناة الأخبار",
+    stories: "خبر",
+    loading: "تحميل الأخبار",
+    empty: "لا توجد أخبار حالياً",
+    preview: "معاينة",
+    open: "فتح",
+    close: "إغلاق المعاينة",
+    frameNote: "بعض المواقع تمنع المعاينة المضمنة. افتح المقال إذا بقيت المعاينة فارغة.",
+  },
+} as const;
+
+function relativeTime(epochMs: number, lang: "ar" | "en"): string {
+  const diff = Math.max(0, Date.now() - epochMs);
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return lang === "ar" ? "الآن" : "now";
+  if (mins < 60) return lang === "ar" ? `منذ ${mins}د` : `${mins}m ago`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return lang === "ar" ? `منذ ${hrs}س` : `${hrs}h ago`;
   const days = Math.floor(hrs / 24);
-  return `${days}d ago`;
+  return lang === "ar" ? `منذ ${days}ي` : `${days}d ago`;
 }
 
-const SCROLL_SPEED = 0.5; // pixels per frame
+function headlineLanguageScore(headline: Headline, lang: "ar" | "en"): number {
+  if (lang === "ar") return headline.language === "Arabic" ? 0 : 1;
+  return headline.language === "English" ? 0 : 1;
+}
 
 export function NewsTicker() {
-  const { t } = useLanguage();
+  const { lang, t } = useLanguage();
+  const copy = COPY[lang];
   const [headlines, setHeadlines] = useState<Headline[]>([]);
   const [loading, setLoading] = useState(true);
-  const [hovered, setHovered] = useState(false);
+  const [preview, setPreview] = useState<Headline | null>(null);
   const fetchedRef = useRef(false);
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>(0);
 
   useEffect(() => {
     if (fetchedRef.current) return;
     fetchedRef.current = true;
+
     fetch("/api/news")
       .then((res) => res.json())
       .then((data: { articles?: Headline[] }) => {
         setHeadlines(data.articles ?? []);
       })
-      .catch(() => {})
+      .catch(() => setHeadlines([]))
       .finally(() => setLoading(false));
   }, []);
 
-  // JS-based auto-scroll via scrollTop for seamless loop + native scroll on hover
-  const tick = useCallback(() => {
-    const el = scrollRef.current;
-    if (el) {
-      el.scrollTop += SCROLL_SPEED;
-      const half = el.scrollHeight / 2;
-      if (el.scrollTop >= half) {
-        el.scrollTop -= half;
-      }
-    }
-    // eslint-disable-next-line react-hooks/immutability
-    rafRef.current = requestAnimationFrame(tick);
-  }, []);
+  const visibleHeadlines = useMemo(() => (
+    [...headlines]
+      .sort((a, b) => {
+        const langDelta = headlineLanguageScore(a, lang) - headlineLanguageScore(b, lang);
+        return langDelta !== 0 ? langDelta : b.publishedAt - a.publishedAt;
+      })
+      .slice(0, 18)
+  ), [headlines, lang]);
 
-  useEffect(() => {
-    if (hovered || headlines.length === 0) return;
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [hovered, headlines.length, tick]);
+  if (!loading && visibleHeadlines.length === 0) {
+    return (
+      <section className="rounded-[8px] border border-border/70 bg-card/75 px-4 py-3">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Newspaper size={14} className="text-primary" />
+          <span>{t.newsTicker_noNews ?? copy.empty}</span>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <div className="relative group/ticker h-full">
-      <div className="absolute -inset-0.5 bg-gradient-to-r from-primary/20 via-primary/5 to-primary/20 rounded-2xl blur-sm opacity-0 group-hover/ticker:opacity-100 transition-opacity duration-500" />
-
-      <div className="relative border border-border/60 rounded-2xl bg-card/80 backdrop-blur-sm overflow-hidden h-full flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-primary/10 via-transparent to-primary/5 border-b border-border/40 shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Newspaper size={14} className="text-primary" />
-              <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-            </div>
-            <span className="text-xs font-bold text-primary tracking-wide uppercase">
-              {t.newsTicker_title}
-            </span>
-          </div>
-          {headlines.length > 0 && (
-            <span className="text-[0.6rem] text-muted-foreground/50 font-mono">
-              {headlines.length} {t.newsTicker_stories}
-            </span>
-          )}
+    <section className="rounded-[8px] border border-border/70 bg-card/75">
+      <div className="flex items-center gap-3 border-b border-border/60 px-3 py-2">
+        <div className="inline-flex items-center gap-2 text-primary">
+          <Newspaper size={14} />
+          <span className="workbench-label">{t.newsTicker_title ?? copy.channel}</span>
         </div>
+        <div className="h-px min-w-6 flex-1 bg-border/60" />
+        <span className="font-mono text-[0.65rem] text-muted-foreground">
+          {loading ? copy.loading : `${visibleHeadlines.length} ${t.newsTicker_stories ?? copy.stories}`}
+        </span>
+      </div>
 
-        {/* Ticker body */}
-        {loading ? (
-          <TickerSkeleton />
-        ) : headlines.length === 0 ? (
-          <div className="flex items-center justify-center flex-1 text-xs text-muted-foreground/40">
-            {t.newsTicker_noNews}
-          </div>
-        ) : (
-          <div className="relative flex-1 overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-6 z-10 pointer-events-none bg-gradient-to-b from-card/90 to-transparent" />
-            <div
-              ref={scrollRef}
-              className="h-full overflow-y-auto scrollbar-thin"
-              onMouseEnter={() => setHovered(true)}
-              onMouseLeave={() => setHovered(false)}
-            >
-              {headlines.map((h, i) => (
-                <HeadlineCard key={i} headline={h} />
-              ))}
-              {/* Duplicate for seamless infinite loop */}
-              {headlines.map((h, i) => (
-                <HeadlineCard key={`dup-${i}`} headline={h} />
-              ))}
-            </div>
-            <div className="absolute bottom-0 left-0 right-0 h-6 z-10 pointer-events-none bg-gradient-to-t from-card/90 to-transparent" />
-          </div>
-        )}
+      <div className="overflow-x-auto px-3 py-2">
+        <div className="flex min-w-max gap-2">
+          {loading
+            ? Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="h-24 w-80 shrink-0 animate-pulse rounded-[7px] border border-border/50 bg-background/70" />
+              ))
+            : visibleHeadlines.map((headline) => (
+                <article
+                  key={`${headline.url}-${headline.publishedAt}`}
+                  className={cn(
+                    "group/news relative h-24 w-80 shrink-0 overflow-hidden rounded-[7px] border border-border/60 bg-background/70 p-2.5 text-start transition-colors",
+                    "hover:border-primary/60 hover:bg-primary/10 focus-within:border-primary/60 focus-within:bg-primary/10",
+                  )}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setPreview(headline)}
+                    className="text-start outline-none"
+                  >
+                    <span className="flex items-center gap-1.5 pe-28 text-[0.62rem] text-muted-foreground">
+                      <span className="max-w-28 truncate font-mono uppercase text-primary/70">{headline.sourceDomain}</span>
+                      <span>·</span>
+                      <span className="font-mono">{relativeTime(headline.publishedAt, lang)}</span>
+                    </span>
+                    <span className="mt-1.5 block max-w-[18rem] overflow-hidden text-xs font-semibold leading-5 text-foreground [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2]">
+                      {headline.title}
+                    </span>
+                  </button>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-1.5 border-t border-border/30 bg-muted/5 shrink-0">
-          <span className="text-[0.5rem] text-muted-foreground/30 font-mono uppercase tracking-wider">
-            RSS + AI
-          </span>
+                  <div className="absolute end-2 top-2 flex items-center gap-1.5 rounded-[6px] bg-background/95 opacity-100 shadow-sm transition-opacity sm:opacity-0 sm:group-hover/news:opacity-100 sm:group-focus-within/news:opacity-100">
+                    <button
+                      type="button"
+                      onClick={() => setPreview(headline)}
+                      className="rounded-[6px] border border-border/70 bg-card px-2 py-1 text-[0.65rem] font-semibold text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+                    >
+                      {copy.preview}
+                    </button>
+                    <a
+                      href={headline.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-[6px] border border-border/70 bg-card px-2 py-1 text-[0.65rem] font-semibold text-muted-foreground no-underline transition-colors hover:border-primary hover:text-primary"
+                    >
+                      {copy.open}
+                      <ExternalLink size={11} />
+                    </a>
+                  </div>
+                </article>
+              ))}
         </div>
       </div>
-    </div>
-  );
-}
 
-function HeadlineCard({ headline }: { headline: Headline }) {
-  return (
-    <a
-      href={headline.url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="block px-4 py-2.5 border-b border-border/15 hover:bg-primary/5 transition-colors no-underline group/card"
-    >
-      <div className="flex items-center gap-1.5 mb-0.5">
-        <span className="text-[0.55rem] font-mono text-primary/50 uppercase tracking-wide truncate max-w-[120px]">
-          {headline.sourceDomain}
-        </span>
-        <span className="text-[0.5rem] text-muted-foreground/25">·</span>
-        <span className="text-[0.5rem] text-muted-foreground/35 font-mono shrink-0">
-          {relativeTime(headline.publishedAt)}
-        </span>
-        <ExternalLink
-          size={8}
-          className="ml-auto shrink-0 text-muted-foreground/20 group-hover/card:text-primary/50 transition-colors"
-        />
-      </div>
-      <p className="text-[0.7rem] leading-snug text-foreground/80 line-clamp-2 group-hover/card:text-foreground transition-colors">
-        {headline.title}
-      </p>
-    </a>
-  );
-}
-
-function TickerSkeleton() {
-  return (
-    <div className="flex-1 px-4 py-3 space-y-3">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="space-y-1.5 animate-pulse" style={{ animationDelay: `${i * 100}ms` }}>
-          <div className="flex items-center gap-2">
-            <div className="h-2.5 w-16 bg-muted/30 rounded" />
-            <div className="h-2 w-8 bg-muted/20 rounded" />
+      {preview && (
+        <div className="border-t border-border/60 p-3 animate-fade-up">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="workbench-label text-primary">{preview.sourceDomain}</p>
+              <h2 className="mt-1 max-w-4xl text-sm font-bold leading-6 text-foreground">{preview.title}</h2>
+              <p className="mt-1 text-[0.68rem] text-muted-foreground">{copy.frameNote}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <a
+                href={preview.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 rounded-[6px] border border-primary/60 bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary no-underline transition-colors hover:bg-primary hover:text-primary-foreground"
+              >
+                {copy.open}
+                <ExternalLink size={12} />
+              </a>
+              <button
+                type="button"
+                onClick={() => setPreview(null)}
+                aria-label={copy.close}
+                className="inline-flex size-8 items-center justify-center rounded-[6px] border border-border/70 bg-background text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              >
+                <X size={14} />
+              </button>
+            </div>
           </div>
-          <div className="h-3 w-full bg-muted/20 rounded" />
-          <div className="h-3 w-3/4 bg-muted/15 rounded" />
+          <iframe
+            key={preview.url}
+            src={preview.url}
+            title={preview.title}
+            className="mt-3 h-[420px] w-full rounded-[7px] border border-border/60 bg-background"
+            sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
+          />
         </div>
-      ))}
-    </div>
+      )}
+    </section>
   );
 }

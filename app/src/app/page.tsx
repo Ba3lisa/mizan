@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { api } from "../../convex/_generated/api";
 import { AiPipelineStatus } from "@/components/ai-pipeline-status";
+import { NewsTicker } from "@/components/news-ticker";
 import { SanadBadge } from "@/components/sanad-badge";
 import { Skeleton } from "@/components/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -1542,6 +1543,9 @@ export default function HomePage() {
   return (
     <div className="mizan-workbench page-content min-h-screen" dir={pageDir}>
       <section className="container-page pb-8 pt-8">
+        <div className="mx-auto mb-5 max-w-7xl">
+          <NewsTicker />
+        </div>
         <div className={cn("mx-auto grid max-w-7xl gap-6", activeTurn ? "lg:grid-cols-[340px_minmax(0,1fr)]" : "grid-cols-1")}>
           {activeTurn && (
             <ChatRail
